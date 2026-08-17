@@ -1,7 +1,7 @@
 -- =====================================================================
 --  Arrow-style Semiconductor Manufacturer -- Sample Dataset (POC)
 --  Target: Databricks SQL (Unity Catalog) on a serverless SQL warehouse.
---  Catalog: arrow_semiconductor   Schema: manufacturing
+--  Catalog: databricks_ws_ai_poc (workspace default)   Schema: arrow_semiconductor
 --
 --  Statements are separated by a line containing exactly: -- @statement
 --  (scripts/load-sample-data.ps1 splits on that marker and runs each one
@@ -10,16 +10,15 @@
 --  region, defect Pareto, production volumes, inventory health, supplier risk.
 -- =====================================================================
 
-CREATE CATALOG IF NOT EXISTS arrow_semiconductor
-COMMENT 'POC catalog for a chip-manufacturing (Arrow-style) demo';
--- @statement
-CREATE SCHEMA IF NOT EXISTS arrow_semiconductor.manufacturing
+-- Account UC uses Default Storage; create a branded SCHEMA inside the workspace
+-- default catalog rather than a new catalog (SQL CREATE CATALOG needs a managed location).
+CREATE SCHEMA IF NOT EXISTS databricks_ws_ai_poc.arrow_semiconductor
 COMMENT 'Semiconductor manufacturing, sales, quality and supply-chain sample data';
 -- @statement
 -- ------------------------------------------------------------------
 -- 1) fab_production : daily wafer production & yield by fab/node
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.fab_production (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.fab_production (
   production_date  DATE     COMMENT 'Calendar production day',
   fab_id           STRING   COMMENT 'Fabrication plant identifier',
   fab_location     STRING   COMMENT 'Fab city/state',
@@ -34,7 +33,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.fab_production (
 )
 COMMENT 'Daily wafer production and yield by fab and process node';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.fab_production
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.fab_production
 WITH dates AS (
   SELECT explode(sequence(DATE'2025-01-01', DATE'2025-12-31', INTERVAL 1 DAY)) AS d
 ),
@@ -83,7 +82,7 @@ FROM calc;
 -- ------------------------------------------------------------------
 -- 2) wafer_yield : monthly yield rollup by fab/node (curated combos)
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.wafer_yield (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.wafer_yield (
   yield_month     DATE   COMMENT 'First day of the month',
   fab_id          STRING,
   process_node    STRING,
@@ -97,7 +96,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.wafer_yield (
 )
 COMMENT 'Monthly yield rollup with target comparison';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.wafer_yield
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.wafer_yield
 SELECT
   trunc(production_date, 'MM')                       AS yield_month,
   fab_id, process_node, product_family,
@@ -111,13 +110,13 @@ SELECT
   ROUND(AVG(yield_pct) - (CASE process_node
           WHEN '3nm' THEN 0.75 WHEN '5nm' THEN 0.82 WHEN '7nm' THEN 0.88
           WHEN '14nm' THEN 0.93 ELSE 0.96 END), 4)   AS yield_vs_target
-FROM arrow_semiconductor.manufacturing.fab_production
+FROM databricks_ws_ai_poc.arrow_semiconductor.fab_production
 GROUP BY trunc(production_date, 'MM'), fab_id, process_node, product_family;
 -- @statement
 -- ------------------------------------------------------------------
 -- 3) defect_analysis : monthly defect Pareto by fab/node/category
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.defect_analysis (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.defect_analysis (
   defect_month    DATE,
   fab_id          STRING,
   process_node    STRING,
@@ -128,7 +127,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.defect_analysis (
 )
 COMMENT 'Monthly defect counts for Pareto analysis';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.defect_analysis
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.defect_analysis
 WITH months AS (
   SELECT explode(sequence(DATE'2025-01-01', DATE'2025-12-01', INTERVAL 1 MONTH)) AS defect_month
 ),
@@ -158,7 +157,7 @@ FROM months CROSS JOIN fabs CROSS JOIN cats;
 -- ------------------------------------------------------------------
 -- 4) product_sales : monthly revenue by region/family/segment
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.product_sales (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.product_sales (
   order_month      DATE,
   fiscal_quarter   STRING COMMENT 'FY25-Q1..Q4',
   region           STRING COMMENT 'North America, EMEA, APAC, LATAM',
@@ -171,7 +170,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.product_sales (
 )
 COMMENT 'Monthly product revenue for region/family/segment breakdowns';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.product_sales
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.product_sales
 WITH months AS (
   SELECT explode(sequence(DATE'2025-01-01', DATE'2025-12-01', INTERVAL 1 MONTH)) AS order_month
 ),
@@ -209,7 +208,7 @@ FROM months CROSS JOIN regions CROSS JOIN families CROSS JOIN segments;
 -- ------------------------------------------------------------------
 -- 5) inventory : monthly component inventory health
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.inventory (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.inventory (
   snapshot_date   DATE,
   product_family  STRING,
   warehouse_region STRING,
@@ -221,7 +220,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.inventory (
 )
 COMMENT 'Monthly inventory snapshot with stock-health status';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.inventory
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.inventory
 WITH months AS (
   SELECT explode(sequence(DATE'2025-01-01', DATE'2025-12-01', INTERVAL 1 MONTH)) AS snapshot_date
 ),
@@ -256,7 +255,7 @@ FROM calc;
 -- ------------------------------------------------------------------
 -- 6) supply_chain : supplier lead time / on-time delivery / risk
 -- ------------------------------------------------------------------
-CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.supply_chain (
+CREATE OR REPLACE TABLE databricks_ws_ai_poc.arrow_semiconductor.supply_chain (
   supplier_name    STRING,
   component_type   STRING COMMENT 'Silicon Wafer, Substrate, Lead Frame, Bond Wire, Chemicals, Photomask',
   region           STRING,
@@ -267,7 +266,7 @@ CREATE OR REPLACE TABLE arrow_semiconductor.manufacturing.supply_chain (
 )
 COMMENT 'Current supplier scorecard for supply-chain risk views';
 -- @statement
-INSERT OVERWRITE arrow_semiconductor.manufacturing.supply_chain
+INSERT OVERWRITE databricks_ws_ai_poc.arrow_semiconductor.supply_chain
 WITH suppliers AS (
   SELECT * FROM VALUES
     ('ShinEtsu Silicon','Silicon Wafer','APAC', 42),
@@ -297,10 +296,10 @@ FROM suppliers;
 -- ------------------------------------------------------------------
 -- Validation summary (row counts) -- returned to the loader for logging
 -- ------------------------------------------------------------------
-SELECT 'fab_production' AS table_name, COUNT(*) AS rows FROM arrow_semiconductor.manufacturing.fab_production
-UNION ALL SELECT 'wafer_yield',    COUNT(*) FROM arrow_semiconductor.manufacturing.wafer_yield
-UNION ALL SELECT 'defect_analysis',COUNT(*) FROM arrow_semiconductor.manufacturing.defect_analysis
-UNION ALL SELECT 'product_sales',  COUNT(*) FROM arrow_semiconductor.manufacturing.product_sales
-UNION ALL SELECT 'inventory',      COUNT(*) FROM arrow_semiconductor.manufacturing.inventory
-UNION ALL SELECT 'supply_chain',   COUNT(*) FROM arrow_semiconductor.manufacturing.supply_chain
+SELECT 'fab_production' AS table_name, COUNT(*) AS rows FROM databricks_ws_ai_poc.arrow_semiconductor.fab_production
+UNION ALL SELECT 'wafer_yield',    COUNT(*) FROM databricks_ws_ai_poc.arrow_semiconductor.wafer_yield
+UNION ALL SELECT 'defect_analysis',COUNT(*) FROM databricks_ws_ai_poc.arrow_semiconductor.defect_analysis
+UNION ALL SELECT 'product_sales',  COUNT(*) FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales
+UNION ALL SELECT 'inventory',      COUNT(*) FROM databricks_ws_ai_poc.arrow_semiconductor.inventory
+UNION ALL SELECT 'supply_chain',   COUNT(*) FROM databricks_ws_ai_poc.arrow_semiconductor.supply_chain
 ORDER BY table_name;

@@ -53,7 +53,7 @@ flowchart LR
   U["Business users<br/>(Teams / M365 Copilot)"] --> CS["Copilot Studio / Foundry<br/>agents"]
   CS -->|"MCP / REST<br/>(subscription key)"| APIM["Azure API Management<br/>ai-gateway-apim-poc-my"]
   APIM -->|"Managed identity<br/>+ private route"| DBX["Databricks Workspace<br/>(Premium, PRIVATE VNet)"]
-  DBX --> D[("arrow_semiconductor<br/>.manufacturing")]
+  DBX --> D[("databricks_ws_ai_poc<br/>.arrow_semiconductor")]
   CS --> PPT["Generated<br/>.pptx / diagrams"]
 ```
 
@@ -154,7 +154,7 @@ Azure-Databricks-Private-Agent-APIM/
 | Managed RG | `databricks-ws-ai-poc-managed-rg` | Auto-created data plane |
 | Private DNS + endpoint | `privatelink.azuredatabricks.net`, `*-pe-uiapi` | Back-end Private Link (`databricks_ui_api`) |
 | SQL warehouse | `poc-serverless-2xs` | Serverless 2X-Small, auto-stop 5 min |
-| Unity Catalog | `arrow_semiconductor.manufacturing` | 6 sample tables |
+| Unity Catalog | `databricks_ws_ai_poc.arrow_semiconductor` | 6 sample tables |
 | APIM APIs | `Databricks SQL`, `Databricks Genie` | On existing `ai-gateway-apim-poc-my` |
 | APIM MCP server | `databricks-mcp` (preview) | Tools for Foundry / Copilot Studio |
 
@@ -222,7 +222,7 @@ workflow (see [§14](#14-cicd--github-actions)).
 
 Full reference: **[docs/sample-data.md](docs/sample-data.md)**.
 
-- Catalog/schema: `arrow_semiconductor.manufacturing`
+- Catalog/schema: `databricks_ws_ai_poc.arrow_semiconductor`
 - 6 tables: `fab_production`, `wafer_yield`, `defect_analysis`, `product_sales`,
   `inventory`, `supply_chain`
 - 10 PPT-ready analytics queries in
@@ -238,7 +238,7 @@ Full reference: **[docs/api-calls.md](docs/api-calls.md)**.
 ```bash
 curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
   -H "Ocp-Apim-Subscription-Key: $APIM_KEY" -H "Content-Type: application/json" \
-  -d '{ "statement": "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM arrow_semiconductor.manufacturing.product_sales GROUP BY region ORDER BY revenue_musd DESC" }'
+  -d '{ "statement": "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region ORDER BY revenue_musd DESC" }'
 ```
 
 ---
@@ -275,7 +275,7 @@ curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
 
 Genie (AI/BI) spaces are created in the workspace UI:
 1. Databricks → **Genie** → **New** → add tables from
-   `arrow_semiconductor.manufacturing` (start with `product_sales`,
+   `databricks_ws_ai_poc.arrow_semiconductor` (start with `product_sales`,
    `fab_production`, `wafer_yield`).
 2. Add sample instructions (e.g. *"revenue is `revenue_usd`; report in $M"*).
 3. Copy the **space id** from the URL (`/genie/rooms/<space_id>`).

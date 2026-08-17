@@ -39,7 +39,7 @@ Write-Host "   OK - authenticated as $($me.userName)" -ForegroundColor Green
 Write-Host "2) Sample query via SQL Statement Execution API..." -ForegroundColor Cyan
 $q = @{
   warehouse_id    = $WarehouseId
-  statement       = "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM arrow_semiconductor.manufacturing.product_sales GROUP BY region ORDER BY revenue_musd DESC"
+  statement       = "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region ORDER BY revenue_musd DESC"
   wait_timeout    = "50s"
   on_wait_timeout = "CONTINUE"
   format          = "JSON_ARRAY"
@@ -55,7 +55,7 @@ $r.result.data_array | ForEach-Object { Write-Host ("     {0,-16} {1,8}" -f $_[0
 if ($ApimBaseUrl -and $ApimKey) {
   Write-Host "3) APIM-exposed Databricks endpoint..." -ForegroundColor Cyan
   $apimHeaders = @{ "Ocp-Apim-Subscription-Key" = $ApimKey; "Content-Type" = "application/json" }
-  $body = @{ statement = "SELECT product_family, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM arrow_semiconductor.manufacturing.product_sales GROUP BY product_family ORDER BY revenue_musd DESC LIMIT 5" } | ConvertTo-Json
+  $body = @{ statement = "SELECT product_family, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY product_family ORDER BY revenue_musd DESC LIMIT 5" } | ConvertTo-Json
   $ar = Invoke-RestMethod -Method POST -Uri "$($ApimBaseUrl.TrimEnd('/'))/query" -Headers $apimHeaders -Body $body
   Write-Host "   APIM query OK. Rows returned: $(( $ar.result.data_array | Measure-Object).Count)" -ForegroundColor Green
 }

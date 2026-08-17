@@ -17,8 +17,8 @@ param(
   [Parameter(Mandatory = $true)] [string] $WarehouseId,
   [string] $ResourceGroup = "ai-myaacoub",
   [string] $ApimName = "ai-gateway-apim-poc-my",
-  [string] $Catalog = "arrow_semiconductor",
-  [string] $Schema = "manufacturing"
+  [string] $Catalog = "databricks_ws_ai_poc",
+  [string] $Schema = "arrow_semiconductor"
 )
 
 $ErrorActionPreference = "Stop"

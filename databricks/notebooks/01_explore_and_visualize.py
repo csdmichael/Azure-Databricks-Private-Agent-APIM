@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # Arrow-style Semiconductor POC — Data & Visualizations
 # MAGIC
-# MAGIC This notebook explores the `arrow_semiconductor.manufacturing` sample dataset and
+# MAGIC This notebook explores the `databricks_ws_ai_poc.arrow_semiconductor` sample dataset and
 # MAGIC renders the charts that Copilot Studio / Foundry agents reproduce in PowerPoint.
 # MAGIC
 # MAGIC **Prerequisite:** run `databricks/sql/01_create_and_load.sql` first
@@ -12,8 +12,8 @@
 
 # COMMAND ----------
 
-CATALOG = "arrow_semiconductor"
-SCHEMA = "manufacturing"
+CATALOG = "databricks_ws_ai_poc"
+SCHEMA = "arrow_semiconductor"
 spark.sql(f"USE CATALOG {CATALOG}")
 spark.sql(f"USE SCHEMA {SCHEMA}")
 print(f"Using {CATALOG}.{SCHEMA}")

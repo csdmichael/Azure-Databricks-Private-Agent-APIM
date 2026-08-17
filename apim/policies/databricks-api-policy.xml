@@ -3,7 +3,7 @@
   - Uses APIM's system-assigned managed identity to obtain an Entra token for the
     Databricks login application, then forwards it as the backend Authorization.
     (The APIM MI must be added as a user in the Databricks workspace with access
-    to the SQL warehouse and the arrow_semiconductor catalog.)
+    to the SQL warehouse and the databricks_ws_ai_poc.arrow_semiconductor schema.)
   - Routes all operations to the private workspace control-plane URL.
   - Applies a conservative rate limit for the POC.
 -->

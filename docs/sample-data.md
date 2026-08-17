@@ -4,8 +4,8 @@ The POC loads a synthetic but realistic **chip-manufacturing** dataset into Unit
 Catalog so business users can generate PowerPoint decks and diagrams from it via
 Copilot Studio / Foundry / CoWork agents.
 
-- **Catalog:** `arrow_semiconductor`
-- **Schema:** `manufacturing`
+- **Catalog:** `databricks_ws_ai_poc` (workspace default)
+- **Schema:** `arrow_semiconductor`
 - **Loader:** [`databricks/sql/01_create_and_load.sql`](../databricks/sql/01_create_and_load.sql) (run by [`scripts/load-sample-data.ps1`](../scripts/load-sample-data.ps1))
 - **Grain:** calendar year **2025**, daily/monthly depending on table
 
@@ -47,8 +47,8 @@ Copilot Studio / Foundry / CoWork agents.
 
 **In the Databricks SQL editor** (attach the `poc-serverless-2xs` warehouse):
 ```sql
-USE CATALOG arrow_semiconductor;
-USE SCHEMA manufacturing;
+USE CATALOG databricks_ws_ai_poc;
+USE SCHEMA arrow_semiconductor;
 SELECT * FROM product_sales LIMIT 20;
 ```
 
@@ -56,7 +56,7 @@ SELECT * FROM product_sales LIMIT 20;
 ```bash
 curl -X POST "$DBX_HOST/api/2.0/sql/statements" \
   -H "Authorization: Bearer $DBX_TOKEN" -H "Content-Type: application/json" \
-  -d '{ "warehouse_id":"<id>", "statement":"SELECT region, SUM(revenue_usd) FROM arrow_semiconductor.manufacturing.product_sales GROUP BY region", "wait_timeout":"30s" }'
+  -d '{ "warehouse_id":"<id>", "statement":"SELECT region, SUM(revenue_usd) FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region", "wait_timeout":"30s" }'
 ```
 
 **Via APIM** (agent-facing — no Databricks token needed): see [api-calls.md](./api-calls.md).

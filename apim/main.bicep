@@ -66,7 +66,7 @@ resource dbxApi 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
   name: 'databricks'
   properties: {
     displayName: 'Databricks SQL'
-    description: 'Query the private Databricks warehouse (arrow_semiconductor sample data).'
+    description: 'Query the private Databricks warehouse (databricks_ws_ai_poc.arrow_semiconductor sample data).'
     path: 'databricks'
     protocols: [ 'https' ]
     subscriptionRequired: true
@@ -101,7 +101,7 @@ resource opQuery 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-pre
           examples: {
             default: {
               value: {
-                statement: 'SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM arrow_semiconductor.manufacturing.product_sales GROUP BY region ORDER BY revenue_musd DESC'
+                statement: 'SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region ORDER BY revenue_musd DESC'
               }
             }
           }
@@ -129,7 +129,7 @@ resource opTables 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-pr
     displayName: 'List sample tables'
     method: 'GET'
     urlTemplate: '/tables'
-    description: 'Lists tables in arrow_semiconductor.manufacturing.'
+    description: 'Lists tables in databricks_ws_ai_poc.arrow_semiconductor.'
     responses: [ { statusCode: 200, description: 'Table list' } ]
   }
 }

@@ -30,9 +30,9 @@ APIM_APPID=$(az ad sp show --id "$APIM_MI" --query appId -o tsv)
 ```
 ```sql
 -- In a Databricks SQL editor as an admin:
-GRANT USE CATALOG  ON CATALOG arrow_semiconductor TO `<APIM_APPID>`;
-GRANT USE SCHEMA   ON SCHEMA  arrow_semiconductor.manufacturing TO `<APIM_APPID>`;
-GRANT SELECT       ON SCHEMA  arrow_semiconductor.manufacturing TO `<APIM_APPID>`;
+GRANT USE CATALOG  ON CATALOG databricks_ws_ai_poc TO `<APIM_APPID>`;
+GRANT USE SCHEMA   ON SCHEMA  databricks_ws_ai_poc.arrow_semiconductor TO `<APIM_APPID>`;
+GRANT SELECT       ON SCHEMA  databricks_ws_ai_poc.arrow_semiconductor TO `<APIM_APPID>`;
 -- Warehouse permission is set in the SQL Warehouse "Permissions" dialog:
 --   add the service principal with "Can use".
 ```
@@ -51,13 +51,13 @@ GRANT SELECT       ON SCHEMA  arrow_semiconductor.manufacturing TO `<APIM_APPID>
 curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
   -H "Ocp-Apim-Subscription-Key: $APIM_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "statement": "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM arrow_semiconductor.manufacturing.product_sales GROUP BY region ORDER BY revenue_musd DESC" }'
+  -d '{ "statement": "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region ORDER BY revenue_musd DESC" }'
 ```
 
 PowerShell:
 ```powershell
 $headers = @{ "Ocp-Apim-Subscription-Key" = $env:APIM_KEY; "Content-Type" = "application/json" }
-$body = @{ statement = "SELECT process_node, ROUND(AVG(yield_pct)*100,2) AS yield_pct FROM arrow_semiconductor.manufacturing.fab_production GROUP BY process_node ORDER BY process_node" } | ConvertTo-Json
+$body = @{ statement = "SELECT process_node, ROUND(AVG(yield_pct)*100,2) AS yield_pct FROM databricks_ws_ai_poc.arrow_semiconductor.fab_production GROUP BY process_node ORDER BY process_node" } | ConvertTo-Json
 Invoke-RestMethod -Method POST -Uri "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" -Headers $headers -Body $body
 ```
 
@@ -73,10 +73,10 @@ The consumer never sees the `warehouse_id` — APIM injects it from a named valu
 
 | Goal | `statement` value |
 |------|-------------------|
-| Revenue by product family | `SELECT product_family, ROUND(SUM(revenue_usd)/1e6,2) m FROM arrow_semiconductor.manufacturing.product_sales GROUP BY product_family ORDER BY m DESC` |
-| Defect Pareto | `SELECT defect_category, SUM(defect_count) c FROM arrow_semiconductor.manufacturing.defect_analysis GROUP BY defect_category ORDER BY c DESC` |
-| Supplier risk | `SELECT supplier_name, risk_level, lead_time_days FROM arrow_semiconductor.manufacturing.supply_chain ORDER BY lead_time_days DESC` |
-| Executive KPIs | `SELECT (SELECT ROUND(SUM(revenue_usd)/1e6,1) FROM arrow_semiconductor.manufacturing.product_sales) revenue_musd` |
+| Revenue by product family | `SELECT product_family, ROUND(SUM(revenue_usd)/1e6,2) m FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY product_family ORDER BY m DESC` |
+| Defect Pareto | `SELECT defect_category, SUM(defect_count) c FROM databricks_ws_ai_poc.arrow_semiconductor.defect_analysis GROUP BY defect_category ORDER BY c DESC` |
+| Supplier risk | `SELECT supplier_name, risk_level, lead_time_days FROM databricks_ws_ai_poc.arrow_semiconductor.supply_chain ORDER BY lead_time_days DESC` |
+| Executive KPIs | `SELECT (SELECT ROUND(SUM(revenue_usd)/1e6,1) FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales) revenue_musd` |
 
 ---
 
