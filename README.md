@@ -24,13 +24,13 @@
 8. [Live URLs & endpoints](#8-live-urls--endpoints)
 9. [Sample data & how to query it](#9-sample-data--how-to-query-it)
 10. [Sample APIM calls](#10-sample-apim-calls)
-11. [Cost — keeping it lowest-cost](#11-cost--keeping-it-lowest-cost)
-12. [Security & networking](#12-security--networking)
-13. [Genie agent & MCP server enablement](#13-genie-agent--mcp-server-enablement)
-14. [CI/CD — GitHub Actions](#14-cicd--github-actions)
-15. [References](#15-references)
-15. [References](#15-references)
-16. [License](#16-license)
+11. [Visualization prompts and agent integration choices](#11-visualization-prompts-and-agent-integration-choices)
+12. [Cost — keeping it lowest-cost](#12-cost--keeping-it-lowest-cost)
+13. [Security & networking](#13-security--networking)
+14. [Genie agent & MCP server enablement](#14-genie-agent--mcp-server-enablement)
+15. [CI/CD — GitHub Actions](#15-cicd--github-actions)
+16. [References](#16-references)
+17. [License](#17-license)
 
 ---
 
@@ -195,7 +195,7 @@ $ws = terraform -chdir="infra/terraform" output -raw workspace_url
 ```
 
 Or provision from CI: run the **Provision Databricks (Private VNet)** GitHub
-workflow (see [§14](#14-cicd--github-actions)).
+workflow (see [§15](#15-cicd--github-actions)).
 
 ---
 
@@ -248,7 +248,141 @@ curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
 
 ---
 
-## 11. Cost — keeping it lowest-cost
+## 11. Visualization prompts and agent integration choices
+
+### 11.1 Ten example prompts for charts and presentations
+
+These prompts work with a Copilot Studio agent, Foundry agent, or Genie Agent
+that has access to the sample schema. They deliberately specify the source,
+aggregation, chart encoding, and expected deliverable. For reliable results,
+configure the agent to use the connected Databricks tool, return the supporting
+table with the chart, and never invent missing values.
+
+1. **Yield trend — line chart:** "Using
+  `databricks_ws_ai_poc.arrow_semiconductor.wafer_yield`, plot monthly average
+  yield percentage by process node as a multi-series line chart. Put month on
+  the x-axis and yield percent on the y-axis, label the latest value for each
+  node, and summarize the two largest month-over-month changes. Include the
+  result table and the date range used."
+
+2. **Regional revenue — clustered columns:** "Query `product_sales` and create
+  a clustered column chart of revenue in USD millions by fiscal quarter and
+  region. Sort quarters chronologically, use one series per region, show data
+  labels, and identify the fastest-growing and largest region without
+  extrapolating beyond the data."
+
+3. **Product mix — donut chart:** "Show total revenue and revenue share by
+  product family from `product_sales`. Create a donut chart ordered from
+  largest to smallest, label each segment with product family and percentage,
+  and group no categories into 'Other'. Add a short observation about product
+  concentration."
+
+4. **Defect Pareto — combo chart:** "From `defect_analysis`, aggregate defect
+  count by category for the full available period. Build a Pareto chart with
+  descending bars for defect count and a cumulative-percentage line on a
+  secondary axis. Mark the point where cumulative defects first reach 80% and
+  list the priority categories."
+
+5. **Fab output — stacked area chart:** "Using `fab_production`, plot monthly
+  good dies in millions by fab as a stacked area chart. Show total monthly
+  output as labels, call out the highest and lowest production months, and
+  include the exact aggregated values used for the graph."
+
+6. **Margin and revenue — horizontal bars:** "Compare product families using
+  average gross margin percentage and total revenue from `product_sales`.
+  Create a horizontal bar chart sorted by gross margin and add revenue in USD
+  millions as data labels. Highlight any family with above-median revenue but
+  below-median margin."
+
+7. **Inventory health — heatmap:** "Use only the latest snapshot in `inventory`
+  and create a product-family-by-warehouse-region heatmap colored by days of
+  supply. Flag stock-out and excess statuses, include on-hand units in the
+  tooltip or supporting table, and state the snapshot date prominently."
+
+8. **Supplier risk — bubble chart:** "Plot suppliers from `supply_chain` with
+  lead-time days on the x-axis, on-time delivery percentage on the y-axis,
+  bubble size based on quality score, and color based on risk level. Label all
+  high-risk suppliers and provide a ranked table of the five suppliers needing
+  the most attention."
+
+9. **Yield versus target — variance bars:** "For the latest month in
+  `wafer_yield`, compare actual average yield with target yield by process
+  node. Create a diverging bar or bullet chart of percentage-point gap, use a
+  zero reference line, label actual and target values, and rank nodes from
+  largest shortfall to largest overperformance."
+
+10. **Executive slide — KPI cards plus two charts:** "Create a one-slide
+   executive manufacturing summary using the full available period. Show KPI
+   cards for total revenue in USD millions, average production yield, total
+   good dies in millions, and number of high-risk suppliers. Add a small
+   quarterly revenue-by-region chart and a monthly yield trend chart. Include
+   an 'As of' date, three evidence-based takeaways, and a compact source table
+   suitable for validation before exporting to PowerPoint."
+
+> **Agent instruction to append when accuracy matters:** "Use the connected
+> Databricks tool for every numeric claim. If a requested field or time period is
+> unavailable, say so. Return the query or tool name, filters, units, source
+> table, and result rows used to build the chart. Do not estimate missing data."
+
+### 11.2 Genie API vs direct Databricks API vs MCP server
+
+The three choices solve different layers of the problem:
+
+- **Genie API** is a semantic, natural-language analytics service. A curated
+  Genie Agent supplies business terminology, instructions, metrics, sample
+  queries, and verified answers, then Genie generates and runs the query.
+- **Direct Databricks API** means a deliberately designed REST action, normally
+  SQL Statement Execution or a narrow application endpoint. The caller supplies
+  SQL or structured parameters and receives deterministic rows.
+- **MCP server** is an agent-tool protocol, not a query engine. An MCP tool still
+  invokes a backend such as Genie, Databricks SQL, or a custom API. This POC uses
+  APIM to expose the `query` and `tables` REST operations as MCP tools;
+  Databricks also provides managed MCP servers for services including Genie,
+  Databricks SQL, and Unity Catalog functions.
+
+| Criterion | Genie API through APIM | Direct Databricks SQL/REST API through APIM | MCP server (APIM facade or Databricks managed) |
+|---|---|---|---|
+| Best fit | Business users asking changing natural-language questions in a curated domain | Known reports, fixed KPIs, parameterized queries, batch extraction, and strict output schemas | Reusable tools shared by multiple Copilot Studio, Foundry, and other MCP-compatible agents |
+| Answer quality | **Best for open-ended business Q&A** when the Genie Agent is well curated; quality depends on metadata, instructions, metrics, sample queries, and verified answers | **Best for deterministic accuracy** when approved SQL or typed parameters encode the business rule; poor if an LLM is allowed to invent arbitrary SQL | Depends on the backend tool and its description; MCP by itself does not improve data or SQL quality |
+| Chart control | Genie returns grounded answers/data, but the calling agent should still specify and render the final chart | Highest control over columns, ordering, units, chart-ready shape, and repeatability | Good when tools return small, typed, chart-ready payloads; weaker when generic tools return large or ambiguous results |
+| Variable cost | SQL/warehouse compute plus Genie usage and calling-agent usage; natural-language interpretation usually costs more than a fixed query | Usually the lowest variable cost for repeated known questions: warehouse/API work plus calling-agent usage, with no second natural-language analytics layer | Protocol has no fixed query cost, but tool discovery/planning can add model tokens and extra calls; backend, APIM, Databricks, and agent charges still apply |
+| Latency | Usually highest because question interpretation, query generation/execution, and asynchronous result polling are involved | Usually lowest and most predictable for optimized parameterized queries | Adds a small protocol/gateway hop; end-to-end latency is primarily determined by tool selection and the backend |
+| Scale | Good for interactive analytics; apply quotas, timeouts, polling, and concurrency controls | Best for high-volume predictable workloads; cache safe aggregates, constrain result sizes, and use warehouse autoscaling | Best organizational scalability because tools can be discovered and reused; runtime scale still depends on APIM tier, backend warehouse, quotas, and agent call patterns |
+| Copilot Studio | Use a custom connector/action for the Genie REST workflow | Use a custom connector or OpenAPI action | Native MCP onboarding with generative orchestration; tools are discovered from the server |
+| Microsoft Foundry | Use a custom function/OpenAPI tool that handles start, poll, result, and follow-up calls | Use an OpenAPI/custom function tool, or application code for maximum control | Native remote MCP tool integration; especially useful for portable multi-tool agents |
+| Security strengths | Unity Catalog governs source data; a curated domain reduces accidental access and semantic ambiguity | Easiest to constrain to read-only, parameterized, allowlisted operations and stable response schemas | Central tool discovery and least-privilege tool exposure; APIM can add Entra auth, rate limits, logging, quotas, and backend managed identity |
+| Security cautions | Do not treat generated SQL as pre-approved merely because Genie produced it; restrict the Genie identity and accessible assets | A generic `statement` endpoint is powerful: prevent write/DDL, enforce row/column controls, cap rows/time, and prefer approved parameterized operations in production | Tool descriptions and outputs are untrusted model input; guard against prompt injection, over-broad tools, excessive chaining, and accidental response-body logging |
+| Main trade-off | Highest semantic quality, but requires curation and adds AI cost/latency | Lowest cost and strongest determinism, but each business capability must be designed and maintained | Best portability and reuse, but adds another abstraction and does not replace backend quality, governance, or capacity planning |
+
+### 11.3 Recommendation by priority
+
+| Priority | Recommended choice | Why |
+|---|---|---|
+| Highest business-question quality | **Genie API behind APIM** | Use a narrow, well-tuned Genie Agent with Unity Catalog governed data, business definitions, metrics, sample queries, and verified answers. |
+| Lowest cost and latency at volume | **Direct parameterized Databricks API behind APIM** | Reuse approved SQL for recurring charts and KPIs, return only chart-ready aggregates, and avoid an extra NL-to-SQL step. |
+| Best reuse across Copilot Studio and Foundry | **MCP through APIM** | One governed tool contract can serve multiple agent platforms; expose narrow direct-SQL tools for fixed analytics and a Genie tool for exploratory questions. |
+| Strongest production security | **APIM front door + Entra OAuth + managed identity + Unity Catalog** | The protocol is secondary to identity, least privilege, data controls, policy enforcement, private networking, and auditability. Subscription keys alone are appropriate only for this POC. |
+
+**Recommended production pattern:** use a **hybrid MCP toolset through APIM**.
+Expose narrow, parameterized tools such as `revenue_by_region`,
+`yield_trend`, and `supplier_risk` for common graphs, plus one separately named
+`ask_genie` tool for exploratory questions. This gives Copilot Studio and Foundry
+agents one reusable integration while retaining direct-API cost and determinism
+for common workloads and Genie quality for the long tail. Route both paths with
+Entra OAuth at the agent-to-APIM boundary, APIM managed identity to Databricks,
+Unity Catalog least privilege, read-only operations, result-size limits, rate
+limits, and end-to-end tracing.
+
+Before rollout, evaluate all three paths against the same representative prompt
+set. Measure answer correctness, chart correctness, p50/p95 latency, Databricks
+compute, Genie usage, agent token/tool-call usage, error rate, and denied-access
+tests. Pricing and preview/GA status change independently, so confirm the current
+Databricks, Copilot Studio, Foundry, and APIM terms for the target region and
+tenant rather than using a static cost estimate from this POC.
+
+---
+
+## 12. Cost — keeping it lowest-cost
 
 - **Databricks Premium** tier is required for Unity Catalog, Genie and Private
   Link — but the *tier* only changes the **DBU rate**; you pay only for compute used.
@@ -263,7 +397,7 @@ curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
 
 ---
 
-## 12. Security & networking
+## 13. Security & networking
 
 - **Databricks is never public**: VNet injection + **Secure Cluster Connectivity**
   (`no_public_ip=true`) means clusters have no public IP; back-end **Private Link**
@@ -276,9 +410,9 @@ curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
 
 ---
 
-## 13. Genie agent & MCP server enablement
+## 14. Genie agent & MCP server enablement
 
-### 13.1 Genie agent (AI/BI)
+### 14.1 Genie agent (AI/BI)
 
 **What the POC deploys:** the Genie **Conversation API** is already wired through
 APIM at `/databricks-genie/*`. Genie **spaces/agents** are created in the Databricks
@@ -306,7 +440,7 @@ UI (there is no public "create space" API), so complete these steps once:
 > `databricks-genie-space-id` named value holds a placeholder until a Genie space is
 > created in the UI and its id is set (step 4).
 
-### 13.2 MCP server (Foundry / Copilot Studio tools)
+### 14.2 MCP server (Foundry / Copilot Studio tools)
 
 **Done in this POC.** The Databricks SQL API is exposed as an APIM **MCP server**
 (APIM AI-gateway feature) so agents consume `query` and `tables` as MCP tools:
@@ -326,16 +460,17 @@ UI (there is no public "create space" API), so complete these steps once:
 - **VS Code (GitHub Copilot agent mode):** `MCP: Add Server` → **HTTP** → paste the
   MCP endpoint → add the subscription-key header.
 
-> APIM MCP is a preview AI-gateway capability (Standard v2 supported). It exposes MCP
-> **tools** only (not resources/prompts), and global-scope policies run before the
-> MCP server scope.
+> APIM exposes selected REST operations as MCP **tools** only, not MCP resources
+> or prompts. Global-scope policies run before MCP-server-scope policies. Avoid
+> response-body logging or reading `context.Response.Body` in MCP policies because
+> response buffering can interfere with streaming.
 
 The Genie **Conversation API** is reachable through APIM at
 `/databricks-genie/genie/ask` (see 13.1).
 
 ---
 
-## 14. CI/CD — GitHub Actions
+## 15. CI/CD — GitHub Actions
 
 [`.github/workflows/provision-databricks.yml`](.github/workflows/provision-databricks.yml)
 provisions the infra with Terraform using **OIDC** (no stored credentials).
@@ -349,7 +484,7 @@ Run **Actions → Provision Databricks (Private VNet) → Run workflow**
 
 ---
 
-## 15. References
+## 16. References
 
 ### Microsoft Learn
 - Azure Databricks documentation — https://learn.microsoft.com/azure/databricks/
@@ -358,10 +493,12 @@ Run **Actions → Provision Databricks (Private VNet) → Run workflow**
 - Azure Private Link for Databricks — https://learn.microsoft.com/azure/databricks/security/network/classic/private-link
 - Unity Catalog — https://learn.microsoft.com/azure/databricks/data-governance/unity-catalog/
 - AI/BI Genie & Genie Agents — https://learn.microsoft.com/azure/databricks/genie/
+- MCPs and agent tools in Azure Databricks — https://learn.microsoft.com/azure/databricks/generative-ai/mcp/
 - Azure API Management — https://learn.microsoft.com/azure/api-management/
 - Expose a REST API as an MCP server (APIM) — https://learn.microsoft.com/azure/api-management/export-rest-mcp-server
 - APIM system-assigned managed identity — https://learn.microsoft.com/azure/api-management/api-management-howto-use-managed-service-identity
 - Microsoft Copilot Studio — https://learn.microsoft.com/microsoft-copilot-studio/
+- Use MCP tools in Copilot Studio — https://learn.microsoft.com/microsoft-copilot-studio/agent-extend-action-mcp
 - Microsoft Foundry — https://learn.microsoft.com/azure/ai-foundry/
 
 ### Databricks references
@@ -380,6 +517,6 @@ Run **Actions → Provision Databricks (Private VNet) → Run workflow**
 
 ---
 
-## 16. License
+## 17. License
 
 [MIT](LICENSE) © 2026 **Michael Yaacoub | Sr Solution Engineer at Microsoft**.
