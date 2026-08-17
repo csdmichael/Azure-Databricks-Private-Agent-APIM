@@ -1,0 +1,24 @@
+<!--
+  POST /query  ->  Databricks SQL Statement Execution API.
+  Consumers send only { "statement": "SELECT ..." }.
+  The warehouse id and execution options are injected server-side so the
+  warehouse stays an internal detail of the gateway.
+-->
+<policies>
+  <inbound>
+    <base />
+    <rewrite-uri template="/api/2.0/sql/statements" />
+    <set-body>@{
+      var body = context.Request.Body.As<Newtonsoft.Json.Linq.JObject>(preserveContent: true);
+      body["warehouse_id"] = "{{databricks-warehouse-id}}";
+      if (body["wait_timeout"] == null) { body["wait_timeout"] = "50s"; }
+      body["on_wait_timeout"] = "CONTINUE";
+      body["format"] = "JSON_ARRAY";
+      body["disposition"] = "INLINE";
+      return body.ToString();
+    }</set-body>
+  </inbound>
+  <backend><base /></backend>
+  <outbound><base /></outbound>
+  <on-error><base /></on-error>
+</policies>

@@ -1,0 +1,30 @@
+<!--
+  API-level policy for the Databricks API.
+  - Uses APIM's system-assigned managed identity to obtain an Entra token for the
+    Databricks login application, then forwards it as the backend Authorization.
+    (The APIM MI must be added as a user in the Databricks workspace with access
+    to the SQL warehouse and the arrow_semiconductor catalog.)
+  - Routes all operations to the private workspace control-plane URL.
+  - Applies a conservative rate limit for the POC.
+-->
+<policies>
+  <inbound>
+    <base />
+    <rate-limit calls="60" renewal-period="60" />
+    <authentication-managed-identity resource="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+                                     output-token-variable-name="msi-access-token" ignore-error="false" />
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+    </set-header>
+    <set-backend-service base-url="{{databricks-workspace-url}}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

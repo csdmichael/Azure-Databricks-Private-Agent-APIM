@@ -1,0 +1,10 @@
+<!-- POST /genie/conversations/{conversationId}/messages : ask a follow-up. Body: { "content": "..." } -->
+<policies>
+  <inbound>
+    <base />
+    <rewrite-uri template="/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages" />
+  </inbound>
+  <backend><base /></backend>
+  <outbound><base /></outbound>
+  <on-error><base /></on-error>
+</policies>

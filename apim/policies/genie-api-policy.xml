@@ -1,0 +1,19 @@
+<!--
+  API-level policy for the Databricks Genie (AI/BI) API.
+  Same managed-identity auth + private backend routing as the Databricks API.
+-->
+<policies>
+  <inbound>
+    <base />
+    <rate-limit calls="30" renewal-period="60" />
+    <authentication-managed-identity resource="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+                                     output-token-variable-name="msi-access-token" ignore-error="false" />
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+    </set-header>
+    <set-backend-service base-url="{{databricks-workspace-url}}" />
+  </inbound>
+  <backend><base /></backend>
+  <outbound><base /></outbound>
+  <on-error><base /></on-error>
+</policies>

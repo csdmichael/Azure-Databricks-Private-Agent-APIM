@@ -1,0 +1,132 @@
+name: Provision Databricks (Private VNet)
+
+# Provisions the Azure Databricks Premium workspace into a private VNet
+# (VNet injection + Secure Cluster Connectivity + back-end Private Link) using
+# Terraform, then optionally loads the semiconductor sample data.
+#
+# Required GitHub configuration (Settings -> Secrets and variables -> Actions):
+#   Secrets:  AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#             (federated credential / OIDC on an Entra app with Contributor on the RG)
+#   Optional Variables: TF_LOCATION, TF_WORKSPACE_NAME
+
+on:
+  workflow_dispatch:
+    inputs:
+      load_sample_data:
+        description: "Load semiconductor sample data after provisioning"
+        type: boolean
+        default: true
+      apply:
+        description: "Apply the Terraform plan (false = plan only)"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/provision-databricks.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_USE_OIDC: "true"
+  TF_IN_AUTOMATION: "true"
+  TF_WORKING_DIR: infra/terraform
+
+jobs:
+  terraform:
+    name: Terraform ${{ (github.event_name == 'push' || inputs.apply) && 'apply' || 'plan' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform fmt (check)
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply
+        if: ${{ github.event_name == 'push' || inputs.apply }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Export outputs
+        if: ${{ github.event_name == 'push' || inputs.apply }}
+        id: tf
+        run: |
+          echo "workspace_url=$(terraform output -raw workspace_url)"   >> "$GITHUB_OUTPUT"
+          echo "workspace_id=$(terraform output -raw workspace_id)"     >> "$GITHUB_OUTPUT"
+          {
+            echo "## Databricks deployed"
+            echo ""
+            echo "- **Workspace URL:** $(terraform output -raw workspace_url)"
+            echo "- **Managed RG:** $(terraform output -raw managed_resource_group)"
+            echo "- **Private Link:** $(terraform output -raw private_link_enabled)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  load-data:
+    name: Load semiconductor sample data
+    needs: terraform
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.load_sample_data && inputs.apply }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Resolve workspace URL
+        id: ws
+        run: echo "url=$(terraform output -raw workspace_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Load sample data (SQL Statement Execution API)
+        shell: pwsh
+        working-directory: .
+        run: >
+          ./scripts/load-sample-data.ps1
+          -WorkspaceUrl "${{ steps.ws.outputs.url }}"
+          -UseAzureCli

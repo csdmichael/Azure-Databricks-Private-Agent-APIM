@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and adjust as needed. Defaults already target the POC.
+subscription_id     = "86b37969-9445-49cf-b03f-d8866235171c"
+resource_group_name = "ai-myaacoub"
+location            = "westus"
+workspace_name      = "databricks-ws-ai-poc"
+sku                 = "premium"
+
+vnet_name                    = "databricks-vnet-ai-poc"
+vnet_cidr                    = "10.179.0.0/16"
+host_subnet_cidr             = "10.179.1.0/24"
+container_subnet_cidr        = "10.179.2.0/24"
+private_endpoint_subnet_cidr = "10.179.3.0/24"
+
+enable_private_link           = true
+public_network_access_enabled = true

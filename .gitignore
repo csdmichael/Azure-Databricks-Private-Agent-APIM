@@ -1,0 +1,38 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+.terraform.lock.hcl
+
+# Azure / secrets
+*.pfx
+*.pem
+.env
+.env.*
+azureauth.json
+*.publishsettings
+
+# Databricks
+.databrickscfg
+databricks-token.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/*.local
+
+# Build / temp
+tmp/
+out/
+*.zip
