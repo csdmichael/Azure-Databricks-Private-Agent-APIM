@@ -26,9 +26,11 @@
 10. [Sample APIM calls](#10-sample-apim-calls)
 11. [Cost — keeping it lowest-cost](#11-cost--keeping-it-lowest-cost)
 12. [Security & networking](#12-security--networking)
-13. [Genie agent setup](#13-genie-agent-setup)
+13. [Genie agent & MCP server enablement](#13-genie-agent--mcp-server-enablement)
 14. [CI/CD — GitHub Actions](#14-cicd--github-actions)
-15. [License](#15-license)
+15. [References](#15-references)
+15. [References](#15-references)
+16. [License](#16-license)
 
 ---
 
@@ -199,22 +201,25 @@ workflow (see [§14](#14-cicd--github-actions)).
 
 ## 8. Live URLs & endpoints
 
-> Filled in after the live deployment completes. Replace `<...>` with your values
-> (the deploy scripts print them).
+> **Live** — deployed to subscription `86b37969-9445-49cf-b03f-d8866235171c`,
+> resource group `ai-myaacoub`, region `westus`. Endpoints marked ✅ were tested end-to-end.
 
 | What | URL |
 |------|-----|
-| **Databricks workspace** | `<DATABRICKS_WORKSPACE_URL>` |
+| **Databricks workspace** | `https://adb-7405608662655754.14.azuredatabricks.net` |
 | Databricks workspace (portal) | [Azure Portal → workspace](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Databricks/workspaces/databricks-ws-ai-poc/overview) |
-| **Genie space** | `<DATABRICKS_WORKSPACE_URL>/genie/rooms/<GENIE_SPACE_ID>` |
-| SQL warehouse | `<DATABRICKS_WORKSPACE_URL>/sql/warehouses/<WAREHOUSE_ID>` |
+| SQL warehouse (`poc-serverless-2xs`, id `64777231f8249fdb`) | `https://adb-7405608662655754.14.azuredatabricks.net/sql/warehouses/64777231f8249fdb` |
+| **Genie space** (create in UI, then set id) | `https://adb-7405608662655754.14.azuredatabricks.net/genie/rooms/<space_id>` |
 | **APIM — Databricks SQL API** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks` |
-| APIM — `POST /query` | `https://ai-gateway-apim-poc-my.azure-api.net/databricks/query` |
-| APIM — `GET /tables` | `https://ai-gateway-apim-poc-my.azure-api.net/databricks/tables` |
-| **APIM — Genie API** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie` |
+| APIM — `POST /query` | `https://ai-gateway-apim-poc-my.azure-api.net/databricks/query` ✅ |
+| APIM — `GET /tables` | `https://ai-gateway-apim-poc-my.azure-api.net/databricks/tables` ✅ |
+| **APIM — Genie API** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie` (set Genie space id) |
 | APIM — `POST /genie/ask` | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie/genie/ask` |
-| **APIM — MCP server** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp` |
+| **APIM — MCP server** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp` ✅ |
 | APIM instance (portal) | [Azure Portal → APIM](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my/apim-apis) |
+
+**APIM managed identity** granted access in Databricks: appId `49ff6000-cfb2-4b1c-94cc-4de99251d5d6`
+(added as workspace service principal, `CAN_USE` on the warehouse, `SELECT` on the schema).
 
 ---
 
@@ -271,19 +276,62 @@ curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks/query" \
 
 ---
 
-## 13. Genie agent setup
+## 13. Genie agent & MCP server enablement
 
-Genie (AI/BI) spaces are created in the workspace UI:
+### 13.1 Genie agent (AI/BI)
+
+**What the POC deploys:** the Genie **Conversation API** is already wired through
+APIM at `/databricks-genie/*`. Genie **spaces/agents** are created in the Databricks
+UI (there is no public "create space" API), so complete these steps once:
+
 1. Databricks → **Genie** → **New** → add tables from
    `databricks_ws_ai_poc.arrow_semiconductor` (start with `product_sales`,
    `fab_production`, `wafer_yield`).
-2. Add sample instructions (e.g. *"revenue is `revenue_usd`; report in $M"*).
-3. Copy the **space id** from the URL (`/genie/rooms/<space_id>`).
-4. Pass it to `apim/deploy-apim.ps1 -GenieSpaceId <space_id>` (or update the
-   `databricks-genie-space-id` named value in APIM).
+2. Add sample instructions (e.g. *"revenue is `revenue_usd`; report in $M"*) and a
+   few sample questions to ground answers.
+3. Copy the **space id** from the URL: `…/genie/rooms/<space_id>`.
+4. Point APIM at it — updates the `databricks-genie-space-id` named value:
+   ```powershell
+   ./apim/deploy-apim.ps1 -WorkspaceUrl "https://adb-7405608662655754.14.azuredatabricks.net" `
+       -WarehouseId 64777231f8249fdb -GenieSpaceId <space_id>
+   ```
+5. Ask Genie **through APIM**:
+   ```bash
+   curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie/genie/ask" \
+     -H "Ocp-Apim-Subscription-Key: $APIM_KEY" -H "Content-Type: application/json" \
+     -d '{ "content": "Top 3 regions by revenue last quarter?" }'
+   ```
 
-The Genie **Conversation API** is then reachable through APIM at
-`/databricks-genie/genie/ask`.
+> **Status in this POC:** the Genie API is **deployed and routed**; the
+> `databricks-genie-space-id` named value holds a placeholder until a Genie space is
+> created in the UI and its id is set (step 4).
+
+### 13.2 MCP server (Foundry / Copilot Studio tools)
+
+**Done in this POC.** The Databricks SQL API is exposed as an APIM **MCP server**
+(APIM AI-gateway feature) so agents consume `query` and `tables` as MCP tools:
+
+1. Ran [`apim/enable-mcp.ps1`](apim/enable-mcp.ps1) — creates an `mcp`-type API
+   (`databricks-mcp`) whose tools map to the `query` and `tables` operations of the
+   Databricks SQL API. Equivalent portal path: APIM → APIs → **MCP Servers** →
+   **+ Create MCP server** → *Expose an API as an MCP server* → source
+   **Databricks SQL**, operations `query`, `tables`.
+2. **MCP endpoint (live):**
+   `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp`
+3. **Auth:** `Ocp-Apim-Subscription-Key: <key>` header.
+
+**Add it as a tool:**
+- **Microsoft Foundry / Copilot Studio:** add an MCP (Model Context Protocol) tool →
+  URL = the MCP endpoint above → header `Ocp-Apim-Subscription-Key = <key>`.
+- **VS Code (GitHub Copilot agent mode):** `MCP: Add Server` → **HTTP** → paste the
+  MCP endpoint → add the subscription-key header.
+
+> APIM MCP is a preview AI-gateway capability (Standard v2 supported). It exposes MCP
+> **tools** only (not resources/prompts), and global-scope policies run before the
+> MCP server scope.
+
+The Genie **Conversation API** is reachable through APIM at
+`/databricks-genie/genie/ask` (see 13.1).
 
 ---
 
@@ -301,6 +349,37 @@ Run **Actions → Provision Databricks (Private VNet) → Run workflow**
 
 ---
 
-## 15. License
+## 15. References
+
+### Microsoft Learn
+- Azure Databricks documentation — https://learn.microsoft.com/azure/databricks/
+- VNet injection (deploy Databricks into your VNet) — https://learn.microsoft.com/azure/databricks/security/network/classic/vnet-inject
+- Secure cluster connectivity (no public IP) — https://learn.microsoft.com/azure/databricks/security/network/classic/secure-cluster-connectivity
+- Azure Private Link for Databricks — https://learn.microsoft.com/azure/databricks/security/network/classic/private-link
+- Unity Catalog — https://learn.microsoft.com/azure/databricks/data-governance/unity-catalog/
+- AI/BI Genie & Genie Agents — https://learn.microsoft.com/azure/databricks/genie/
+- Azure API Management — https://learn.microsoft.com/azure/api-management/
+- Expose a REST API as an MCP server (APIM) — https://learn.microsoft.com/azure/api-management/export-rest-mcp-server
+- APIM system-assigned managed identity — https://learn.microsoft.com/azure/api-management/api-management-howto-use-managed-service-identity
+- Microsoft Copilot Studio — https://learn.microsoft.com/microsoft-copilot-studio/
+- Microsoft Foundry — https://learn.microsoft.com/azure/ai-foundry/
+
+### Databricks references
+- SQL Statement Execution API — https://docs.databricks.com/api/azure/workspace/statementexecution
+- Genie Conversation API — https://docs.databricks.com/api/azure/workspace/genie
+- Serverless SQL warehouses — https://learn.microsoft.com/azure/databricks/compute/sql-warehouse/
+- Databricks pricing — https://www.databricks.com/product/pricing
+
+### GitHub repositories
+- This project — https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM
+- Databricks Terraform provider — https://github.com/databricks/terraform-provider-databricks
+- Terraform AzureRM provider — https://github.com/hashicorp/terraform-provider-azurerm
+- Databricks CLI — https://github.com/databricks/cli
+- Model Context Protocol (spec + SDKs) — https://github.com/modelcontextprotocol
+- Azure API Management policy snippets — https://github.com/Azure-Samples/api-management-policy-snippets
+
+---
+
+## 16. License
 
 [MIT](LICENSE) © 2026 **Michael Yaacoub | Sr Solution Engineer at Microsoft**.

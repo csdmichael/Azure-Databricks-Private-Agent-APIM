@@ -23,8 +23,6 @@ param databricksWarehouseId string
 @description('Databricks Genie space id (optional; set later if not ready).')
 param genieSpaceId string = ''
 
-var apiVersion = '2023-09-01-preview'
-
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' existing = {
   name: apimServiceName
 }

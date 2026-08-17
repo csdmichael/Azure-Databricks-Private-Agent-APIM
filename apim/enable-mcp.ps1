@@ -34,30 +34,35 @@ $opIds = @($ops.value | ForEach-Object { $_.name })
 Write-Host "  Operations: $($opIds -join ', ')"
 
 $mcpApiId = "$SourceApiId-mcp"
+$srcApiResourceId = "$base/apis/$SourceApiId"
 $bodyObj = @{
   properties = @{
     type        = "mcp"
     displayName = $McpDisplayName
     path        = $McpPath
     protocols   = @("https")
-    mcpTools    = @($opIds | ForEach-Object { @{ name = $_; operationId = $_ } })
-    backendApiId = "/apis/$SourceApiId"
+    # Each tool maps to an operation of the source API (full resource id required).
+    mcpTools    = @($opIds | ForEach-Object { @{ name = $_; operationId = "$srcApiResourceId/operations/$_" } })
   }
 }
 $tmp = New-TemporaryFile
 $bodyObj | ConvertTo-Json -Depth 8 | Set-Content -Path $tmp -Encoding utf8
 
 Write-Host "Creating MCP server '$mcpApiId' (preview)..." -ForegroundColor Yellow
-try {
-  az rest --method put `
-    --url "$base/apis/$mcpApiId?api-version=$ApiVersion" `
-    --headers "Content-Type=application/json" `
-    --body "@$tmp" | Out-Null
+# az is a native command; check the exit code (try/catch does not trap it).
+$out = az rest --method put `
+  --url "$base/apis/$mcpApiId?api-version=$ApiVersion" `
+  --headers "Content-Type=application/json" `
+  --body "@$tmp" 2>&1
+Remove-Item $tmp -ErrorAction SilentlyContinue
+
+if ($LASTEXITCODE -eq 0) {
   Write-Host "MCP server created." -ForegroundColor Green
   Write-Host "MCP endpoint: https://$ApimName.azure-api.net/$McpPath/mcp" -ForegroundColor Green
 }
-catch {
-  Write-Warning "Preview MCP API call failed: $_"
+else {
+  Write-Warning "Preview MCP API call failed (exit $LASTEXITCODE):"
+  Write-Host $out
   Write-Host @"
 
 Do this in the Azure Portal instead (preview):
@@ -68,7 +73,4 @@ Do this in the Azure Portal instead (preview):
   5. Create. MCP endpoint = https://$ApimName.azure-api.net/$McpPath/mcp
   6. Repeat for 'Databricks Genie' if you want Genie exposed as MCP too.
 "@ -ForegroundColor Cyan
-}
-finally {
-  Remove-Item $tmp -ErrorAction SilentlyContinue
 }

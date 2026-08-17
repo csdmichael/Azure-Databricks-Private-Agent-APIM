@@ -105,9 +105,13 @@ $warehouseId = Get-OrCreate-Warehouse
 Write-Host "Using warehouse id=$warehouseId" -ForegroundColor Green
 
 $raw = Get-Content -Path $SqlFile -Raw
+# Keep chunks that contain at least one non-comment, non-blank line. Uses simple
+# per-line checks to avoid catastrophic regex backtracking on big comment blocks.
 $statements = $raw -split '(?m)^\s*--\s*@statement\s*$' |
   ForEach-Object { $_.Trim() } |
-  Where-Object { $_ -and ($_ -notmatch '^\s*(--.*\s*)*$') }
+  Where-Object {
+    $_ -and (($_ -split "`n" | Where-Object { $_.Trim() -and ($_.Trim() -notmatch '^--') } | Measure-Object).Count -gt 0)
+  }
 
 Write-Host "Executing $($statements.Count) SQL statements..." -ForegroundColor Cyan
 $i = 0
