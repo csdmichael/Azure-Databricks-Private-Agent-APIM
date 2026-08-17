@@ -1,0 +1,14 @@
+Provision Azure Databricks in private VNET in US West at lowest cost possible for a POC.
+Call Workspace as databricks-ws-ai-poc.
+Generate github workflow to provision azure databricks in a private vnet in the following Azure Subscription and RG:
+    - Subscription: 86b37969-9445-49cf-b03f-d8866235171c
+    - Resource Group: ai-myaacoub
+Leverage this APIM instance to expose APIs and MCP Server for databricks and genie agent so I can use it as a Tool in Foundry Agents or Copilot Studio Agents:
+    - APIM Url: https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my/apim-apis
+Create one readme file that has TOC that explains project, folder structure, has architecture diagrams png files displayed from docs folder and describe each one and add link to pdf document and explain it and summarize content in it to compare 4 alternative architectures.
+Add License file for Michael Yaacoub | Sr Solution Engineer at Microsoft
+Commit, publish and test that Azure databricks is deployed and generate sample data at lowest cost, then test agent. Also, test its apim endpoint
+Add urls for databricks, its genie agent, apim endpoints configured for databricks apis, mcp servers, agent.
+Document sample data added in databricks and how to query it and expected results.
+Show sample api calls in apim that retrieve data from Databricks.
+The goal of this POC is that business users generate PPT presentations from Databricks data using Copilot Studio agents or Co-Work so make the sample data in databricks good to show visualizations in ppt presentations for chip manufacturing company like Arrow Electronics.
