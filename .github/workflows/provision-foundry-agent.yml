@@ -1,4 +1,4 @@
-name: Provision Foundry Databricks Agent
+name: Provision Foundry Databricks Agents
 
 on:
   workflow_dispatch:
@@ -28,9 +28,12 @@ env:
   FOUNDRY_PROJECT_NAME: proj-default
   FOUNDRY_PROJECT_ENDPOINT: https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default
   FOUNDRY_AGENT_NAME: databricks-agent-mcp
+  FOUNDRY_GENIE_AGENT_NAME: databricks-genie-agent
   FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-4.1
   MCP_CONNECTION_NAME: databricks-apim-mcp
   MCP_SERVER_URL: https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp
+  GENIE_MCP_CONNECTION_NAME: databricks-apim-genie-mcp
+  GENIE_MCP_SERVER_URL: https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp
   APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
 
 jobs:
@@ -57,9 +60,16 @@ jobs:
       - name: Install Foundry SDK
         run: python -m pip install --requirement foundry/requirements.txt
 
-      - name: Create or update agent
+      - name: Create or update the Databricks SQL agent
+        working-directory: foundry
         run: >-
-          python foundry/provision_agent.py
+          python provision_agent.py --output-dir ../artifacts
+          ${{ (github.event_name == 'workflow_dispatch' && !inputs.run_smoke_test) && '--skip-test' || '' }}
+
+      - name: Create or update the Databricks Genie agent
+        working-directory: foundry
+        run: >-
+          python provision_genie_agent.py --output-dir ../artifacts
           ${{ (github.event_name == 'workflow_dispatch' && !inputs.run_smoke_test) && '--skip-test' || '' }}
 
       - name: Upload generated PowerPoint

@@ -251,6 +251,32 @@ resource opGenieResultPolicy 'Microsoft.ApiManagement/service/apis/operations/po
   dependsOn: [ nvGenieSpace ]
 }
 
+resource opGenieMessage 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview' = {
+  parent: genieApi
+  name: 'message'
+  properties: {
+    displayName: 'Get Genie message status'
+    method: 'GET'
+    urlTemplate: '/genie/conversations/{conversationId}/messages/{messageId}'
+    description: 'Poll until status is COMPLETED, then read the text answer and generated SQL from attachments.'
+    templateParameters: [
+      { name: 'conversationId', type: 'string', required: true }
+      { name: 'messageId', type: 'string', required: true }
+    ]
+    responses: [ { statusCode: 200, description: 'Message status and attachments' } ]
+  }
+}
+
+resource opGenieMessagePolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2023-09-01-preview' = {
+  parent: opGenieMessage
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('./policies/genie-message-operation-policy.xml')
+  }
+  dependsOn: [ nvGenieSpace ]
+}
+
 // ---------------- Product grouping the two APIs ------------------------
 resource product 'Microsoft.ApiManagement/service/products@2023-09-01-preview' = {
   parent: apim

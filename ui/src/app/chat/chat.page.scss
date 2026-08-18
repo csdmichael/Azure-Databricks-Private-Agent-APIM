@@ -1,0 +1,279 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 20px 20px;
+  box-sizing: border-box;
+}
+
+.chat-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fdece9;
+  color: #a4262c;
+  font-size: 13px;
+}
+
+.agent-tabs {
+  --background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.agent-tabs ion-segment-button {
+  --indicator-color: rgba(0, 120, 212, 0.12);
+  min-height: 56px;
+  text-transform: none;
+}
+
+.agent-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  margin-bottom: 2px;
+}
+
+.agent-tabs ion-label strong {
+  display: block;
+  font-size: 13px;
+}
+
+.agent-tabs ion-label small {
+  display: block;
+  font-size: 11px;
+  color: var(--app-muted);
+}
+
+.agent-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+}
+
+.agent-header h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.agent-header p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--app-muted);
+  max-width: 70ch;
+}
+
+.agent-tools ion-chip {
+  font-size: 11px;
+  height: 22px;
+  margin: 2px 4px 0 0;
+}
+
+.transcript {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 6px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.starters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.starters-title {
+  grid-column: 1 / -1;
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--app-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.starter {
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+
+  strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  span {
+    font-size: 12px;
+    color: var(--app-muted);
+  }
+
+  &:hover {
+    border-color: #0f5ba7;
+  }
+}
+
+.message {
+  display: flex;
+}
+
+.message.from-user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.from-user .bubble {
+  background: #0f5ba7;
+  border-color: #0f5ba7;
+  color: #ffffff;
+}
+
+.bubble.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.bubble-body {
+  :first-child {
+    margin-top: 0;
+  }
+
+  :last-child {
+    margin-bottom: 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--app-border);
+    padding: 5px 8px;
+    text-align: left;
+  }
+
+  pre {
+    background: #f4f4f4;
+    padding: 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+
+  code {
+    font-family: 'Cascadia Code', Consolas, monospace;
+    font-size: 12.5px;
+  }
+}
+
+.tool-calls {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--app-border);
+}
+
+.tool-calls-label {
+  font-size: 11px;
+  color: var(--app-muted);
+  margin-right: 6px;
+}
+
+.tool-calls ion-chip {
+  height: 20px;
+  font-size: 10.5px;
+  margin: 2px 4px 0 0;
+}
+
+.files {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(0, 120, 212, 0.1);
+  color: #0f5ba7;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba(0, 120, 212, 0.18);
+  }
+}
+
+.composer {
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 8px 8px 10px;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px 0;
+}
+
+.composer-hint {
+  font-size: 11.5px;
+  color: var(--app-muted);
+}
+
+@media (max-width: 720px) {
+  .bubble {
+    max-width: 92%;
+  }
+
+  .agent-header {
+    flex-direction: column;
+  }
+}

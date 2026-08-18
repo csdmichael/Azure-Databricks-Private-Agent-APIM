@@ -10,6 +10,7 @@ Databricks tokens are handled by the agent.
 - [Databricks SQL API](#databricks-sql-api)
 - [Databricks Genie API](#databricks-genie-api)
 - [MCP server (Foundry / Copilot Studio tools)](#mcp-server-foundry--copilot-studio-tools)
+- [Agents API (this POC's own service)](#agents-api-this-pocs-own-service)
 - [Understanding the response](#understanding-the-response)
 
 ---
@@ -82,20 +83,34 @@ The consumer never sees the `warehouse_id` — APIM injects it from a named valu
 
 ## Databricks Genie API
 
-Natural-language questions answered by AI/BI Genie over the same data.
+Natural-language questions answered by AI/BI Genie over the same data. The Genie
+space **`Arrow Semiconductor Analytics`** (id `01f19b3c346c1698910416cf7a4c830c`)
+is curated over all six sample tables. The APIM managed identity has `CAN_RUN` on
+it; without that grant every call returns `PERMISSION_DENIED`.
 
-**Ask** — `POST /databricks-genie/genie/ask`:
+Genie is asynchronous — the flow is **ask → poll → result**.
+
+**1. Ask** — `POST /databricks-genie/genie/ask`:
 ```bash
 curl -X POST "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie/genie/ask" \
   -H "Ocp-Apim-Subscription-Key: $APIM_KEY" -H "Content-Type: application/json" \
   -d '{ "content": "What were the top 3 regions by revenue last quarter?" }'
-# -> returns conversation_id + message_id
+# -> { "conversation_id": "01f1...", "message_id": "01f1..." }
 ```
 
-**Get the result** — `GET /databricks-genie/genie/conversations/{conversationId}/messages/{messageId}/result`:
+**2. Poll the message** — `GET /databricks-genie/genie/conversations/{conversationId}/messages/{messageId}`:
+```bash
+curl "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie/genie/conversations/$CONV/messages/$MSG" \
+  -H "Ocp-Apim-Subscription-Key: $APIM_KEY"
+# status goes ASKING_AI -> PENDING_WAREHOUSE -> EXECUTING_QUERY -> COMPLETED
+# the answer is in attachments[].text.content, the SQL in attachments[].query.query
+```
+
+**3. Get the result rows** — `GET /databricks-genie/genie/conversations/{conversationId}/messages/{messageId}/result`:
 ```bash
 curl "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie/genie/conversations/$CONV/messages/$MSG/result" \
   -H "Ocp-Apim-Subscription-Key: $APIM_KEY"
+# rows in statement_response.result.data_array
 ```
 
 **Follow-up** — `POST /databricks-genie/genie/conversations/{conversationId}/messages`:
@@ -105,28 +120,68 @@ curl -X POST ".../databricks-genie/genie/conversations/$CONV/messages" \
   -d '{ "content": "Now break that down by product family." }'
 ```
 
+The whole flow is scripted in [`scripts/test-genie.ps1`](../scripts/test-genie.ps1).
+
 ---
 
 ## MCP server (Foundry / Copilot Studio tools)
 
-APIM exposes the Databricks operations as an **MCP server** (preview), so agents
-can call them as tools.
+APIM exposes both APIs as **MCP servers**, so agents call them as tools.
 
-- **MCP endpoint:** `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp`
+| MCP server | Endpoint | Tools |
+|---|---|---|
+| Databricks SQL | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp` | `query`, `tables` |
+| Databricks Genie | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp` | `ask`, `message`, `result`, `follow-up` |
+
 - **Auth:** `Ocp-Apim-Subscription-Key` header (APIM subscription key)
-- **Enable it:** run [`apim/enable-mcp.ps1`](../apim/enable-mcp.ps1) or use the portal
-  (APIM → APIs → **MCP Servers** → *Expose an API as an MCP server* → select
-  `Databricks SQL` → operations `query`, `tables`).
+- **Enable them:** run [`apim/enable-mcp.ps1`](../apim/enable-mcp.ps1) once per API,
+  or use the portal (APIM → APIs → **MCP Servers** → *Expose an API as an MCP server*).
+- **Inspect the generated tool schemas:**
+  `python scripts/mcp_tools_probe.py <mcp-endpoint>` with `APIM_SUBSCRIPTION_KEY` set.
+
+> Operations that take a request body are advertised with a single `body` **string**
+> input. Agents must place JSON in it — `{"statement": "<SQL>"}` for `query`, and
+> `{"content": "<question>"}` for `ask` and `follow-up`. A bare string makes the
+> backend policy fail with HTTP 500.
 
 **Add as a tool in Microsoft Foundry Agents:**
 1. Agent → **Tools** → **Add tool** → **MCP server**.
-2. URL: the MCP endpoint above. Header: `Ocp-Apim-Subscription-Key = <key>`.
-3. The `query` and `tables` tools appear and can be invoked by the agent.
+2. URL: one of the endpoints above. Header: `Ocp-Apim-Subscription-Key = <key>`.
+3. The tools appear and can be invoked by the agent.
 
 **Add as a tool in Copilot Studio:**
 1. Copilot Studio → **Tools** → **Add a tool** → **Model Context Protocol**.
 2. Provide the MCP endpoint + subscription-key header.
 3. Publish; the agent can now retrieve Databricks data to build PPT/diagrams.
+
+---
+
+## Agents API (this POC's own service)
+
+The chat UI talks to a small FastAPI service that invokes the Foundry agents with
+a managed identity. Interactive docs:
+<https://databricks-agents-api-my.azurewebsites.net/docs>
+
+Chat is asynchronous because a turn can outlive the App Service request limit:
+
+```bash
+BASE=https://databricks-agents-api-my.azurewebsites.net
+
+# 1. start a turn -> 202 with a jobId
+curl -X POST "$BASE/api/agents/databricks-genie/chat" -H "Content-Type: application/json" \
+  -d '{ "message": "Total revenue in USD millions by region, as a bar chart in a PowerPoint." }'
+
+# 2. poll until status is completed or failed
+curl "$BASE/api/chat/jobs/$JOB_ID"
+
+# 3. download any generated file cited in result.files[]
+curl -o deck.pptx "$BASE/api/files/$CONTAINER_ID/$FILE_ID?filename=deck.pptx"
+
+# Microsoft 365 declarative agent package
+curl -o databricks-genie-m365-agent.zip "$BASE/api/m365/packages/databricks-genie"
+```
+
+Pass `conversationId` from a previous turn to continue the same thread.
 
 ---
 

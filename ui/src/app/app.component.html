@@ -1,0 +1,35 @@
+<div class="shell">
+  <header class="shell-header">
+    <a class="brand" [href]="githubRepoUrl" target="_blank" rel="noopener noreferrer">
+      <svg class="ms-logo" viewBox="0 0 23 23" aria-hidden="true" focusable="false">
+        <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+        <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+        <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+        <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+      </svg>
+      <span class="brand-text">
+        <span class="brand-name">Microsoft</span>
+        <span class="brand-product">Databricks Agents</span>
+      </span>
+    </a>
+
+    <nav class="shell-nav">
+      <a routerLink="/chat" routerLinkActive="active">Chat</a>
+      <a routerLink="/packages" routerLinkActive="active">Microsoft 365 packages</a>
+      <a [href]="swaggerUrl" target="_blank" rel="noopener noreferrer">API docs</a>
+    </nav>
+  </header>
+
+  <main class="shell-main">
+    <router-outlet></router-outlet>
+  </main>
+
+  <footer class="shell-footer">
+    <span class="footer-author">Michael Yaacoub <span class="sep">|</span> Sr Solution Engineer</span>
+    <span class="footer-links">
+      <a [href]="githubRepoUrl" target="_blank" rel="noopener noreferrer">GitHub repository</a>
+      <a [href]="swaggerUrl" target="_blank" rel="noopener noreferrer">Swagger</a>
+      <a [href]="redocUrl" target="_blank" rel="noopener noreferrer">ReDoc</a>
+    </span>
+  </footer>
+</div>

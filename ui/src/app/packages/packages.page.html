@@ -1,0 +1,87 @@
+<div class="packages">
+  <header class="page-header">
+    <h1>Microsoft 365 agent packages</h1>
+    <p>
+      Download each Foundry agent as a Microsoft 365 <strong>declarative agent</strong> package and
+      upload it in the
+      <a href="https://dev.teams.microsoft.com/apps" target="_blank" rel="noopener noreferrer">
+        Teams Developer Portal </a
+      >. Each package carries the agent's own icons, its instructions, and an API plugin that calls
+      the private Databricks data through API Management.
+    </p>
+  </header>
+
+  <div class="page-error" *ngIf="loadError">{{ loadError }}</div>
+
+  <div class="cards">
+    <article class="card" *ngFor="let card of cards">
+      <div class="card-head">
+        <img class="card-icon" [src]="card.iconUrl" [alt]="card.displayName" />
+        <div>
+          <h2>{{ card.displayName }}</h2>
+          <p class="tagline">{{ card.tagline }}</p>
+        </div>
+      </div>
+
+      <p class="description">{{ card.description }}</p>
+
+      <dl class="meta">
+        <dt>Teams app id</dt>
+        <dd><code>{{ card.teamsAppId }}</code></dd>
+        <dt>File</dt>
+        <dd><code>{{ card.fileName }}</code></dd>
+      </dl>
+
+      <div class="contents">
+        <span class="contents-label">Package contents</span>
+        <ion-chip *ngFor="let entry of card.contents" outline="true">{{ entry }}</ion-chip>
+      </div>
+
+      <ion-item lines="none" class="key-input">
+        <ion-icon slot="start" name="key-outline"></ion-icon>
+        <ion-label position="stacked">API key auth config id (optional)</ion-label>
+        <ion-input
+          [(ngModel)]="card.apiKeyReferenceId"
+          placeholder="From Developer Portal → Tools → API key registration"
+        ></ion-input>
+      </ion-item>
+      <p class="hint">
+        Leave blank to build the package with <code>auth: None</code>. Supply the id to build it with
+        <code>ApiKeyPluginVault</code>, so Copilot sends the API Management subscription key.
+      </p>
+
+      <div class="actions">
+        <ion-button [href]="downloadUrl(card)" download>
+          <ion-icon slot="start" name="cloud-download-outline"></ion-icon>
+          Download package
+        </ion-button>
+        <ion-button
+          fill="outline"
+          [href]="openApiSpecUrl(card)"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <ion-icon slot="start" name="document-text-outline"></ion-icon>
+          View OpenAPI
+        </ion-button>
+      </div>
+    </article>
+  </div>
+
+  <section class="steps">
+    <h2>Uploading to Microsoft 365</h2>
+    <ol>
+      <li>
+        In the Teams Developer Portal, register the API Management subscription key under
+        <strong>Tools → API key registration</strong>, using the API Management base URL, and copy
+        the auth config id.
+      </li>
+      <li>Paste that id above and download the package so the plugin uses it.</li>
+      <li>
+        Go to <strong>Apps → Import app</strong>, upload the <code>.zip</code>, then
+        <strong>Preview in Teams</strong> to sideload the declarative agent.
+      </li>
+      <li>Open Microsoft 365 Copilot, pick the agent, and ask one of the sample questions.</li>
+    </ol>
+  </section>
+</div>

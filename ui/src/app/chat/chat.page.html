@@ -1,0 +1,97 @@
+<div class="chat">
+  <div class="chat-error" *ngIf="loadError">{{ loadError }}</div>
+
+  <ion-segment
+    *ngIf="agents.length"
+    class="agent-tabs"
+    [value]="selectedAgentId"
+    (ionChange)="selectAgent($any($event.detail.value))"
+  >
+    <ion-segment-button *ngFor="let agent of agents" [value]="agent.id">
+      <img class="agent-icon" [src]="agent.iconUrl" [alt]="agent.displayName" />
+      <ion-label>
+        <strong>{{ agent.shortName }}</strong>
+        <small>{{ agent.tagline }}</small>
+      </ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <div class="agent-header" *ngIf="selectedAgent as agent">
+    <div class="agent-header-text">
+      <h2>{{ agent.displayName }}</h2>
+      <p>{{ agent.description }}</p>
+      <div class="agent-tools">
+        <ion-chip *ngFor="let tool of agent.tools" outline="true">{{ tool }}</ion-chip>
+      </div>
+    </div>
+    <ion-button fill="outline" size="small" (click)="newConversation()">
+      <ion-icon slot="start" name="add-outline"></ion-icon>
+      New conversation
+    </ion-button>
+  </div>
+
+  <div class="transcript" #transcript>
+    <div class="starters" *ngIf="!messages.length && selectedAgent as agent">
+      <p class="starters-title">
+        <ion-icon name="sparkles-outline"></ion-icon>
+        Try one of these
+      </p>
+      <button
+        class="starter"
+        type="button"
+        *ngFor="let starter of agent.conversationStarters"
+        (click)="useStarter(starter.text)"
+      >
+        <strong>{{ starter.title }}</strong>
+        <span>{{ starter.text }}</span>
+      </button>
+    </div>
+
+    <div class="message" *ngFor="let message of messages" [class.from-user]="message.role === 'user'">
+      <div class="bubble">
+        <div class="bubble-body" [innerHTML]="message.html"></div>
+
+        <div class="tool-calls" *ngIf="message.toolCalls?.length">
+          <span class="tool-calls-label">Tools used</span>
+          <ion-chip *ngFor="let tool of message.toolCalls" outline="true">{{ tool }}</ion-chip>
+        </div>
+
+        <div class="files" *ngIf="message.files?.length">
+          <a
+            class="file"
+            *ngFor="let file of message.files"
+            [href]="file.downloadUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ion-icon name="cloud-download-outline"></ion-icon>
+            {{ file.filename }}
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="message" *ngIf="sending">
+      <div class="bubble thinking">
+        <ion-spinner name="dots"></ion-spinner>
+        <span>Querying Databricks and building the answer…</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="composer">
+    <quill-editor
+      [(ngModel)]="draft"
+      [modules]="quillModules"
+      [styles]="{ height: '140px' }"
+      placeholder="Ask about revenue, yield, defects, inventory or suppliers. Ask for a chart or a PowerPoint."
+    ></quill-editor>
+    <div class="composer-actions">
+      <span class="composer-hint">Rich text is converted to Markdown before it reaches the agent.</span>
+      <ion-button (click)="send()" [disabled]="sending || !selectedAgent">
+        <ion-icon slot="start" name="send-outline"></ion-icon>
+        Send
+      </ion-button>
+    </div>
+  </div>
+</div>

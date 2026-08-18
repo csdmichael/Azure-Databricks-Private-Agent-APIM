@@ -43,3 +43,13 @@ out/
 artifacts/
 __pycache__/
 *.pyc
+
+# Python
+.venv/
+*.egg-info/
+
+# Node / Angular
+node_modules/
+ui/www/
+ui/.angular/
+npm-debug.log*
