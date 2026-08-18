@@ -63,17 +63,27 @@ flowchart LR
 
 ## 2. Architecture diagrams
 
-### 2.1 Four architecture options — Copilot/Teams to Databricks in a private VNet
+### 2.1 Secure access patterns — APIM gateway or fully private connectivity
 ![Architecture alternatives](docs/Agents-DataBricks-Private-Architecture-Alternatives.png)
 
-This diagram compares **four secure ways** for M365 Copilot / Teams / Copilot
-Studio to reach a **private** Databricks workspace to generate PPT & diagrams. In
-every option **Databricks stays private** (no public access); the options differ
-only in *what sits between the agent and the VNet* (Power Platform managed
-environment, APIM, Foundry VNet injection, or CoWork + Genie via APIM). The right
-rail lists the **skills needed** to build the Copilot Studio agents (agent design,
-Databricks integration, Power Platform, security/networking, content generation,
-DevOps).
+This diagram groups the solution into an **APIM-based gateway model** and two
+**non-APIM, fully private options**. In every path, the Databricks workspace stays
+inside its private VNet with no public access:
+
+- The **APIM-based model** lets Microsoft Foundry, Copilot Studio / M365 agents,
+  and CoWork call Databricks MCP, SQL, and Genie capabilities through one secure
+  gateway. APIM provides authentication and authorization, throttling and rate
+  limiting, monitoring and logging, and request transformation and routing;
+  APIM-to-Databricks traffic uses private VNet connectivity.
+- **Non-APIM option 1** uses Microsoft Foundry with VNet injection so private
+  agents and flows connect directly to the Databricks VNet.
+- **Non-APIM option 2** uses Copilot Studio with a Power Automate Managed
+  Environment that has VNet support, plus a custom or Databricks connector.
+
+The arrows distinguish data/API traffic, private VNet connectivity, and
+control/authentication flows. The right rail summarizes the implementation
+skills required across agent design, Databricks integration, Power Platform,
+and security and networking.
 
 ### 2.2 APIM operational process & policy enforcement
 ![APIM operational process](docs/APIM%20-%20Operational%20Process.png)
