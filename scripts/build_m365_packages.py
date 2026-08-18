@@ -197,6 +197,16 @@ def main() -> int:
         for problem in problems:
             failed = True
             print(f"       - {problem}")
+
+        # The shipping configuration uses an API key auth config from the
+        # developer portal, so validate that variant too.
+        keyed = build_package(agent, "00000000-0000-0000-0000-000000000000")
+        keyed_problems = check(keyed, agent)
+        print(f"[{'FAIL' if keyed_problems else 'ok'}] {agent.id} with ApiKeyPluginVault auth")
+        for problem in keyed_problems:
+            failed = True
+            print(f"       - {problem}")
+
     if failed:
         print("\nPackage checks failed.")
         return 1

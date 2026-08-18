@@ -824,6 +824,11 @@ registration `gh-databricks-agents-poc`, adds federated credentials for `main` a
 pull requests, grants only the roles listed in [§17](#17-security--networking),
 and writes the repository secrets.
 
+> GitHub now presents **ID-qualified** OIDC subjects, for example
+> `repo:csdmichael@26285760/Azure-Databricks-Private-Agent-APIM@1336581362:ref:refs/heads/main`.
+> A federated credential registered with only the unqualified subject fails with
+> `AADSTS700213`. The script registers **both** forms.
+
 Repository secrets (**Settings → Secrets and variables → Actions**):
 
 | Secret | Used by | Notes |
