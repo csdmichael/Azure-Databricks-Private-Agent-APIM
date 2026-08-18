@@ -67,9 +67,19 @@ else {
 }
 
 Write-Host "== Federated credentials ==" -ForegroundColor Cyan
+# GitHub issues ID-qualified subjects, e.g.
+#   repo:<owner>@<ownerId>/<repo>@<repoId>:ref:refs/heads/main
+# Older, unqualified subjects are still registered so either form is accepted.
+$repoInfo = gh api "repos/$Repository" --jq "{id: .id, ownerId: .owner.id}" | ConvertFrom-Json
+if (-not $repoInfo.id) { throw "Could not read repository ids for $Repository." }
+$owner, $name = $Repository -split "/", 2
+$qualified = "$owner@$($repoInfo.ownerId)/$name@$($repoInfo.id)"
+
 $credentials = @(
-    @{ name = "github-main"; subject = "repo:$($Repository):ref:refs/heads/main" }
-    @{ name = "github-pr";   subject = "repo:$($Repository):pull_request" }
+    @{ name = "github-main";    subject = "repo:$($Repository):ref:refs/heads/main" }
+    @{ name = "github-pr";      subject = "repo:$($Repository):pull_request" }
+    @{ name = "github-main-id"; subject = "repo:$($qualified):ref:refs/heads/main" }
+    @{ name = "github-pr-id";   subject = "repo:$($qualified):pull_request" }
 )
 $existingNames = Get-AzValue @("ad", "app", "federated-credential", "list", "--id", $appId, "--query", "[].name", "-o", "tsv")
 foreach ($credential in $credentials) {
