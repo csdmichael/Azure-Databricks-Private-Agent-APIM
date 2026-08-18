@@ -1,0 +1,72 @@
+name: Provision Foundry Databricks Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_smoke_test:
+        description: "Query Databricks and generate a PowerPoint smoke-test artifact"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "foundry/**"
+      - ".github/workflows/provision-foundry-agent.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: provision-foundry-databricks-agent
+  cancel-in-progress: false
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ai-myaacoub
+  FOUNDRY_ACCOUNT_NAME: 002-ai-poc-private
+  FOUNDRY_PROJECT_NAME: proj-default
+  FOUNDRY_PROJECT_ENDPOINT: https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default
+  FOUNDRY_AGENT_NAME: databricks-agent-mcp
+  FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-4.1
+  MCP_CONNECTION_NAME: databricks-apim-mcp
+  MCP_SERVER_URL: https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp
+  APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
+
+jobs:
+  provision-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: foundry/requirements.txt
+
+      - name: Install Foundry SDK
+        run: python -m pip install --requirement foundry/requirements.txt
+
+      - name: Create or update agent
+        run: >-
+          python foundry/provision_agent.py
+          ${{ (github.event_name == 'workflow_dispatch' && !inputs.run_smoke_test) && '--skip-test' || '' }}
+
+      - name: Upload generated PowerPoint
+        if: ${{ github.event_name == 'push' || inputs.run_smoke_test }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: databricks-agent-pptx-smoke-test
+          path: artifacts/*.pptx
+          if-no-files-found: error
+          retention-days: 7

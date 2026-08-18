@@ -38,3 +38,8 @@ Thumbs.db
 tmp/
 out/
 *.zip
+
+# Foundry agent smoke-test output
+artifacts/
+__pycache__/
+*.pyc

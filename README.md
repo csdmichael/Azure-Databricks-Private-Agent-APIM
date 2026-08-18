@@ -132,6 +132,9 @@ Azure-Databricks-Private-Agent-APIM/
 │  ├─ main.bicep                   # Databricks SQL + Genie APIs, product, policies
 │  ├─ policies/                    # Managed-identity auth + request-shaping XML
 │  ├─ deploy-apim.ps1  enable-mcp.ps1
+├─ foundry/
+│  ├─ provision_agent.py           # Upserts MCP + Code Interpreter prompt agent and tests PPTX output
+│  └─ requirements.txt             # Pinned Foundry SDK dependency
 ├─ scripts/
 │  ├─ deploy.ps1                   # terraform init/plan/apply wrapper
 │  ├─ load-sample-data.ps1         # Serverless warehouse + SQL Statement Execution API
@@ -475,12 +478,30 @@ The Genie **Conversation API** is reachable through APIM at
 [`.github/workflows/provision-databricks.yml`](.github/workflows/provision-databricks.yml)
 provisions the infra with Terraform using **OIDC** (no stored credentials).
 
+[`provision-foundry-agent.yml`](.github/workflows/provision-foundry-agent.yml)
+creates or updates the `databricks-agent-mcp` prompt agent in
+`002-ai-poc-private/proj-default`. The agent uses the APIM Databricks MCP server
+for grounded data access and Code Interpreter for charts and PowerPoint files.
+Its smoke test queries regional revenue, generates a `.pptx`, downloads it,
+validates the Office Open XML package, and publishes it as a workflow artifact.
+
 Configure once in **Settings → Secrets and variables → Actions**:
 - Secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
   (federated credential on an Entra app with Contributor on `ai-myaacoub`).
+- Secret: `APIM_SUBSCRIPTION_KEY` (a key for the APIM product containing the
+  Databricks MCP API). The workflow stores it in a Foundry project connection;
+  it is not embedded in the agent definition or repository.
+
+The OIDC principal also needs **Foundry User** and **Foundry Project Manager** on
+the Foundry project so it can create agent versions, invoke the agent, and
+create or rotate the MCP project connection.
 
 Run **Actions → Provision Databricks (Private VNet) → Run workflow**
 (`apply=true`, `load_sample_data=true`).
+
+Run **Actions → Provision Foundry Databricks Agent → Run workflow** to upsert and
+test the agent. Disable `run_smoke_test` only when rotating configuration without
+incurring a Code Interpreter session; normal pushes run the full smoke test.
 
 ---
 
