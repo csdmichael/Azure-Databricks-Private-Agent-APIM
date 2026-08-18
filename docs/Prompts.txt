@@ -12,3 +12,11 @@ Add urls for databricks, its genie agent, apim endpoints configured for databric
 Document sample data added in databricks and how to query it and expected results.
 Show sample api calls in apim that retrieve data from Databricks.
 The goal of this POC is that business users generate PPT presentations from Databricks data using Copilot Studio agents or Co-Work so make the sample data in databricks good to show visualizations in ppt presentations for chip manufacturing company like Arrow Electronics.
+
+Build another Foundry agent in same foundry project that use databricks genie api as a tool.
+Then build a UI in Angular / Ionic / Typescript that has Rich Text area (WYSIWYG) chat box with tabs to pick agent and chat with it in UI.
+Add Microsoft logo in header and Michael yaacoub | Sr Solution Engineer in footer and link to this github repo.
+For API, make it in python and add swagger urls.
+Commit, publish code and build github workflow separate for ui versus api and will run automatically when corresponding component get updated.
+Update readme with deployed resources urls including ui, api, swagger api documentation.
+Add module in UI to download agents as packages to upload them to M365 Dev Portal with their own icons. Test these packages to ensure that they will deploy well in M365

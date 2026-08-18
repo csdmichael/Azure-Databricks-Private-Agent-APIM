@@ -1,0 +1,99 @@
+name: Deploy Agents API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "scripts/build_m365_packages.py"
+      - "scripts/requirements-dev.txt"
+      - ".github/workflows/deploy-api.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-databricks-agents-api
+  cancel-in-progress: true
+
+env:
+  AZURE_RESOURCE_GROUP: ai-myaacoub
+  API_APP_NAME: databricks-agents-api-my
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r api/requirements.txt -r scripts/requirements-dev.txt
+
+      - name: Import check
+        working-directory: api
+        run: python -c "from app.main import app; print(len(app.routes), 'routes')"
+
+      - name: Build and validate Microsoft 365 agent packages
+        run: python scripts/build_m365_packages.py
+
+      - name: Upload Microsoft 365 packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: m365-agent-packages
+          path: artifacts/m365/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Package API
+        run: |
+          cd api
+          zip -r ../api.zip . -x '*.pyc' -x '__pycache__/*' -x '*/__pycache__/*'
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        run: |
+          az webapp deploy \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$API_APP_NAME" \
+            --src-path api.zip \
+            --type zip \
+            --async false
+
+      - name: Wait for the app to come back up
+        run: |
+          url="https://${API_APP_NAME}.azurewebsites.net/health"
+          for attempt in $(seq 1 30); do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 30 "$url" || true)
+            if [ "$code" = "200" ]; then
+              echo "Health check passed:"; cat /tmp/health.json; exit 0
+            fi
+            echo "attempt $attempt: HTTP $code"; sleep 15
+          done
+          echo "API did not become healthy in time"; exit 1
+
+      - name: Verify Swagger and agent catalog
+        run: |
+          base="https://${API_APP_NAME}.azurewebsites.net"
+          curl -sSf "$base/openapi.json" > /dev/null && echo "openapi.json ok"
+          curl -sSf "$base/docs" > /dev/null && echo "swagger ui ok"
+          curl -sSf "$base/api/agents" | head -c 400; echo
+          curl -sSf -o /tmp/pkg.zip "$base/api/m365/packages/databricks-genie"
+          unzip -l /tmp/pkg.zip

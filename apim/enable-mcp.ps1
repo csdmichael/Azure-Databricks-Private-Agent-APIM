@@ -49,11 +49,11 @@ $tmp = New-TemporaryFile
 $bodyObj | ConvertTo-Json -Depth 8 | Set-Content -Path $tmp -Encoding utf8
 
 Write-Host "Creating MCP server '$mcpApiId' (preview)..." -ForegroundColor Yellow
+# Build the URL up front: inline interpolation of the query string has been seen
+# to drop ?api-version when splatted across backtick continuations.
+$mcpUrl = "$base/apis/{0}?api-version={1}" -f $mcpApiId, $ApiVersion
 # az is a native command; check the exit code (try/catch does not trap it).
-$out = az rest --method put `
-  --url "$base/apis/$mcpApiId?api-version=$ApiVersion" `
-  --headers "Content-Type=application/json" `
-  --body "@$tmp" 2>&1
+$out = az rest --method put --url $mcpUrl --headers "Content-Type=application/json" --body "@$($tmp.FullName)" 2>&1
 Remove-Item $tmp -ErrorAction SilentlyContinue
 
 if ($LASTEXITCODE -eq 0) {
