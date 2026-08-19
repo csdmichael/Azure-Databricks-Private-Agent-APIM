@@ -43,18 +43,19 @@ $listSecrets = "https://management.azure.com/subscriptions/$SubscriptionId/resou
 $env:APIM_SUBSCRIPTION_KEY = az rest --method post --url $listSecrets --query primaryKey -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $env:APIM_SUBSCRIPTION_KEY) { throw "Unable to read the APIM subscription key." }
 
-$testArg = if ($SkipTest) { @("--skip-test") } else { @() }
+$testArgs = @()
+if ($SkipTest) { $testArgs += "--skip-test" }
 
 try {
     Push-Location (Join-Path $repoRoot "foundry")
     if ($Agent -in @("all", "databricks")) {
         Write-Host "== databricks-agent-mcp ==" -ForegroundColor Cyan
-        & $PythonExe "provision_agent.py" @testArg --output-dir (Join-Path $repoRoot "artifacts")
+    & $PythonExe "provision_agent.py" @testArgs --output-dir (Join-Path $repoRoot "artifacts")
         if ($LASTEXITCODE -ne 0) { throw "provision_agent.py failed with exit code $LASTEXITCODE" }
     }
     if ($Agent -in @("all", "genie")) {
         Write-Host "== databricks-genie-agent ==" -ForegroundColor Cyan
-        & $PythonExe "provision_genie_agent.py" @testArg --output-dir (Join-Path $repoRoot "artifacts")
+    & $PythonExe "provision_genie_agent.py" @testArgs --output-dir (Join-Path $repoRoot "artifacts")
         if ($LASTEXITCODE -ne 0) { throw "provision_genie_agent.py failed with exit code $LASTEXITCODE" }
     }
 }
