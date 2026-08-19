@@ -28,6 +28,8 @@ export interface GeneratedFile {
   containerId: string;
   filename: string;
   downloadUrl: string;
+  previewUrl?: string;
+  mediaType?: string;
 }
 
 export interface ChatResult {

@@ -11,17 +11,33 @@ import {
   IonSpinner,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { addOutline, cloudDownloadOutline, sendOutline, sparklesOutline } from 'ionicons/icons';
+import {
+  addOutline,
+  barChartOutline,
+  cloudDownloadOutline,
+  sendOutline,
+  sparklesOutline,
+} from 'ionicons/icons';
 import { QuillEditorComponent } from 'ngx-quill';
 
 import { AgentSummary, ApiService, GeneratedFile } from '../core/api.service';
 import { htmlToMarkdown, renderMarkdown } from '../core/markdown';
+
+interface PreviewableFile extends GeneratedFile {
+  previewUrl: string;
+  mediaType: string;
+}
 
 interface ChatMessage {
   role: 'user' | 'agent';
   html: string;
   toolCalls?: string[];
   files?: GeneratedFile[];
+  charts?: PreviewableFile[];
+}
+
+function isPreviewableFile(file: GeneratedFile): file is PreviewableFile {
+  return Boolean(file.previewUrl && file.mediaType?.startsWith('image/'));
 }
 
 @Component({
@@ -66,7 +82,13 @@ export class ChatPage implements OnInit {
   };
 
   constructor() {
-    addIcons({ sendOutline, addOutline, cloudDownloadOutline, sparklesOutline });
+    addIcons({
+      sendOutline,
+      addOutline,
+      barChartOutline,
+      cloudDownloadOutline,
+      sparklesOutline,
+    });
   }
 
   ngOnInit(): void {
@@ -134,7 +156,8 @@ export class ChatPage implements OnInit {
               status.result.reply || '_The agent finished without a text answer._',
             ),
             toolCalls: status.result.toolCalls,
-            files: status.result.files,
+            charts: status.result.files.filter(isPreviewableFile),
+            files: status.result.files.filter((file) => !isPreviewableFile(file)),
           });
           this.sending = false;
           this.scrollToBottom();

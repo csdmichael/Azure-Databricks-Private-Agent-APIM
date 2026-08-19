@@ -10,7 +10,7 @@
   // Floor keeps the layout usable if the host reports a degenerate viewport.
   min-height: 32rem;
   overflow: hidden;
-  background: var(--app-surface);
+  background: linear-gradient(180deg, #f8fafb 0, var(--app-surface) 100%);
 }
 
 .shell-header {
@@ -19,10 +19,12 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  padding: 12px 24px;
+  min-height: 64px;
+  padding: 10px 32px;
   background: #ffffff;
   border-bottom: 1px solid var(--app-border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(23, 33, 43, 0.06);
+  z-index: 2;
 }
 
 .brand {
@@ -46,13 +48,14 @@
 }
 
 .brand-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--app-text);
 }
 
 .brand-product {
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--app-muted);
 }
 
@@ -64,20 +67,30 @@
 }
 
 .shell-nav a {
-  padding: 7px 12px;
-  border-radius: 6px;
+  position: relative;
+  padding: 10px 12px;
   font-size: 13px;
-  font-weight: 500;
-  color: #3a3a3a;
+  font-weight: 600;
+  color: #46525d;
   text-decoration: none;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.05);
+    color: var(--app-text);
+    background: #f2f5f7;
   }
 
   &.active {
-    background: rgba(0, 120, 212, 0.12);
-    color: #0f5ba7;
+    color: var(--ion-color-primary);
+
+    &::after {
+      position: absolute;
+      right: 12px;
+      bottom: 2px;
+      left: 12px;
+      height: 2px;
+      background: var(--ion-color-primary);
+      content: '';
+    }
   }
 }
 
@@ -95,7 +108,7 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 24px;
+  padding: 10px 32px;
   background: #ffffff;
   border-top: 1px solid var(--app-border);
   font-size: 12px;
@@ -113,7 +126,7 @@
 }
 
 .footer-links a {
-  color: #0f5ba7;
+  color: var(--ion-color-primary);
   text-decoration: none;
 
   &:hover {
@@ -121,9 +134,45 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .shell-main {
+    flex: 1 0 auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
   .shell-header,
   .shell-footer {
     padding: 10px 14px;
+  }
+
+  .shell-header {
+    align-items: stretch;
+  }
+
+  .shell-nav {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .shell-nav a {
+    flex: none;
+  }
+
+  .shell-footer {
+    align-items: flex-start;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .footer-links {
+    flex-wrap: wrap;
   }
 }

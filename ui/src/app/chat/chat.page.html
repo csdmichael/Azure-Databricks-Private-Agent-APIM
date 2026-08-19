@@ -4,6 +4,7 @@
   <ion-segment
     *ngIf="agents.length"
     class="agent-tabs"
+    [scrollable]="true"
     [value]="selectedAgentId"
     (ionChange)="selectAgent($any($event.detail.value))"
   >
@@ -17,11 +18,17 @@
   </ion-segment>
 
   <div class="agent-header" *ngIf="selectedAgent as agent">
-    <div class="agent-header-text">
-      <h2>{{ agent.displayName }}</h2>
-      <p>{{ agent.description }}</p>
-      <div class="agent-tools">
-        <ion-chip *ngFor="let tool of agent.tools" outline="true">{{ tool }}</ion-chip>
+    <div class="agent-summary">
+      <img class="agent-header-icon" [src]="agent.iconUrl" alt="" />
+      <div class="agent-header-text">
+        <div class="agent-title-row">
+          <h1>{{ agent.displayName }}</h1>
+          <span class="availability"><span></span>Available</span>
+        </div>
+        <p>{{ agent.description }}</p>
+        <div class="agent-tools" aria-label="Agent tools">
+          <ion-chip *ngFor="let tool of agent.tools" outline="true">{{ tool }}</ion-chip>
+        </div>
       </div>
     </div>
     <ion-button fill="outline" size="small" (click)="newConversation()">
@@ -47,13 +54,46 @@
       </button>
     </div>
 
-    <div class="message" *ngFor="let message of messages" [class.from-user]="message.role === 'user'">
-      <div class="bubble">
+    <div
+      class="message"
+      *ngFor="let message of messages"
+      [class.from-user]="message.role === 'user'"
+    >
+      <div class="message-avatar" *ngIf="message.role === 'agent' && selectedAgent as agent">
+        <img [src]="agent.iconUrl" alt="" />
+      </div>
+      <article class="bubble">
+        <div class="message-meta">
+          {{ message.role === 'user' ? 'You' : selectedAgent?.shortName }}
+        </div>
         <div class="bubble-body" [innerHTML]="message.html"></div>
 
         <div class="tool-calls" *ngIf="message.toolCalls?.length">
           <span class="tool-calls-label">Tools used</span>
           <ion-chip *ngFor="let tool of message.toolCalls" outline="true">{{ tool }}</ion-chip>
+        </div>
+
+        <div class="charts" *ngIf="message.charts?.length">
+          <figure class="chart" *ngFor="let file of message.charts">
+            <div class="chart-viewport">
+              <img
+                [src]="file.previewUrl"
+                [alt]="'Generated chart: ' + file.filename"
+              />
+            </div>
+            <figcaption>
+              <span><ion-icon name="bar-chart-outline"></ion-icon>{{ file.filename }}</span>
+              <a
+                [href]="file.downloadUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                [attr.aria-label]="'Download ' + file.filename"
+              >
+                <ion-icon name="cloud-download-outline"></ion-icon>
+                Download
+              </a>
+            </figcaption>
+          </figure>
         </div>
 
         <div class="files" *ngIf="message.files?.length">
@@ -68,26 +108,38 @@
             {{ file.filename }}
           </a>
         </div>
-      </div>
+      </article>
     </div>
 
     <div class="message" *ngIf="sending">
-      <div class="bubble thinking">
-        <ion-spinner name="dots"></ion-spinner>
-        <span>Querying Databricks and building the answer…</span>
+      <div class="message-avatar" *ngIf="selectedAgent as agent">
+        <img [src]="agent.iconUrl" alt="" />
+      </div>
+      <div class="bubble">
+        <div class="message-meta">{{ selectedAgent?.shortName }}</div>
+        <div class="thinking">
+          <ion-spinner name="dots"></ion-spinner>
+          <span>Querying Databricks and building the answer…</span>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="composer">
+    <div class="composer-heading">
+      <div>
+        <strong>Ask {{ selectedAgent?.shortName || 'an agent' }}</strong>
+        <span>Private, governed data workspace</span>
+      </div>
+      <span class="composer-status"><span></span>Ready</span>
+    </div>
     <quill-editor
       [(ngModel)]="draft"
       [modules]="quillModules"
-      [styles]="{ height: '140px' }"
+      [styles]="{ height: '210px' }"
       placeholder="Ask about revenue, yield, defects, inventory or suppliers. Ask for a chart or a PowerPoint."
     ></quill-editor>
     <div class="composer-actions">
-      <span class="composer-hint">Rich text is converted to Markdown before it reaches the agent.</span>
       <ion-button (click)="send()" [disabled]="sending || !selectedAgent">
         <ion-icon slot="start" name="send-outline"></ion-icon>
         Send

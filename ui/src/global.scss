@@ -38,14 +38,19 @@
 /* This POC pins a light Microsoft-style surface, so system dark mode is not imported. */
 
 :root {
-  --app-surface: #f5f5f5;
-  --app-border: #e1e1e1;
-  --app-muted: #616161;
-  --ion-color-primary: #0f5ba7;
-  --ion-color-primary-rgb: 15, 91, 167;
+  --app-surface: #f3f6f8;
+  --app-panel: #ffffff;
+  --app-border: #d7dee5;
+  --app-border-strong: #bdc8d2;
+  --app-text: #17212b;
+  --app-muted: #5c6873;
+  --app-success: #247a55;
+  --app-shadow: 0 4px 14px rgba(23, 33, 43, 0.07);
+  --ion-color-primary: #075ea8;
+  --ion-color-primary-rgb: 7, 94, 168;
   --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-shade: #0d4f93;
-  --ion-color-primary-tint: #276bb0;
+  --ion-color-primary-shade: #065394;
+  --ion-color-primary-tint: #206eb1;
 }
 
 html,
@@ -53,7 +58,7 @@ body {
   height: 100%;
   margin: 0;
   background: var(--app-surface);
-  color: #201f1e;
+  color: var(--app-text);
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
 }
 
@@ -70,5 +75,29 @@ body {
 .ql-container.ql-snow {
   border-radius: 0 0 8px 8px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
+}
+
+.ql-editor {
+  line-height: 1.6;
+  padding: 16px 18px;
+}
+
+.ql-editor.ql-blank::before {
+  color: #77838e;
+  font-style: normal;
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body {
+    position: static;
+  }
 }
