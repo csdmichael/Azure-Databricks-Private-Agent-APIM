@@ -10,6 +10,7 @@ Interactive docs: /docs (Swagger UI) and /redoc.
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -109,6 +110,8 @@ class GeneratedFileModel(BaseModel):
     containerId: str
     filename: str
     downloadUrl: str
+    previewUrl: str | None = None
+    mediaType: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -159,6 +162,20 @@ def _agent_or_404(agent_id: str):
 
 def _base_url() -> str:
     return settings.public_api_url
+
+
+PREVIEW_IMAGE_TYPES = {
+    "gif": "image/gif",
+    "jpeg": "image/jpeg",
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+
+
+def _preview_media_type(filename: str) -> str | None:
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    return PREVIEW_IMAGE_TYPES.get(extension)
 
 
 def _summary(agent) -> AgentSummary:
@@ -215,23 +232,30 @@ def get_agent_icon(agent_id: str) -> Response:
 
 def _chat_response(agent, reply) -> ChatResponse:
     base = _base_url()
+    generated_files = []
+    for file in reply.files:
+        encoded_filename = quote(file.filename, safe="")
+        download_url = (
+            f"{base}/api/files/{file.container_id}/{file.file_id}"
+            f"?filename={encoded_filename}"
+        )
+        media_type = _preview_media_type(file.filename)
+        generated_files.append(
+            GeneratedFileModel(
+                fileId=file.file_id,
+                containerId=file.container_id,
+                filename=file.filename,
+                downloadUrl=download_url,
+                previewUrl=f"{download_url}&inline=true" if media_type else None,
+                mediaType=media_type,
+            )
+        )
     return ChatResponse(
         agentId=agent.id,
         conversationId=reply.conversation_id,
         reply=reply.text,
         toolCalls=reply.tool_calls,
-        files=[
-            GeneratedFileModel(
-                fileId=file.file_id,
-                containerId=file.container_id,
-                filename=file.filename,
-                downloadUrl=(
-                    f"{base}/api/files/{file.container_id}/{file.file_id}"
-                    f"?filename={file.filename}"
-                ),
-            )
-            for file in reply.files
-        ],
+        files=generated_files,
     )
 
 
@@ -291,6 +315,7 @@ def download_generated_file(
     container_id: str,
     file_id: str,
     filename: str = Query("download", description="Name to save the file as."),
+    inline: bool = Query(False, description="Display supported chart images in the browser."),
 ) -> Response:
     """Downloads a file (usually a .pptx) produced by Code Interpreter."""
     safe_name = filename.replace("\\", "/").split("/")[-1] or "download"
@@ -299,15 +324,23 @@ def download_generated_file(
     except Exception as error:
         logger.exception("File download failed")
         raise HTTPException(status_code=404, detail=f"File not available: {error}") from error
-    media_type = (
+    preview_media_type = _preview_media_type(safe_name)
+    media_type = preview_media_type or (
         "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         if safe_name.lower().endswith(".pptx")
         else "application/octet-stream"
     )
+    disposition = "inline" if inline and preview_media_type else "attachment"
+    header_name = safe_name.replace('"', "'").replace("\r", "").replace("\n", "")
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+        headers={
+            "Content-Disposition": (
+                f'{disposition}; filename="{header_name}"; '
+                f"filename*=UTF-8''{quote(safe_name, safe='')}"
+            )
+        },
     )
 
 
