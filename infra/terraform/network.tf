@@ -25,10 +25,11 @@ resource "azurerm_network_security_group" "databricks" {
 
 # Host (a.k.a. public) delegated subnet.
 resource "azurerm_subnet" "host" {
-  name                 = "databricks-host"
-  resource_group_name  = data.azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.host_subnet_cidr]
+  name                            = "databricks-host"
+  resource_group_name             = data.azurerm_resource_group.this.name
+  virtual_network_name            = azurerm_virtual_network.this.name
+  address_prefixes                = [var.host_subnet_cidr]
+  default_outbound_access_enabled = false
 
   delegation {
     name = "databricks-host-delegation"
@@ -45,10 +46,11 @@ resource "azurerm_subnet" "host" {
 
 # Container (a.k.a. private) delegated subnet.
 resource "azurerm_subnet" "container" {
-  name                 = "databricks-container"
-  resource_group_name  = data.azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.container_subnet_cidr]
+  name                            = "databricks-container"
+  resource_group_name             = data.azurerm_resource_group.this.name
+  virtual_network_name            = azurerm_virtual_network.this.name
+  address_prefixes                = [var.container_subnet_cidr]
+  default_outbound_access_enabled = false
 
   delegation {
     name = "databricks-container-delegation"
@@ -69,6 +71,7 @@ resource "azurerm_subnet" "private_endpoints" {
   resource_group_name               = data.azurerm_resource_group.this.name
   virtual_network_name              = azurerm_virtual_network.this.name
   address_prefixes                  = [var.private_endpoint_subnet_cidr]
+  default_outbound_access_enabled   = false
   private_endpoint_network_policies = "Disabled"
 }
 
