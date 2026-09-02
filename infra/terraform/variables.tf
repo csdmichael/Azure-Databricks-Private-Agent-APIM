@@ -22,6 +22,18 @@ variable "workspace_name" {
   default     = "databricks-ws-ai-poc"
 }
 
+variable "replica_workspace_name" {
+  description = "Azure Databricks replica workspace name."
+  type        = string
+  default     = "databricks-ws-ai-poc2"
+}
+
+variable "replica_location" {
+  description = "Azure region for the replica workspace and its injected VNet."
+  type        = string
+  default     = "westus2"
+}
+
 variable "sku" {
   description = "Databricks pricing tier. Premium is required for Unity Catalog, Genie (AI/BI) and Private Link."
   type        = string
@@ -56,6 +68,36 @@ variable "private_endpoint_subnet_cidr" {
   description = "Subnet that hosts Private Link private endpoints."
   type        = string
   default     = "10.179.3.0/24"
+}
+
+variable "replica_vnet_name" {
+  description = "Virtual network name for the replica workspace."
+  type        = string
+  default     = "databricks-vnet-ai-poc2"
+}
+
+variable "replica_vnet_cidr" {
+  description = "Non-overlapping address space for the replica workspace VNet."
+  type        = string
+  default     = "10.180.0.0/16"
+}
+
+variable "replica_host_subnet_cidr" {
+  description = "Replica Databricks host delegated subnet."
+  type        = string
+  default     = "10.180.1.0/24"
+}
+
+variable "replica_container_subnet_cidr" {
+  description = "Replica Databricks container delegated subnet."
+  type        = string
+  default     = "10.180.2.0/24"
+}
+
+variable "replica_private_endpoint_subnet_cidr" {
+  description = "Replica subnet that hosts Private Link private endpoints."
+  type        = string
+  default     = "10.180.3.0/24"
 }
 
 variable "enable_private_link" {
