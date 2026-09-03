@@ -21,6 +21,13 @@ resource "azurerm_network_security_group" "replica_databricks" {
   tags                = local.replica_tags
 }
 
+resource "azurerm_network_security_group" "replica_private_endpoints" {
+  name                = "${var.replica_vnet_name}-private-endpoints-nsg-${var.replica_location}"
+  location            = var.replica_location
+  resource_group_name = data.azurerm_resource_group.this.name
+  tags                = local.replica_tags
+}
+
 resource "azurerm_subnet" "replica_host" {
   name                            = "databricks-host"
   resource_group_name             = data.azurerm_resource_group.this.name
@@ -78,6 +85,11 @@ resource "azurerm_subnet_network_security_group_association" "replica_host" {
 resource "azurerm_subnet_network_security_group_association" "replica_container" {
   subnet_id                 = azurerm_subnet.replica_container.id
   network_security_group_id = azurerm_network_security_group.replica_databricks.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "replica_private_endpoints" {
+  subnet_id                 = azurerm_subnet.replica_private_endpoints.id
+  network_security_group_id = azurerm_network_security_group.replica_private_endpoints.id
 }
 
 resource "azurerm_databricks_workspace" "replica" {
