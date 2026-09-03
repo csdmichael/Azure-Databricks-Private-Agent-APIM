@@ -20,6 +20,12 @@ param databricksWorkspaceUrl string
 @description('Databricks serverless SQL warehouse id.')
 param databricksWarehouseId string
 
+@description('Unity Catalog catalog exposed through the Databricks SQL API.')
+param databricksCatalog string = 'databricks_ws_ai_poc'
+
+@description('Unity Catalog schema exposed through the Databricks SQL API.')
+param databricksSchema string = 'arrow_semiconductor'
+
 @description('Databricks Genie space id (optional; set later if not ready).')
 param genieSpaceId string = ''
 
@@ -48,6 +54,26 @@ resource nvWarehouseId 'Microsoft.ApiManagement/service/namedValues@2023-09-01-p
   }
 }
 
+resource nvCatalog 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'databricks-catalog'
+  properties: {
+    displayName: 'databricks-catalog'
+    value: databricksCatalog
+    secret: false
+  }
+}
+
+resource nvSchema 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'databricks-schema'
+  properties: {
+    displayName: 'databricks-schema'
+    value: databricksSchema
+    secret: false
+  }
+}
+
 resource nvGenieSpace 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
   parent: apim
   name: 'databricks-genie-space-id'
@@ -64,7 +90,7 @@ resource dbxApi 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
   name: 'databricks'
   properties: {
     displayName: 'Databricks SQL'
-    description: 'Query the private Databricks warehouse (databricks_ws_ai_poc.arrow_semiconductor sample data).'
+    description: 'Query the private Databricks warehouse (${databricksCatalog}.${databricksSchema}).'
     path: 'databricks'
     protocols: [ 'https' ]
     subscriptionRequired: true
@@ -99,7 +125,7 @@ resource opQuery 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-pre
           examples: {
             default: {
               value: {
-                statement: 'SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales GROUP BY region ORDER BY revenue_musd DESC'
+                statement: 'SHOW TABLES IN ${databricksCatalog}.${databricksSchema}'
               }
             }
           }
@@ -124,10 +150,10 @@ resource opTables 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-pr
   parent: dbxApi
   name: 'tables'
   properties: {
-    displayName: 'List sample tables'
+    displayName: 'List schema tables'
     method: 'GET'
     urlTemplate: '/tables'
-    description: 'Lists tables in databricks_ws_ai_poc.arrow_semiconductor.'
+    description: 'Lists tables in ${databricksCatalog}.${databricksSchema}.'
     responses: [ { statusCode: 200, description: 'Table list' } ]
   }
 }
@@ -139,7 +165,11 @@ resource opTablesPolicy 'Microsoft.ApiManagement/service/apis/operations/policie
     format: 'rawxml'
     value: loadTextContent('./policies/databricks-tables-operation-policy.xml')
   }
-  dependsOn: [ nvWarehouseId ]
+  dependsOn: [
+    nvWarehouseId
+    nvCatalog
+    nvSchema
+  ]
 }
 
 // ---------------- Databricks Genie API ---------------------------------
@@ -306,6 +336,22 @@ resource productGenieApi 'Microsoft.ApiManagement/service/products/apiLinks@2023
   }
 }
 
+resource databricksSubscription 'Microsoft.ApiManagement/service/subscriptions@2023-09-01-preview' = {
+  parent: apim
+  name: 'DatabricksSubscription'
+  properties: {
+    allowTracing: false
+    displayName: 'Databricks Subscription'
+    scope: product.id
+    state: 'active'
+  }
+  dependsOn: [
+    productDbxApi
+    productGenieApi
+  ]
+}
+
 output databricksApiPath string = 'https://${apimServiceName}.azure-api.net/databricks'
 output genieApiPath string = 'https://${apimServiceName}.azure-api.net/databricks-genie'
 output productName string = product.name
+output subscriptionName string = databricksSubscription.name

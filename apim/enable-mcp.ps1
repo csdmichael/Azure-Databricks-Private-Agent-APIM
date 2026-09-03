@@ -21,6 +21,7 @@ param(
   [string] $SourceApiId = "databricks",
   [string] $McpDisplayName = "Databricks MCP",
   [string] $McpPath = "databricks-mcp",
+  [string] $ProductId = "databricks-agents",
   [string] $ApiVersion = "2024-06-01-preview"
 )
 
@@ -41,6 +42,7 @@ $bodyObj = @{
     displayName = $McpDisplayName
     path        = $McpPath
     protocols   = @("https")
+    subscriptionRequired = $true
     # Each tool maps to an operation of the source API (full resource id required).
     mcpTools    = @($opIds | ForEach-Object { @{ name = $_; operationId = "$srcApiResourceId/operations/$_" } })
   }
@@ -57,7 +59,18 @@ $out = az rest --method put --url $mcpUrl --headers "Content-Type=application/js
 Remove-Item $tmp -ErrorAction SilentlyContinue
 
 if ($LASTEXITCODE -eq 0) {
-  Write-Host "MCP server created." -ForegroundColor Green
+  $linkBody = @{ properties = @{ apiId = "$base/apis/$mcpApiId" } }
+  $linkFile = New-TemporaryFile
+  $linkBody | ConvertTo-Json -Depth 5 | Set-Content -Path $linkFile -Encoding utf8
+  $linkUrl = "$base/products/$ProductId/apiLinks/link-$mcpApiId`?api-version=$ApiVersion"
+  $linkOut = az rest --method put --url $linkUrl --headers "Content-Type=application/json" --body "@$($linkFile.FullName)" 2>&1
+  $linkExit = $LASTEXITCODE
+  Remove-Item $linkFile -ErrorAction SilentlyContinue
+  if ($linkExit -ne 0) {
+    throw "MCP server was created, but linking it to product '$ProductId' failed (exit $linkExit): $linkOut"
+  }
+
+  Write-Host "MCP server created and linked to product '$ProductId'." -ForegroundColor Green
   Write-Host "MCP endpoint: https://$ApimName.azure-api.net/$McpPath/mcp" -ForegroundColor Green
 }
 else {
