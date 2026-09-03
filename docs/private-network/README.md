@@ -595,6 +595,7 @@ no keys or tokens.
 | Genie REST API | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-genie` |
 | SQL MCP | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-mcp/mcp` |
 | Genie MCP | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-genie-mcp/mcp` |
+| Power Platform enterprise policy | [Open `power-platform-network-injection-us` in Azure portal](https://portal.azure.com/#@b158173c-91f6-4f99-b5e9-aa9bcb463863/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview) |
 
 ### Databricks resources
 
@@ -647,6 +648,11 @@ The APIM managed identity has principal ID
 | APIM to West peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-power-platform-westus` |
 | West APIM DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/power-platform-westus-apim-dns-link` |
 | Network-injection policy | United States | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us` |
+
+The enterprise policy is an ARM control-plane resource and has no public
+runtime endpoint. Use its [Azure portal URL](https://portal.azure.com/#@b158173c-91f6-4f99-b5e9-aa9bcb463863/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview)
+to inspect it. Pass the full ARM resource ID from the table to
+`Enable-SubnetInjection -PolicyArmId`.
 
 ## Repository files used by this runbook
 
