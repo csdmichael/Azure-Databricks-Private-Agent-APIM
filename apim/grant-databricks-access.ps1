@@ -4,7 +4,7 @@
   workspace so APIM can query it on behalf of agents:
     1. Adds the MI as a workspace service principal (SCIM).
     2. Grants CAN_USE on the SQL warehouse.
-    3. Grants USE CATALOG / USE SCHEMA / SELECT on the sample data.
+    3. Grants USE CATALOG / USE SCHEMA / SELECT on the selected schema.
 
   Run as a Databricks workspace admin (the identity that created the workspace).
 

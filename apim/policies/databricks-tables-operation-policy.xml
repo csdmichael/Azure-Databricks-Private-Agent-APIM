@@ -1,5 +1,5 @@
 <!--
-  GET /tables  ->  lists the sample tables in databricks_ws_ai_poc.arrow_semiconductor.
+  GET /tables  ->  lists the sample tables in the configured catalog and schema.
   A fixed, safe read-only statement so agents can discover the schema.
 -->
 <policies>
@@ -10,7 +10,7 @@
     <set-body>@{
       var body = new Newtonsoft.Json.Linq.JObject();
       body["warehouse_id"] = "{{databricks-warehouse-id}}";
-      body["statement"] = "SHOW TABLES IN databricks_ws_ai_poc.arrow_semiconductor";
+      body["statement"] = "SHOW TABLES IN {{databricks-catalog}}.{{databricks-schema}}";
       body["wait_timeout"] = "50s";
       body["on_wait_timeout"] = "CONTINUE";
       body["format"] = "JSON_ARRAY";

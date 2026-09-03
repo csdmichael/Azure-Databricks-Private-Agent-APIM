@@ -1,0 +1,502 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "13143908969439119162"
+    }
+  },
+  "parameters": {
+    "apimServiceName": {
+      "type": "string",
+      "defaultValue": "ai-gateway-apim-poc-my",
+      "metadata": {
+        "description": "Existing API Management service name."
+      }
+    },
+    "databricksWorkspaceUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks workspace URL, e.g. https://adb-123.11.azuredatabricks.net"
+      }
+    },
+    "databricksWarehouseId": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks serverless SQL warehouse id."
+      }
+    },
+    "databricksCatalog": {
+      "type": "string",
+      "defaultValue": "databricks_ws_ai_poc",
+      "metadata": {
+        "description": "Unity Catalog catalog exposed through the Databricks SQL API."
+      }
+    },
+    "databricksSchema": {
+      "type": "string",
+      "defaultValue": "arrow_semiconductor",
+      "metadata": {
+        "description": "Unity Catalog schema exposed through the Databricks SQL API."
+      }
+    },
+    "genieSpaceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Databricks Genie space id (optional; set later if not ready)."
+      }
+    }
+  },
+  "variables": {
+    "$fxv#0": "<!--\r\n  API-level policy for the Databricks API.\r\n  - Uses APIM's system-assigned managed identity to obtain an Entra token for the\r\n    Databricks login application, then forwards it as the backend Authorization.\r\n    (The APIM MI must be added as a user in the Databricks workspace with access\r\n    to the SQL warehouse and the databricks_ws_ai_poc.arrow_semiconductor schema.)\r\n  - Routes all operations to the private workspace control-plane URL.\r\n  - Applies a conservative rate limit for the POC.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"60\" renewal-period=\"60\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>\r\n",
+    "$fxv#1": "<!--\r\n  POST /query  ->  Databricks SQL Statement Execution API.\r\n  Consumers send only { \"statement\": \"SELECT ...\" }.\r\n  The warehouse id and execution options are injected server-side so the\r\n  warehouse stays an internal detail of the gateway.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-body>@{\r\n      var body = context.Request.Body.As<Newtonsoft.Json.Linq.JObject>(preserveContent: true);\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      if (body[\"wait_timeout\"] == null) { body[\"wait_timeout\"] = \"50s\"; }\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#2": "<!--\r\n  GET /tables  ->  lists the sample tables in the configured catalog and schema.\r\n  A fixed, safe read-only statement so agents can discover the schema.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-method>POST</set-method>\r\n    <set-body>@{\r\n      var body = new Newtonsoft.Json.Linq.JObject();\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      body[\"statement\"] = \"SHOW TABLES IN {{databricks-catalog}}.{{databricks-schema}}\";\r\n      body[\"wait_timeout\"] = \"50s\";\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n    <set-header name=\"Content-Type\" exists-action=\"override\">\r\n      <value>application/json</value>\r\n    </set-header>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#3": "<!--\r\n  API-level policy for the Databricks Genie (AI/BI) API.\r\n  Same managed-identity auth + private backend routing as the Databricks API.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"30\" renewal-period=\"60\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#4": "<!-- POST /genie/ask : start a Genie conversation on the configured space. Body: { \"content\": \"natural-language question\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/start-conversation\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#5": "<!-- POST /genie/conversations/{conversationId}/messages : ask a follow-up. Body: { \"content\": \"...\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#6": "<!-- GET /genie/conversations/{conversationId}/messages/{messageId}/result : fetch the SQL result Genie generated. -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}/query-result\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#7": "<!-- GET /genie/conversations/{conversationId}/messages/{messageId} : poll message status and read the text/query attachments. -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-workspace-url')]",
+      "properties": {
+        "displayName": "databricks-workspace-url",
+        "value": "[parameters('databricksWorkspaceUrl')]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-warehouse-id')]",
+      "properties": {
+        "displayName": "databricks-warehouse-id",
+        "value": "[parameters('databricksWarehouseId')]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-catalog')]",
+      "properties": {
+        "displayName": "databricks-catalog",
+        "value": "[parameters('databricksCatalog')]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-schema')]",
+      "properties": {
+        "displayName": "databricks-schema",
+        "value": "[parameters('databricksSchema')]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-genie-space-id')]",
+      "properties": {
+        "displayName": "databricks-genie-space-id",
+        "value": "[if(empty(parameters('genieSpaceId')), 'REPLACE_WITH_GENIE_SPACE_ID', parameters('genieSpaceId'))]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks')]",
+      "properties": {
+        "displayName": "Databricks SQL",
+        "description": "[format('Query the private Databricks warehouse ({0}.{1} sample data).', parameters('databricksCatalog'), parameters('databricksSchema'))]",
+        "path": "databricks",
+        "protocols": [
+          "https"
+        ],
+        "subscriptionRequired": true,
+        "subscriptionKeyParameterNames": {
+          "header": "Ocp-Apim-Subscription-Key"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#0')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-workspace-url')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks', 'query')]",
+      "properties": {
+        "displayName": "Run SQL query",
+        "method": "POST",
+        "urlTemplate": "/query",
+        "description": "Body: { \"statement\": \"SELECT ...\" }. Returns JSON_ARRAY rows.",
+        "request": {
+          "representations": [
+            {
+              "contentType": "application/json",
+              "examples": {
+                "default": {
+                  "value": {
+                    "statement": "[format('SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM {0}.{1}.product_sales GROUP BY region ORDER BY revenue_musd DESC', parameters('databricksCatalog'), parameters('databricksSchema'))]"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "SQL result"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks', 'query', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#1')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-warehouse-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks', 'query')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks', 'tables')]",
+      "properties": {
+        "displayName": "List sample tables",
+        "method": "GET",
+        "urlTemplate": "/tables",
+        "description": "[format('Lists tables in {0}.{1}.', parameters('databricksCatalog'), parameters('databricksSchema'))]",
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Table list"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks', 'tables', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#2')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-catalog')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-schema')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-warehouse-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks', 'tables')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-genie')]",
+      "properties": {
+        "displayName": "Databricks Genie",
+        "description": "Ask natural-language questions of the Databricks data via AI/BI Genie.",
+        "path": "databricks-genie",
+        "protocols": [
+          "https"
+        ],
+        "subscriptionRequired": true,
+        "subscriptionKeyParameterNames": {
+          "header": "Ocp-Apim-Subscription-Key"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#3')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-workspace-url')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie', 'ask')]",
+      "properties": {
+        "displayName": "Ask Genie (start conversation)",
+        "method": "POST",
+        "urlTemplate": "/genie/ask",
+        "description": "Body: { \"content\": \"natural-language question\" }.",
+        "request": {
+          "representations": [
+            {
+              "contentType": "application/json",
+              "examples": {
+                "default": {
+                  "value": {
+                    "content": "What was total revenue by region last quarter?"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Conversation + message ids"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks-genie', 'ask', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#4')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-genie-space-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks-genie', 'ask')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie', 'follow-up')]",
+      "properties": {
+        "displayName": "Ask Genie follow-up",
+        "method": "POST",
+        "urlTemplate": "/genie/conversations/{conversationId}/messages",
+        "templateParameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Message"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks-genie', 'follow-up', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#5')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-genie-space-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks-genie', 'follow-up')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie', 'result')]",
+      "properties": {
+        "displayName": "Get Genie query result",
+        "method": "GET",
+        "urlTemplate": "/genie/conversations/{conversationId}/messages/{messageId}/result",
+        "templateParameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "messageId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Query result"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks-genie', 'result', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#6')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-genie-space-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks-genie', 'result')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie', 'message')]",
+      "properties": {
+        "displayName": "Get Genie message status",
+        "method": "GET",
+        "urlTemplate": "/genie/conversations/{conversationId}/messages/{messageId}",
+        "description": "Poll until status is COMPLETED, then read the text answer and generated SQL from attachments.",
+        "templateParameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "messageId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "responses": [
+          {
+            "statusCode": 200,
+            "description": "Message status and attachments"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks-genie', 'message', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#7')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-genie-space-id')]",
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks-genie', 'message')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-agents')]",
+      "properties": {
+        "displayName": "Databricks Agents",
+        "description": "APIs and MCP tools for Foundry / Copilot Studio agents over private Databricks.",
+        "subscriptionRequired": true,
+        "approvalRequired": false,
+        "state": "published"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products/apiLinks",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-agents', 'link-databricks')]",
+      "properties": {
+        "apiId": "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]",
+        "[resourceId('Microsoft.ApiManagement/service/products', parameters('apimServiceName'), 'databricks-agents')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products/apiLinks",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-agents', 'link-databricks-genie')]",
+      "properties": {
+        "apiId": "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]",
+        "[resourceId('Microsoft.ApiManagement/service/products', parameters('apimServiceName'), 'databricks-agents')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/subscriptions",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'DatabricksSubscription')]",
+      "properties": {
+        "allowTracing": false,
+        "displayName": "Databricks Subscription",
+        "scope": "[resourceId('Microsoft.ApiManagement/service/products', parameters('apimServiceName'), 'databricks-agents')]",
+        "state": "active"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/products', parameters('apimServiceName'), 'databricks-agents')]",
+        "[resourceId('Microsoft.ApiManagement/service/products/apiLinks', parameters('apimServiceName'), 'databricks-agents', 'link-databricks')]",
+        "[resourceId('Microsoft.ApiManagement/service/products/apiLinks', parameters('apimServiceName'), 'databricks-agents', 'link-databricks-genie')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "databricksApiPath": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net/databricks', parameters('apimServiceName'))]"
+    },
+    "genieApiPath": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net/databricks-genie', parameters('apimServiceName'))]"
+    },
+    "productName": {
+      "type": "string",
+      "value": "databricks-agents"
+    },
+    "subscriptionName": {
+      "type": "string",
+      "value": "DatabricksSubscription"
+    }
+  }
+}

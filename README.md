@@ -14,6 +14,12 @@
 [![Data: Databricks](https://img.shields.io/badge/Data-Azure%20Databricks-FF3621)](databricks)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
+**Customer deployment:** Follow the
+[existing Databricks and APIM integration runbook](docs/private-network/README.md)
+when the customer already has private services and data. It covers REST and MCP
+exposure, managed-identity grants, Power Platform VNets, and inline Microsoft
+Learn guidance without reprovisioning Databricks or APIM.
+
 ---
 
 ## Table of contents

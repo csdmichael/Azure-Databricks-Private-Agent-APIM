@@ -1,0 +1,345 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "3668492122929453204"
+    }
+  },
+  "parameters": {
+    "apimServiceName": {
+      "type": "string",
+      "defaultValue": "ai-gateway-apim-poc-my2",
+      "metadata": {
+        "description": "Globally unique API Management service name."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "westus",
+      "metadata": {
+        "description": "Azure region for the API Management service and its dedicated virtual network."
+      }
+    },
+    "publisherName": {
+      "type": "string",
+      "defaultValue": "Azure AI Gateway",
+      "metadata": {
+        "description": "API Management publisher display name."
+      }
+    },
+    "publisherEmail": {
+      "type": "string",
+      "metadata": {
+        "description": "API Management publisher email address."
+      }
+    },
+    "databricksVnetName": {
+      "type": "string",
+      "defaultValue": "databricks-vnet-ai-poc2",
+      "metadata": {
+        "description": "Existing West US 2 Databricks virtual network to peer with the APIM virtual network."
+      }
+    },
+    "databricksPrivateDnsZoneName": {
+      "type": "string",
+      "defaultValue": "privatelink.azuredatabricks.net",
+      "metadata": {
+        "description": "Existing private DNS zone used by Azure Databricks private endpoints."
+      }
+    },
+    "apimPrivateDnsZoneName": {
+      "type": "string",
+      "defaultValue": "privatelink.azure-api.net",
+      "metadata": {
+        "description": "Existing private DNS zone used by API Management private endpoints."
+      }
+    },
+    "publicNetworkAccess": {
+      "type": "string",
+      "allowedValues": [
+        "Enabled",
+        "Disabled"
+      ],
+      "metadata": {
+        "description": "Public ingress state. Use Enabled for initial creation, then Disabled only after validating the private endpoint."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "environment": "poc",
+        "managed_by": "bicep",
+        "workload": "databricks-ai-gateway"
+      }
+    }
+  },
+  "variables": {
+    "apimVnetName": "[format('{0}-vnet', parameters('apimServiceName'))]",
+    "integrationSubnetName": "apim-outbound-integration",
+    "privateEndpointSubnetName": "private-endpoints",
+    "integrationNsgName": "[format('{0}-integration-nsg', parameters('apimServiceName'))]",
+    "privateEndpointNsgName": "[format('{0}-private-endpoints-nsg', parameters('apimServiceName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('integrationNsgName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": []
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('privateEndpointNsgName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": []
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-05-01",
+      "name": "[variables('apimVnetName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.181.0.0/16"
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', variables('apimVnetName'), variables('integrationSubnetName'))]",
+      "properties": {
+        "addressPrefix": "10.181.0.0/24",
+        "delegations": [
+          {
+            "name": "apim-standard-v2-integration",
+            "properties": {
+              "serviceName": "Microsoft.Web/serverFarms"
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('integrationNsgName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('integrationNsgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', variables('apimVnetName'), variables('privateEndpointSubnetName'))]",
+      "properties": {
+        "addressPrefix": "10.181.1.0/24",
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('privateEndpointNsgName'))]"
+        },
+        "privateEndpointNetworkPolicies": "Disabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('privateEndpointNsgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', variables('apimVnetName'), 'apim-to-databricks-poc2')]",
+      "properties": {
+        "allowForwardedTraffic": true,
+        "allowGatewayTransit": false,
+        "allowVirtualNetworkAccess": true,
+        "remoteVirtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('databricksVnetName'))]"
+        },
+        "useRemoteGateways": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('integrationSubnetName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('privateEndpointSubnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', parameters('databricksVnetName'), 'databricks-poc2-to-apim')]",
+      "properties": {
+        "allowForwardedTraffic": true,
+        "allowGatewayTransit": false,
+        "allowVirtualNetworkAccess": true,
+        "remoteVirtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]"
+        },
+        "useRemoteGateways": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('integrationSubnetName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('privateEndpointSubnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', parameters('databricksPrivateDnsZoneName'), format('{0}-databricks-dns-link', parameters('apimServiceName')))]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', parameters('apimPrivateDnsZoneName'), format('{0}-gateway-dns-link', parameters('apimServiceName')))]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('apimVnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', parameters('apimPrivateDnsZoneName'), format('{0}-apim-dns-link', parameters('databricksVnetName')))]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('databricksVnetName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('apimServiceName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "sku": {
+        "name": "StandardV2",
+        "capacity": 1
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "publisherEmail": "[parameters('publisherEmail')]",
+        "publisherName": "[parameters('publisherName')]",
+        "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+        "virtualNetworkType": "External",
+        "virtualNetworkConfiguration": {
+          "subnetResourceId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('integrationSubnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('integrationSubnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-gateway-pe', parameters('apimServiceName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[format('{0}-gateway-connection', parameters('apimServiceName'))]",
+            "properties": {
+              "groupIds": [
+                "Gateway"
+              ],
+              "privateLinkServiceId": "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('privateEndpointSubnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('apimVnetName'), variables('privateEndpointSubnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', format('{0}-gateway-pe', parameters('apimServiceName')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "apim-gateway",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', parameters('apimPrivateDnsZoneName'))]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-gateway-pe', parameters('apimServiceName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "apimResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+    },
+    "apimPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName')), '2024-05-01', 'full').identity.principalId]"
+    },
+    "gatewayUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net', parameters('apimServiceName'))]"
+    },
+    "databricksMcpUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net/databricks-mcp/mcp', parameters('apimServiceName'))]"
+    },
+    "genieMcpUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net/databricks-genie-mcp/mcp', parameters('apimServiceName'))]"
+    },
+    "privateEndpointResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-gateway-pe', parameters('apimServiceName')))]"
+    },
+    "publicNetworkAccessState": {
+      "type": "string",
+      "value": "[parameters('publicNetworkAccess')]"
+    }
+  }
+}
