@@ -1,6 +1,6 @@
 ---
 name: executive-deck-builder
-description: Builds a high-fidelity, executive-ready PowerPoint (.pptx) file from Databricks Genie query results. Use whenever the user asks for a deck, presentation, slides, a report, or a readout. Produces at least nine slides with native charts, tables, KPI tiles, a shapes-based diagram, bullet summaries, and speaker notes, branded with a Microsoft header band, and returns the file for download.
+description: Builds a high-fidelity, executive-ready PowerPoint (.pptx) file from Databricks Genie query results. Use whenever the user asks for a deck, presentation, slides, a report, or a readout. Scales the deck to the question with native charts, tables, KPI tiles, shapes-based diagrams, bullet summaries, and speaker notes, branded with a Microsoft header band, and returns the file for download.
 ---
 
 # Executive deck builder
@@ -81,18 +81,33 @@ do not fake a diagram with text boxes alone.
 
 ## 5. Deck structure
 
-Produce at least nine slides in this order:
+Deck length follows the request and the data, not a fixed template. Ask yourself what the
+question actually needs, then build that.
+
+**Always include these four:**
 
 1. **Title** - deck title, the question asked, the date, and the source
    `Azure Databricks Unity Catalog (private)`.
 2. **Executive summary** - 3 to 5 bullets, each containing a specific number.
-3. **Key stats** - 4 to 6 KPI tiles.
-4. **Trend** - chart over time.
-5. **Comparison** - chart across a categorical dimension.
-6. **Composition** - share of total.
-7. **Data table** - the underlying rows.
-8. **Diagram** - a process or relationship view built from shapes and connectors.
-9. **Findings and recommendations** - each tied to a number from the data.
+3. **Evidence** - at least one chart or table carrying the numbers behind the summary.
+4. **Findings and recommendations** - each tied to a number from the data.
+
+**Add these when the data or the request warrants it:**
+
+| Slide | Include when |
+|---|---|
+| Key stats / KPI tiles | There are 4 or more headline metrics worth isolating |
+| Trend chart | The data has a time dimension |
+| Comparison chart | There is a categorical dimension worth ranking |
+| Composition chart | Share of total is part of the story |
+| Data table | The underlying rows matter or the audience will ask for them |
+| Diagram | A process or relationship view aids understanding |
+| Per-segment detail | The user named specific regions, fabs, or product families |
+
+Honour explicit instructions about length. If the user asks for a short readout, produce
+the four core slides. If they ask for a full review, expand using the table above. A
+typical executive review lands around nine to twelve slides, but never pad a deck to reach
+a number, and never drop evidence to hit one.
 
 Slide titles are assertions carrying a number, for example
 `APAC leads 2025 at $101.85M, 37.5% of total`, never bare labels like `Revenue`.
@@ -104,8 +119,9 @@ source table.
 
 After saving, reopen the file and assert:
 
-- The slide count is at least 9.
-- Every chart slide contains a chart object and every table slide contains a table.
+- The four core slides are present.
+- Every slide you planned exists, and every chart slide contains a chart object and every
+  table slide contains a table.
 - No text frame overflows its shape.
 
 Then state the filename and give a one-line summary of what the deck contains.

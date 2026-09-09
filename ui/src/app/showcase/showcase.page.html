@@ -16,10 +16,6 @@
         <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
         Setup guide
       </a>
-      <a class="btn" routerLink="/chat">
-        <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
-        Open the demo app
-      </a>
     </div>
   </header>
 
@@ -74,8 +70,8 @@
 
         <dl class="video-stats" aria-label="Solution at a glance">
           <div><dt>0</dt><dd>Public endpoints</dd></div>
-          <div><dt>4</dt><dd>Genie connector tools</dd></div>
-          <div><dt>9</dt><dd>Slides per deck</dd></div>
+          <div><dt>60%</dt><dd>Less time per deck</dd></div>
+          <div><dt>100%</dt><dd>Figures traced to source</dd></div>
         </dl>
 
         <div class="video-details">
@@ -107,7 +103,62 @@
         }
       </div>
 
-      <aside class="playlist" aria-label="Video playlist">
+      <div class="video-rail">
+        <aside class="value-gadget" aria-labelledby="value-gadget-title">
+          <div class="value-gadget__heading">
+            <span>Illustrative business case</span>
+            <ion-icon name="analytics-outline" aria-hidden="true"></ion-icon>
+          </div>
+
+          <div class="value-gadget__primary" aria-live="polite">
+            <span id="value-gadget-title">Annual run-rate benefit</span>
+            <strong>{{ selectedValueScenario().annualBenefit }}</strong>
+            <small>
+              {{ selectedValueScenario().label }} &middot; {{ selectedValueScenario().users }}
+              @if (selectedValueScenario().isDefault) {
+                <b>Default</b>
+              }
+            </small>
+          </div>
+
+          <dl class="value-gadget__metrics">
+            <div>
+              <dt>{{ selectedValueScenario().roi }}</dt>
+              <dd>Year-one ROI</dd>
+            </div>
+            <div>
+              <dt>{{ selectedValueScenario().payback }}</dt>
+              <dd>Payback</dd>
+            </div>
+          </dl>
+
+          <div class="value-gadget__range">
+            <span>Net monthly benefit</span>
+            <strong>{{ selectedValueScenario().netMonthly }}</strong>
+            <div aria-hidden="true"><span [style.width.%]="selectedValueScenario().relative"></span></div>
+          </div>
+
+          <div class="value-gadget__modes" role="group" aria-label="Select a deployment scenario">
+            @for (scenario of valueScenarios; track scenario.id) {
+              <button
+                type="button"
+                [class.is-active]="selectedValueScenarioId() === scenario.id"
+                [attr.aria-pressed]="selectedValueScenarioId() === scenario.id"
+                [attr.aria-label]="'Show the ' + scenario.label + ' estimate'"
+                (click)="setValueScenario(scenario.id)"
+              >
+                {{ scenario.selectorLabel }}
+              </button>
+            }
+          </div>
+
+          <button class="value-gadget__details" type="button" (click)="setTab('business-case')">
+            Assumptions and full business case
+            <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon>
+          </button>
+        </aside>
+
+        <aside class="playlist" aria-label="Video playlist">
         <div class="playlist__header">
           <div>
             <span>Solution series</span>
@@ -133,7 +184,8 @@
             </li>
           }
         </ol>
-      </aside>
+        </aside>
+      </div>
     </div>
   </section>
 
@@ -319,50 +371,6 @@
         <ion-icon name="layers-outline" aria-hidden="true"></ion-icon>
         Deck skill specification
       </a>
-    </div>
-  </section>
-
-  <!-- Try it -->
-  <section
-    class="tab-panel"
-    id="panel-try-it"
-    role="tabpanel"
-    aria-labelledby="tab-try-it"
-    [hidden]="activeTab() !== 'try-it'"
-  >
-    <div class="try-grid">
-      <article class="try-card">
-        <h3>1. Explore the demo app</h3>
-        <p>Ask questions against the sample semiconductor dataset and download generated files.</p>
-        <a class="btn btn-primary" routerLink="/chat">
-          <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
-          Open the chat
-        </a>
-      </article>
-      <article class="try-card">
-        <h3>2. Read the setup guide</h3>
-        <p>Connect a Power Platform managed environment to an existing private Databricks and API Management estate.</p>
-        <a class="btn" [href]="setupGuideUrl" target="_blank" rel="noopener noreferrer">
-          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
-          Setup guide
-        </a>
-      </article>
-      <article class="try-card">
-        <h3>3. Build your own agent</h3>
-        <p>Create an agent on the GitHub Copilot harness and upload the reusable deck skill.</p>
-        <a class="btn" [href]="copilotStudioUrl" target="_blank" rel="noopener noreferrer">
-          <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
-          Copilot Studio
-        </a>
-      </article>
-      <article class="try-card">
-        <h3>4. Get in touch</h3>
-        <p>Questions about applying this pattern to your own estate.</p>
-        <a class="btn" [href]="contactUrl">
-          <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon>
-          Contact
-        </a>
-      </article>
     </div>
   </section>
 </section>

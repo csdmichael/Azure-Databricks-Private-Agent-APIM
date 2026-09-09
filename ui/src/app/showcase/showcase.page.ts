@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
 import { IonIcon, IonToggle } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
@@ -19,7 +18,7 @@ import {
   volumeHighOutline,
 } from 'ionicons/icons';
 
-type ShowcaseTab = 'videos' | 'business-case' | 'features' | 'architecture' | 'try-it';
+type ShowcaseTab = 'videos' | 'business-case' | 'features' | 'architecture';
 
 interface ShowcaseTabItem {
   id: ShowcaseTab;
@@ -60,6 +59,21 @@ interface UseCaseItem {
   output: string;
 }
 
+type ValueScenarioId = 'pilot' | 'business-unit' | 'enterprise';
+
+interface ValueScenario {
+  id: ValueScenarioId;
+  label: string;
+  selectorLabel: string;
+  users: string;
+  annualBenefit: string;
+  netMonthly: string;
+  roi: string;
+  payback: string;
+  relative: number;
+  isDefault?: boolean;
+}
+
 const REPO_ROOT = 'https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM';
 const RAW_ROOT = 'https://raw.githubusercontent.com/csdmichael/Azure-Databricks-Private-Agent-APIM/main';
 const MEDIA_ROOT = `https://media.githubusercontent.com/media/csdmichael/Azure-Databricks-Private-Agent-APIM/main/docs/Videos`;
@@ -69,7 +83,7 @@ const BUSINESS_CASE_FILE = 'private-data-to-powerpoint-business-case-final';
 @Component({
   selector: 'app-showcase',
   standalone: true,
-  imports: [CommonModule, RouterLink, IonIcon, IonToggle],
+  imports: [CommonModule, IonIcon, IonToggle],
   templateUrl: './showcase.page.html',
   styleUrl: './showcase.page.scss',
 })
@@ -102,7 +116,6 @@ export class ShowcasePage implements AfterViewInit {
     { id: 'business-case', label: 'Business case', icon: 'analytics-outline' },
     { id: 'features', label: 'Features', icon: 'sparkles-outline' },
     { id: 'architecture', label: 'Architecture', icon: 'layers-outline' },
-    { id: 'try-it', label: 'Try it', icon: 'open-outline' },
   ];
 
   // Placeholder entries. Drop the matching files into docs/Videos to activate them.
@@ -192,7 +205,7 @@ export class ShowcasePage implements AfterViewInit {
       icon: 'layers-outline',
       title: 'Portable deck specification',
       description:
-        'The nine-slide structure, branding, and chart fidelity rules live in a reusable SKILL.md that can be uploaded to any agent on the same harness.',
+        'Four core slides plus optional sections chosen from the data, branding, and chart fidelity rules live in a reusable SKILL.md that can be uploaded to any agent on the same harness.',
     },
   ];
 
@@ -232,6 +245,52 @@ export class ShowcasePage implements AfterViewInit {
     { team: 'Leadership', focus: 'Cross-functional metrics', output: 'Executive and board briefings' },
   ];
 
+  // Derived from the assumption table using the deck's formula:
+  // users x decks x hours saved x loaded cost x productive usage, less operating cost.
+  readonly valueScenarios: ValueScenario[] = [
+    {
+      id: 'pilot',
+      label: 'Pilot',
+      selectorLabel: 'Pilot',
+      users: '25 users',
+      annualBenefit: '$97.5K',
+      netMonthly: '$8.1K',
+      roi: '31%',
+      payback: '7.4 months',
+      relative: 3,
+    },
+    {
+      id: 'business-unit',
+      label: 'Business unit',
+      selectorLabel: 'Business',
+      users: '100 users',
+      annualBenefit: '$892.5K',
+      netMonthly: '$74.4K',
+      roi: '243%',
+      payback: '2.4 months',
+      relative: 26,
+      isDefault: true,
+    },
+    {
+      id: 'enterprise',
+      label: 'Enterprise',
+      selectorLabel: 'Enterprise',
+      users: '300 users',
+      annualBenefit: '$3.48M',
+      netMonthly: '$290K',
+      roi: '482%',
+      payback: '1.2 months',
+      relative: 100,
+    },
+  ];
+
+  readonly selectedValueScenarioId = signal<ValueScenarioId>('business-unit');
+  readonly selectedValueScenario = computed(
+    () =>
+      this.valueScenarios.find((scenario) => scenario.id === this.selectedValueScenarioId()) ??
+      this.valueScenarios[1],
+  );
+
   constructor() {
     addIcons({
       alertCircleOutline,
@@ -255,6 +314,10 @@ export class ShowcasePage implements AfterViewInit {
 
   setTab(tab: ShowcaseTab): void {
     this.activeTab.set(tab);
+  }
+
+  setValueScenario(id: ValueScenarioId): void {
+    this.selectedValueScenarioId.set(id);
   }
 
   selectVideo(index: number): void {
