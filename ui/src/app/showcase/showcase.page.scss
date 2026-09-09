@@ -7,6 +7,12 @@
   margin: 0 auto;
   padding: 24px 20px 56px;
   color: #243a5e;
+  overflow-wrap: break-word;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Hero */
@@ -44,6 +50,7 @@
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
@@ -51,7 +58,9 @@
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: 40px;
   padding: 9px 16px;
   border: 1px solid #d4d4d4;
   border-radius: 8px;
@@ -59,11 +68,14 @@
   color: #243a5e;
   font-size: 0.9rem;
   font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 
   ion-icon {
+    flex-shrink: 0;
     font-size: 1.05rem;
   }
 
@@ -88,15 +100,21 @@
 /* Tabs */
 .tabbar {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
   margin: 26px 0 22px;
   border-bottom: 1px solid #e5e5e5;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    flex-shrink: 0;
     padding: 11px 16px;
     border: none;
     border-bottom: 2px solid transparent;
@@ -104,6 +122,7 @@
     color: #6b7280;
     font-size: 0.92rem;
     font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
 
     ion-icon {
@@ -915,16 +934,155 @@
   }
 }
 
+/* Tablet and below */
 @media (max-width: 900px) {
+  .showcase {
+    padding: 18px 16px 44px;
+  }
+
   .video-layout {
     grid-template-columns: 1fr;
   }
 
-  .video-details {
+  .video-rail {
+    /* Keep the value proposition directly under the player on narrow screens. */
     flex-direction: column;
   }
 
+  .playlist ol {
+    max-height: 360px;
+  }
+
+  .video-details {
+    flex-direction: column;
+    gap: 12px;
+  }
+
   .showcase-hero {
-    padding: 26px 20px 22px;
+    padding: 24px 20px 22px;
+  }
+
+  .case-header {
+    flex-direction: column;
+  }
+
+  .pdf-frame iframe {
+    height: 560px;
+  }
+}
+
+/* Phones */
+@media (max-width: 600px) {
+  .showcase {
+    padding: 14px 12px 40px;
+  }
+
+  .showcase-hero {
+    padding: 20px 16px 18px;
+    border-radius: 12px;
+  }
+
+  .hero-lede {
+    font-size: 0.95rem;
+  }
+
+  .hero-actions .btn {
+    flex: 1 1 100%;
+  }
+
+  .tabbar {
+    margin: 20px 0 18px;
+
+    button {
+      padding: 10px 12px;
+      font-size: 0.86rem;
+    }
+  }
+
+  .video-stats {
+    gap: 8px;
+
+    div {
+      padding: 10px 8px;
+    }
+
+    dt {
+      font-size: 1.2rem;
+    }
+
+    dd {
+      font-size: 0.7rem;
+    }
+  }
+
+  .video-message {
+    flex-wrap: wrap;
+
+    button {
+      margin-left: 0;
+      width: 100%;
+    }
+  }
+
+  .case-header__actions .btn {
+    flex: 1 1 100%;
+  }
+
+  .metric-card {
+    padding: 15px 16px;
+
+    strong {
+      font-size: 1.4rem;
+    }
+  }
+
+  .case-block {
+    padding: 18px 16px;
+  }
+
+  .usecase-list li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+
+    strong {
+      grid-row: auto;
+    }
+  }
+
+  .scenario-table {
+    font-size: 0.84rem;
+
+    th,
+    td {
+      padding: 8px 10px;
+    }
+  }
+
+  .pdf-frame iframe {
+    height: 60vh;
+    min-height: 380px;
+  }
+
+  .architecture {
+    padding: 12px;
+  }
+
+  .feature-card {
+    padding: 18px 16px;
+  }
+
+  .value-gadget__primary strong {
+    font-size: 1.7rem;
+  }
+}
+
+/* Coarse pointers: give tap targets room */
+@media (pointer: coarse) {
+  .playlist button {
+    padding: 14px 15px;
+  }
+
+  .value-gadget__modes button {
+    padding: 10px 4px;
   }
 }
