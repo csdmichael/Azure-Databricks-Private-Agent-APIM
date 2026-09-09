@@ -43,8 +43,7 @@
             ],
             "styles": [
               "src/global.scss",
-              "src/theme/variables.scss",
-              "node_modules/quill/dist/quill.snow.css"
+              "src/theme/variables.scss"
             ],
             "scripts": []
           },
