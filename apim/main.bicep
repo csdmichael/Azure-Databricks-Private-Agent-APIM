@@ -1,18 +1,18 @@
 // =====================================================================
 //  Exposes the PRIVATE Azure Databricks workspace through the existing
-//  APIM instance (ai-gateway-apim-poc-my) as:
+//  APIM instance (caldova-apim-westus) as:
 //    - "Databricks SQL"  : POST /databricks/query, GET /databricks/tables
 //    - "Databricks Genie": POST /databricks-genie/genie/ask (+ follow-up, result)
 //  APIM authenticates to Databricks with its managed identity, so no secrets
 //  are stored. Consumers use an APIM subscription key.
 //
 //  Deploy:
-//    az deployment group create -g ai-myaacoub -f apim/main.bicep \
+//    az deployment group create -g m365-myaacoub -f apim/main.bicep \
 //      -p databricksWorkspaceUrl=<url> databricksWarehouseId=<id> genieSpaceId=<id>
 // =====================================================================
 
 @description('Existing API Management service name.')
-param apimServiceName string = 'ai-gateway-apim-poc-my'
+param apimServiceName string = 'caldova-apim-westus'
 
 @description('Databricks workspace URL, e.g. https://adb-123.11.azuredatabricks.net')
 param databricksWorkspaceUrl string

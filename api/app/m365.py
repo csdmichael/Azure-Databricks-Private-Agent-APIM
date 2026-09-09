@@ -87,7 +87,7 @@ def _databricks_openapi(base_url: str) -> dict:
             "title": "Databricks SQL",
             "description": (
                 "Read-only access to the private Azure Databricks warehouse "
-                "(databricks_ws_ai_poc.arrow_semiconductor) through Azure API Management."
+                "(caldova_dbx_westus2.arrow_semiconductor) through Azure API Management."
             ),
             "version": "1.0.0",
         },
@@ -120,7 +120,7 @@ def _databricks_openapi(base_url: str) -> dict:
                                 "example": {
                                     "statement": (
                                         "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd "
-                                        "FROM databricks_ws_ai_poc.arrow_semiconductor.product_sales "
+                                        "FROM caldova_dbx_westus2.arrow_semiconductor.product_sales "
                                         "GROUP BY region ORDER BY revenue_musd DESC"
                                     )
                                 },
@@ -143,7 +143,7 @@ def _databricks_openapi(base_url: str) -> dict:
                     "summary": "List the sample tables",
                     "description": (
                         "Lists the tables available in "
-                        "databricks_ws_ai_poc.arrow_semiconductor."
+                        "caldova_dbx_westus2.arrow_semiconductor."
                     ),
                     "responses": {
                         "200": {

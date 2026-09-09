@@ -15,9 +15,9 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $ResourceGroup = "ai-myaacoub",
-  [string] $ApimName = "ai-gateway-apim-poc-my",
-  [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
+  [string] $ResourceGroup = "m365-myaacoub",
+  [string] $ApimName = "caldova-apim-westus",
+  [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
   [string] $SourceApiId = "databricks",
   [string] $McpDisplayName = "Databricks MCP",
   [string] $McpPath = "databricks-mcp",

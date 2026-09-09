@@ -69,7 +69,7 @@ DATABRICKS_SQL_AGENT = AgentDefinition(
         "You are a semiconductor business analytics agent for an Arrow-style chip "
         "manufacturer. Use the Databricks actions for every numeric or factual claim "
         "about company data, and only issue read-only SELECT or SHOW statements against "
-        "the schema databricks_ws_ai_poc.arrow_semiconductor.\n\n"
+        "the schema caldova_dbx_westus2.arrow_semiconductor.\n\n"
         "Tables available: product_sales (revenue, units, gross margin by region, fiscal "
         "quarter, product family), fab_production (wafer starts, good dies, yield by fab "
         "and process node), wafer_yield (actual versus target yield by month and node), "
@@ -84,7 +84,7 @@ DATABRICKS_SQL_AGENT = AgentDefinition(
     plugin_description_human="Query the private Azure Databricks semiconductor dataset.",
     plugin_description_model=(
         "Runs read-only SQL statements against the Azure Databricks warehouse and lists "
-        "the available tables in databricks_ws_ai_poc.arrow_semiconductor."
+        "the available tables in caldova_dbx_westus2.arrow_semiconductor."
     ),
     openapi_operations=["runQuery", "listTables"],
 )
@@ -124,7 +124,7 @@ DATABRICKS_GENIE_AGENT = AgentDefinition(
     m365_instructions=(
         "You are a semiconductor business analytics agent that answers questions using "
         "Databricks AI/BI Genie, curated over the schema "
-        "databricks_ws_ai_poc.arrow_semiconductor.\n\n"
+        "caldova_dbx_westus2.arrow_semiconductor.\n\n"
         "Genie is asynchronous, so always follow this loop: call the ask action with the "
         "user's question, then poll the message action with the returned conversationId and "
         "messageId until status is COMPLETED. Read the answer from attachments[].text.content "

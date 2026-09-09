@@ -14,15 +14,15 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $WorkspaceUrl = "https://adb-7405608662655754.14.azuredatabricks.net",
-    [string] $WarehouseId = "64777231f8249fdb",
-    [string] $Catalog = "databricks_ws_ai_poc",
+    [string] $WorkspaceUrl = "https://adb-7405616934814750.10.azuredatabricks.net",
+    [string] $WarehouseId = "a3c7c9526aa58992",
+    [string] $Catalog = "caldova_dbx_westus2",
     [string] $Schema = "arrow_semiconductor",
     [string] $Title = "Arrow Semiconductor Analytics",
-    [string] $ResourceGroup = "ai-myaacoub",
-    [string] $ApimName = "ai-gateway-apim-poc-my",
-    [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
-    [string] $ApimApplicationId = "49ff6000-cfb2-4b1c-94cc-4de99251d5d6",
+    [string] $ResourceGroup = "m365-myaacoub",
+    [string] $ApimName = "caldova-apim-westus",
+    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
+    [string] $ApimApplicationId = "8f7e8889-3159-4a37-b816-1500a2e476ef",
     [switch] $SkipApimUpdate
 )
 

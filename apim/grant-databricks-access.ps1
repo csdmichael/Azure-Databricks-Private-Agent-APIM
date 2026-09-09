@@ -15,9 +15,9 @@
 param(
   [Parameter(Mandatory = $true)] [string] $WorkspaceUrl,
   [Parameter(Mandatory = $true)] [string] $WarehouseId,
-  [string] $ResourceGroup = "ai-myaacoub",
-  [string] $ApimName = "ai-gateway-apim-poc-my",
-  [string] $Catalog = "databricks_ws_ai_poc",
+  [string] $ResourceGroup = "m365-myaacoub",
+  [string] $ApimName = "caldova-apim-westus",
+  [string] $Catalog = "caldova_dbx_westus2",
   [string] $Schema = "arrow_semiconductor"
 )
 

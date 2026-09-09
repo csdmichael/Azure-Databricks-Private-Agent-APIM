@@ -8,8 +8,8 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $ResourceGroup = "ai-myaacoub",
-  [string] $ApimName = "ai-gateway-apim-poc-my",
+  [string] $ResourceGroup = "m365-myaacoub",
+  [string] $ApimName = "caldova-apim-westus",
   [Parameter(Mandatory = $true)] [string] $WorkspaceUrl,
   [Parameter(Mandatory = $true)] [string] $WarehouseId,
   [string] $GenieSpaceId = ""

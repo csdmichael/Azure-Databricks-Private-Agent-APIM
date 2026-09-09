@@ -16,9 +16,9 @@ param(
     [ValidateSet("all", "databricks", "genie")]
     [string] $Agent = "all",
     [switch] $SkipTest,
-    [string] $ResourceGroup = "ai-myaacoub",
-    [string] $ApimName = "ai-gateway-apim-poc-my",
-    [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
+    [string] $ResourceGroup = "m365-myaacoub",
+    [string] $ApimName = "caldova-apim-westus",
+    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
     [string] $ApimSubscriptionName = "DatabricksSubscription",
     [string] $PythonExe = "python"
 )
@@ -34,10 +34,10 @@ $env:FOUNDRY_PROJECT_ENDPOINT = "https://002-ai-poc-private.services.ai.azure.co
 $env:FOUNDRY_MODEL_DEPLOYMENT_NAME = "gpt-4.1"
 $env:FOUNDRY_AGENT_NAME = "databricks-agent-mcp"
 $env:MCP_CONNECTION_NAME = "databricks-apim-mcp"
-$env:MCP_SERVER_URL = "https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp"
+$env:MCP_SERVER_URL = "https://caldova-apim-westus.azure-api.net/databricks-mcp/mcp"
 $env:FOUNDRY_GENIE_AGENT_NAME = "databricks-genie-agent"
 $env:GENIE_MCP_CONNECTION_NAME = "databricks-apim-genie-mcp"
-$env:GENIE_MCP_SERVER_URL = "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp"
+$env:GENIE_MCP_SERVER_URL = "https://caldova-apim-westus.azure-api.net/databricks-genie-mcp/mcp"
 
 $listSecrets = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.ApiManagement/service/$ApimName/subscriptions/$ApimSubscriptionName/listSecrets?api-version=2024-06-01-preview"
 $env:APIM_SUBSCRIPTION_KEY = az rest --method post --url $listSecrets --query primaryKey -o tsv

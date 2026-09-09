@@ -23,7 +23,7 @@ concurrency:
 
 env:
   AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  AZURE_RESOURCE_GROUP: ai-myaacoub
+  AZURE_RESOURCE_GROUP: m365-myaacoub
   FOUNDRY_ACCOUNT_NAME: 002-ai-poc-private
   FOUNDRY_PROJECT_NAME: proj-default
   FOUNDRY_PROJECT_ENDPOINT: https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default
@@ -31,9 +31,9 @@ env:
   FOUNDRY_GENIE_AGENT_NAME: databricks-genie-agent
   FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-4.1
   MCP_CONNECTION_NAME: databricks-apim-mcp
-  MCP_SERVER_URL: https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp
+  MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-mcp/mcp
   GENIE_MCP_CONNECTION_NAME: databricks-apim-genie-mcp
-  GENIE_MCP_SERVER_URL: https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp
+  GENIE_MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-genie-mcp/mcp
   APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
 
 jobs:

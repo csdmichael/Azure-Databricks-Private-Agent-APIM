@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "Databricks Genie (Private APIM)",
+    "title": "Databricks Genie APIM v2",
     "version": "1.0",
     "description": "Asks natural-language questions of private Azure Databricks data through AI/BI Genie, proxied by Azure API Management over Private Link. Reached from Power Platform through the delegated subnet."
   },

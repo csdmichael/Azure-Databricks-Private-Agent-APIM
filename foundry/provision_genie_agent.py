@@ -22,7 +22,7 @@ from common import put_mcp_connection, required_env, run_pptx_smoke_test
 
 INSTRUCTIONS = """You are a semiconductor business analytics agent for an Arrow-style
 chip manufacturer. You answer questions using Databricks AI/BI Genie, which is
-curated over the schema databricks_ws_ai_poc.arrow_semiconductor.
+curated over the schema caldova_dbx_westus2.arrow_semiconductor.
 
 Genie is asynchronous. Follow this loop exactly for every business question:
 

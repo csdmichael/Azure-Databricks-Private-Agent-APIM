@@ -15,11 +15,11 @@
 [CmdletBinding()]
 param(
     [string] $Question = "What was total revenue in USD millions by region? Return the top 5 regions.",
-    [string] $ApimBaseUrl = "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie",
+    [string] $ApimBaseUrl = "https://caldova-apim-westus.azure-api.net/databricks-genie",
     [string] $ApimKey,
-    [string] $ResourceGroup = "ai-myaacoub",
-    [string] $ApimName = "ai-gateway-apim-poc-my",
-    [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
+    [string] $ResourceGroup = "m365-myaacoub",
+    [string] $ApimName = "caldova-apim-westus",
+    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
     [string] $ApimSubscriptionName = "DatabricksSubscription",
     [int]    $TimeoutSeconds = 300
 )

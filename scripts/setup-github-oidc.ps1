@@ -24,8 +24,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
-    [string] $ResourceGroup = "ai-myaacoub",
+    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
+    [string] $ResourceGroup = "m365-myaacoub",
     [string] $Repository = "csdmichael/Azure-Databricks-Private-Agent-APIM",
     [string] $AppName = "gh-databricks-agents-poc",
     [string] $ApiAppName = "databricks-agents-api-my",

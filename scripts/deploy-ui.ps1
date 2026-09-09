@@ -11,7 +11,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ResourceGroup = "ai-myaacoub",
+    [string] $ResourceGroup = "m365-myaacoub",
     [string] $UiAppName = "databricks-agents-ui-my",
     [switch] $SkipBuild
 )
