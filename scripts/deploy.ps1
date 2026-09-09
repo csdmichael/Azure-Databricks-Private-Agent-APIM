@@ -12,7 +12,7 @@
 param(
   [switch] $PlanOnly,
   [switch] $LoadData,
-  [string] $TerraformDir = "$PSScriptRoot/../infra/terraform"
+  [string] $TerraformDir = "$PSScriptRoot/../terraform"
 )
 
 $ErrorActionPreference = "Stop"

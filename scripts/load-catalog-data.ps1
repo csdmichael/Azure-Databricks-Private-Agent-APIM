@@ -18,7 +18,7 @@ param(
   [string] $Catalog,
   [string] $Schema = 'arrow_semiconductor',
   [string] $WarehouseName = 'caldova-serverless-2xs',
-  [string] $SqlFile = "$PSScriptRoot/../../databricks/sql/01_create_and_load.sql",
+  [string] $SqlFile = "$PSScriptRoot/../databricks/sql/01_create_and_load.sql",
   [string] $SourceCatalogToken = 'databricks_ws_ai_poc',
   [string] $SourceSchemaToken = 'arrow_semiconductor'
 )
