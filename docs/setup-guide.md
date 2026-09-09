@@ -453,7 +453,7 @@ create files. Agents on the GitHub Copilot harness consume Copilot Credits.
 1. Add all four connector tools and select the connection you created.
 2. Upload [../skills/executive-deck-builder/SKILL.md](../skills/executive-deck-builder/SKILL.md)
    under **Skills**. It carries the canvas, branding, chart, table, and
-   nine-slide rules.
+   deck-structure rules.
 3. Keep the agent instructions short: identity, the Genie call sequence, and a
    line delegating deck work to the skill.
 

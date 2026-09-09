@@ -389,7 +389,8 @@ on this harness. It specifies:
 - Native chart objects only, with chart type per purpose, axis titles, data labels, and
   number formats per unit
 - Table, KPI tile, and diagram construction rules
-- The nine-slide structure and assertion-style slide titles
+- Four core slides plus optional sections chosen from the data, and assertion-style slide
+  titles
 - A verification step that reopens the saved file and asserts its contents
 
 > The header logo is drawn programmatically from four colored squares. Replace it with
