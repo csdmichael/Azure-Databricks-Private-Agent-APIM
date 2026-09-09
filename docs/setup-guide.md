@@ -135,7 +135,14 @@ $token = $null
 `Geo` must be a supported Power Platform region, `Managed` must be `Standard`,
 and `Dataverse` must be `True`.
 
-![Power Platform admin center environment details showing region and Managed environment state](images/01-power-platform-environment.png)
+![Power Platform admin center environment details showing region and Managed environment state](images/01.a-power-platform-environment.png)
+
+You can confirm the same three prerequisites in the portal under
+**Security → Data and privacy → Azure Virtual Network policies**, which lists every
+environment eligible for subnet injection along with its Dataverse, Managed, region, and
+attached policy.
+
+![Virtual Network policies panel listing the environment with Dataverse Yes, Managed Yes, its region, and the attached enterprise policy](images/01.c-power-platform-environment-VirtualNetworkPolicies.png)
 
 Map `Geo` to the required Azure region pair:
 
