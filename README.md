@@ -129,7 +129,6 @@ geo: environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5` is `canada`, so the VNet
 | [apim](apim) | Databricks SQL and Genie APIs, policies, MCP projection |
 | [api](api) | FastAPI service that calls Databricks through APIM |
 | [ui](ui) | Angular + Ionic front end |
-| [foundry](foundry) | Microsoft Foundry agent provisioning |
 | [databricks](databricks) | Sample dataset SQL and exploration notebook |
 | [scripts](scripts) | Deployment, data-load, connector, and test helpers |
 | [docs/setup-guide.md](docs/setup-guide.md) | Step-by-step guide for an existing Databricks + APIM estate |
@@ -189,9 +188,11 @@ Two APIs are published, the Databricks SQL API and the Genie API.
 
 ![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/05-apim-apis.png)
 
-Both APIs are also projected as MCP servers. These are used by the Microsoft Foundry
-path; they are **not** usable from Copilot Studio over the private network, for the
-reason explained [below](#why-a-custom-connector-and-not-an-mcp-server).
+Both APIs are also projected as MCP servers. These belong to the archived Microsoft
+Foundry path, documented in
+[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md); they are **not** usable
+from Copilot Studio over the private network, for the reason explained
+[below](#why-a-custom-connector-and-not-an-mcp-server).
 
 ![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp with their server URLs](docs/images/06-apim-mcp-servers.png)
 
@@ -291,8 +292,9 @@ both reproduced here:
 - Runtime: `that tool is not available in this chat environment`
 
 The custom connector is the supported path to a private endpoint, so the agent uses it.
-The MCP servers in APIM remain published for the Microsoft Foundry path, which reaches
-them differently.
+The MCP servers in APIM remain published for the archived Microsoft Foundry path, which
+reaches them differently. See
+[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md).
 
 ---
 
@@ -395,3 +397,9 @@ APIM access to Databricks, the custom connector, and the agent.
 [old mcaps](old%20mcaps) holds the original `infra`, `docs`, and README from the MCAPS
 subscription. Those Azure resources have been deleted; the folder is retained for history
 and is not wired into any deployment path.
+
+It also holds the **Microsoft Foundry** prompt agents, which reach the same Databricks
+data through the APIM MCP servers and Code Interpreter rather than through the private
+custom connector. See
+[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md). Its workflow is manual
+dispatch only and does not run on commits.
