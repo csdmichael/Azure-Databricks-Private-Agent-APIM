@@ -1,0 +1,154 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Databricks Genie (Direct Private)",
+    "description": "Calls the Azure Databricks AI/BI Genie REST API directly over Private Link, with no API Management hop. Reached from Power Platform through the delegated subnet.",
+    "version": "1.0"
+  },
+  "host": "adb-7405616934814750.10.azuredatabricks.net",
+  "basePath": "/api/2.0/genie",
+  "schemes": [ "https" ],
+  "consumes": [ "application/json" ],
+  "produces": [ "application/json" ],
+  "paths": {
+    "/spaces/{spaceId}/start-conversation": {
+      "post": {
+        "summary": "Ask Genie (start conversation)",
+        "description": "Starts a Genie conversation with a natural-language question.",
+        "operationId": "StartConversation",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "default": "01f1abe9e51e19ddbb15297aee9a5850",
+            "x-ms-summary": "Genie space id",
+            "x-ms-visibility": "internal"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [ "content" ],
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The natural-language question to ask Genie.",
+                  "x-ms-summary": "Question"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation and message identifiers",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "conversation_id": { "type": "string", "x-ms-summary": "Conversation id" },
+                "message_id": { "type": "string", "x-ms-summary": "Message id" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spaces/{spaceId}/conversations/{conversationId}/messages/{messageId}": {
+      "get": {
+        "summary": "Get Genie message status",
+        "description": "Polls a Genie message until its status is COMPLETED.",
+        "operationId": "GetMessage",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "default": "01f1abe9e51e19ddbb15297aee9a5850",
+            "x-ms-summary": "Genie space id",
+            "x-ms-visibility": "internal"
+          },
+          { "name": "conversationId", "in": "path", "required": true, "type": "string", "x-ms-summary": "Conversation id" },
+          { "name": "messageId", "in": "path", "required": true, "type": "string", "x-ms-summary": "Message id" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message status and content",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": { "type": "string", "x-ms-summary": "Status" },
+                "content": { "type": "string", "x-ms-summary": "Question" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spaces/{spaceId}/conversations/{conversationId}/messages/{messageId}/query-result": {
+      "get": {
+        "summary": "Get Genie query result",
+        "description": "Returns the rows produced by a completed Genie message.",
+        "operationId": "GetQueryResult",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "default": "01f1abe9e51e19ddbb15297aee9a5850",
+            "x-ms-summary": "Genie space id",
+            "x-ms-visibility": "internal"
+          },
+          { "name": "conversationId", "in": "path", "required": true, "type": "string", "x-ms-summary": "Conversation id" },
+          { "name": "messageId", "in": "path", "required": true, "type": "string", "x-ms-summary": "Message id" }
+        ],
+        "responses": {
+          "200": { "description": "Statement response containing the result rows" }
+        }
+      }
+    },
+    "/spaces/{spaceId}/conversations/{conversationId}/messages": {
+      "post": {
+        "summary": "Ask Genie follow-up",
+        "description": "Adds a follow-up question to an existing Genie conversation.",
+        "operationId": "CreateMessage",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "default": "01f1abe9e51e19ddbb15297aee9a5850",
+            "x-ms-summary": "Genie space id",
+            "x-ms-visibility": "internal"
+          },
+          { "name": "conversationId", "in": "path", "required": true, "type": "string", "x-ms-summary": "Conversation id" },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [ "content" ],
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The follow-up question to ask Genie.",
+                  "x-ms-summary": "Question"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message identifiers" }
+        }
+      }
+    }
+  }
+}

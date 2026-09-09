@@ -1,0 +1,151 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Databricks Genie (Private APIM)",
+    "version": "1.0",
+    "description": "Asks natural-language questions of private Azure Databricks data through AI/BI Genie, proxied by Azure API Management over Private Link. Reached from Power Platform through the delegated subnet."
+  },
+  "host": "caldova-apim-westus.azure-api.net",
+  "basePath": "/databricks-genie",
+  "paths": {
+    "/genie/conversations/{conversationId}/messages/{messageId}/result": {
+      "get": {
+        "operationId": "result",
+        "summary": "Get Genie query result",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query result"
+          }
+        }
+      }
+    },
+    "/genie/ask": {
+      "post": {
+        "description": "Body: { \"content\": \"natural-language question\" }.",
+        "operationId": "ask",
+        "summary": "Ask Genie (start conversation)",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The natural-language question to ask Genie.",
+                  "x-ms-summary": "Question"
+                }
+              }
+            }
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation + message ids"
+          }
+        }
+      }
+    },
+    "/genie/conversations/{conversationId}/messages/{messageId}": {
+      "get": {
+        "description": "Poll until status is COMPLETED, then read the text answer and generated SQL from attachments.",
+        "operationId": "message",
+        "summary": "Get Genie message status",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message status and attachments"
+          }
+        }
+      }
+    },
+    "/genie/conversations/{conversationId}/messages": {
+      "post": {
+        "operationId": "follow-up",
+        "summary": "Ask Genie follow-up",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "content"
+              ],
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The natural-language question to ask Genie.",
+                  "x-ms-summary": "Question"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message"
+          }
+        }
+      }
+    }
+  },
+  "tags": [],
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Ocp-Apim-Subscription-Key"
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "schemes": [
+    "https"
+  ]
+}

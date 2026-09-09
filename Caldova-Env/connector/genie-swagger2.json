@@ -1,0 +1,132 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Databricks Genie",
+    "version": "1.0",
+    "description": "Ask natural-language questions of the Databricks data via AI/BI Genie."
+  },
+  "host": "caldova-apim-westus.azure-api.net",
+  "basePath": "/databricks-genie",
+  "schemes": [
+    "https"
+  ],
+  "securityDefinitions": {
+    "apiKeyHeader": {
+      "type": "apiKey",
+      "name": "Ocp-Apim-Subscription-Key",
+      "in": "header"
+    },
+    "apiKeyQuery": {
+      "type": "apiKey",
+      "name": "subscription-key",
+      "in": "query"
+    }
+  },
+  "security": [
+    {
+      "apiKeyHeader": []
+    },
+    {
+      "apiKeyQuery": []
+    }
+  ],
+  "paths": {
+    "/genie/conversations/{conversationId}/messages/{messageId}/result": {
+      "get": {
+        "operationId": "result",
+        "summary": "Get Genie query result",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query result"
+          }
+        }
+      }
+    },
+    "/genie/ask": {
+      "post": {
+        "description": "Body: { \"content\": \"natural-language question\" }.",
+        "operationId": "ask",
+        "summary": "Ask Genie (start conversation)",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "example": {
+                "content": "What was total revenue by region last quarter?"
+              }
+            }
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation + message ids"
+          }
+        }
+      }
+    },
+    "/genie/conversations/{conversationId}/messages/{messageId}": {
+      "get": {
+        "description": "Poll until status is COMPLETED, then read the text answer and generated SQL from attachments.",
+        "operationId": "message",
+        "summary": "Get Genie message status",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message status and attachments"
+          }
+        }
+      }
+    },
+    "/genie/conversations/{conversationId}/messages": {
+      "post": {
+        "operationId": "follow-up",
+        "summary": "Ask Genie follow-up",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}

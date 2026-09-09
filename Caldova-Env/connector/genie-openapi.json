@@ -1,0 +1,84 @@
+openapi: 3.0.1
+info:
+  title: Databricks Genie
+  description: Ask natural-language questions of the Databricks data via AI/BI Genie.
+  version: '1.0'
+servers:
+  - url: https://caldova-apim-westus.azure-api.net/databricks-genie
+paths:
+  '/genie/conversations/{conversationId}/messages/{messageId}/result':
+    get:
+      summary: Get Genie query result
+      operationId: result
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Query result
+  /genie/ask:
+    post:
+      summary: Ask Genie (start conversation)
+      description: 'Body: { "content": "natural-language question" }.'
+      operationId: ask
+      requestBody:
+        content:
+          application/json:
+            example:
+              content: What was total revenue by region last quarter?
+      responses:
+        '200':
+          description: Conversation + message ids
+  '/genie/conversations/{conversationId}/messages/{messageId}':
+    get:
+      summary: Get Genie message status
+      description: 'Poll until status is COMPLETED, then read the text answer and generated SQL from attachments.'
+      operationId: message
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message status and attachments
+  '/genie/conversations/{conversationId}/messages':
+    post:
+      summary: Ask Genie follow-up
+      operationId: follow-up
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]
