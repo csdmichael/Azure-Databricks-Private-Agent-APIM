@@ -288,6 +288,92 @@ endpoint rejects `PATCH`/`PUT` with `405` — apply it by deleting and
 recreating the connector, or by editing the request body of the **Ask Genie**
 action in the maker portal.
 
+## Custom connector configuration
+
+Two private data paths exist. Both use custom connectors, because Copilot
+Studio MCP servers are not covered by Power Platform virtual network support.
+
+| Connector | Path | Backend | Auth |
+|---|---|---|---|
+| `Databricks Genie (Private APIM)` | via API Management | `https://caldova-apim-westus.azure-api.net/databricks-genie` | API key header `Ocp-Apim-Subscription-Key` |
+| `Databricks Genie (Direct Private)` | straight to Databricks | `https://adb-7405616934814750.10.azuredatabricks.net/api/2.0/genie` | Entra ID (delegated) |
+
+### Portal URLs
+
+| Purpose | URL |
+|---|---|
+| Custom connectors | `https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors` |
+| Connections | `https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/connections` |
+| Copilot Studio agent | `https://copilotstudio.microsoft.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/bots/b5dd7db7-f0ab-f111-aaab-70a8a50cc161/overview` |
+| Power Platform admin | `https://admin.powerplatform.microsoft.com/manage/environments/environment/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/hub` |
+
+### Definition files
+
+| File | Use |
+|---|---|
+| [connector/genie-swagger2.json](connector/genie-swagger2.json) | Raw APIM export, Swagger 2.0 |
+| [connector/genie-connector-swagger.json](connector/genie-connector-swagger.json) | APIM path, typed `content` body + `api_key` security |
+| [connector/genie-direct-swagger.json](connector/genie-direct-swagger.json) | Direct Databricks path, space id pinned |
+
+### Import through the maker portal
+
+The scripted path is preferred, but the PowerApps connector API is unreliable —
+`POST` returns intermittent `500`, `PATCH` returns `500`, and the admin endpoint
+rejects `PATCH`/`PUT` with `405`. When that happens, import by hand:
+
+1. Open **Custom connectors** in the environment.
+2. Select **New custom connector → Import an OpenAPI file**.
+3. Name it, choose the definition file above, then **Continue**.
+4. On **General**, confirm the host and base URL match the table above.
+5. On **Security**, configure authentication:
+   - APIM path: **API Key**, parameter label `APIM subscription key`,
+     parameter name `Ocp-Apim-Subscription-Key`, location **Header**.
+   - Direct path: **OAuth 2.0**, identity provider **Azure Active Directory**,
+     client id `82bbdaca-f996-452d-89c2-49dee7456ebe`, resource URL
+     `2ff814a6-3304-4ab8-85cb-cd0e6f879c1d`, and the client secret from the
+     app registration.
+6. On **Definition**, confirm every operation that posts a question declares a
+   typed body. Without it Copilot Studio sends an empty payload and Genie
+   returns `400 Field 'content' is required`.
+7. Select **Create connector**, then **Create connection** and supply the
+   secret.
+
+### Genie call sequence
+
+| Step | APIM operation | Direct operation |
+|---|---|---|
+| 1. Ask | `POST /genie/ask` | `POST /spaces/{spaceId}/start-conversation` |
+| 2. Poll | `GET /genie/conversations/{conversationId}/messages/{messageId}` | `GET /spaces/{spaceId}/conversations/{conversationId}/messages/{messageId}` |
+| 3. Rows | `.../result` | `.../query-result` |
+| 4. Refine | `POST /genie/conversations/{conversationId}/messages` | `POST /spaces/{spaceId}/conversations/{conversationId}/messages` |
+
+Both ask operations take `{"content": "<question>"}`. Poll step 2 until
+`status` is `COMPLETED` before calling step 3.
+
+### Creating a connection without exposing the key
+
+The APIM subscription key never needs to be pasted by hand or held in a script:
+
+```powershell
+$key = (az rest --method post --url "https://management.azure.com/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.ApiManagement/service/caldova-apim-westus/subscriptions/DatabricksSubscription/listSecrets?api-version=2024-05-01" | ConvertFrom-Json).primaryKey
+$token = az account get-access-token --resource 'https://service.powerapps.com/' --query accessToken -o tsv
+$env = '52456fcd-1d20-ecdb-aa2e-8979e3f794f5'
+$api = '<connector name from the apis list>'
+
+$body = @{ properties = @{
+    environment          = @{ name = $env }
+    displayName          = 'Caldova APIM - Databricks Agents'
+    connectionParameters = @{ api_key = $key }
+} } | ConvertTo-Json -Depth 8
+
+Invoke-RestMethod -Method PUT -Headers @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' } -Body $body `
+  -Uri "https://api.powerapps.com/providers/Microsoft.PowerApps/apis/$api/connections/$([guid]::NewGuid().ToString('N'))?api-version=2016-11-01&`$filter=environment eq '$env'"
+
+$key = $null; $token = $null; $body = $null; [System.GC]::Collect()
+```
+
+A successful call returns `statuses.status = Connected`.
+
 ## Microsoft Learn references
 
 ### Azure Databricks networking

@@ -14,8 +14,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SubscriptionId = "86b37969-9445-49cf-b03f-d8866235171c",
-    [string] $ResourceGroup = "ai-myaacoub",
+    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
+    [string] $ResourceGroup = "m365-myaacoub",
     [string] $Location = "westus2",
     [string] $PlanName = "plan-databricks-agents-poc",
     [ValidateSet("F1", "B1")]
@@ -98,7 +98,7 @@ $settings = @(
     "PUBLIC_API_URL=$apiUrl",
     "CORS_ALLOW_ORIGINS=$uiUrl,http://localhost:4200,http://localhost:8100",
     "FOUNDRY_PROJECT_ENDPOINT=https://$FoundryAccountName.services.ai.azure.com/api/projects/$FoundryProjectName",
-    "APIM_BASE_URL=https://ai-gateway-apim-poc-my.azure-api.net",
+    "APIM_BASE_URL=https://caldova-apim-westus.azure-api.net",
     "GITHUB_REPO_URL=https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM"
 )
 Invoke-Az (@("webapp", "config", "appsettings", "set", "-g", $ResourceGroup, "-n", $ApiAppName, "-o", "none", "--settings") + $settings) | Out-Null

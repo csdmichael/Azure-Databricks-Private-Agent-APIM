@@ -22,7 +22,7 @@ from common import put_mcp_connection, required_env, run_pptx_smoke_test
 INSTRUCTIONS = """You are a semiconductor business analytics agent.
 Use the Databricks MCP tools for every numeric or factual claim about company data.
 Use only read-only SELECT or SHOW statements and only the connected sample schema
-databricks_ws_ai_poc.arrow_semiconductor.
+caldova_dbx_westus2.arrow_semiconductor.
 
 The MCP `query` tool takes a single string argument named `body`. Always set `body`
 to a compact JSON object string of the exact form {"statement": "<SQL>"} where <SQL>

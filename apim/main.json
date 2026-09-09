@@ -11,7 +11,7 @@
   "parameters": {
     "apimServiceName": {
       "type": "string",
-      "defaultValue": "ai-gateway-apim-poc-my",
+      "defaultValue": "caldova-apim-westus",
       "metadata": {
         "description": "Existing API Management service name."
       }

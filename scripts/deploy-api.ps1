@@ -13,7 +13,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ResourceGroup = "ai-myaacoub",
+    [string] $ResourceGroup = "m365-myaacoub",
     [string] $ApiAppName = "databricks-agents-api-my",
     [int] $HealthTimeoutSeconds = 900
 )

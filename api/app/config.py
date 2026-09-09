@@ -19,11 +19,11 @@ class Settings:
             "https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default",
         )
         self.apim_base_url = os.getenv(
-            "APIM_BASE_URL", "https://ai-gateway-apim-poc-my.azure-api.net"
+            "APIM_BASE_URL", "https://caldova-apim-westus.azure-api.net"
         )
         self.databricks_workspace_url = os.getenv(
             "DATABRICKS_WORKSPACE_URL",
-            "https://adb-7405608662655754.14.azuredatabricks.net",
+            "https://adb-7405616934814750.10.azuredatabricks.net",
         )
         self.github_repo_url = os.getenv(
             "GITHUB_REPO_URL",

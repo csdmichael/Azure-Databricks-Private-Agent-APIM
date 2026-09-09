@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AZURE_RESOURCE_GROUP: ai-myaacoub
+  AZURE_RESOURCE_GROUP: m365-myaacoub
   API_APP_NAME: databricks-agents-api-my
 
 jobs:

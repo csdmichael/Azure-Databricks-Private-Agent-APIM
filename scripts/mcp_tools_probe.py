@@ -9,7 +9,7 @@ import os
 import sys
 import urllib.request
 
-MCP_URL = sys.argv[1] if len(sys.argv) > 1 else "https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp"
+MCP_URL = sys.argv[1] if len(sys.argv) > 1 else "https://caldova-apim-westus.azure-api.net/databricks-genie-mcp/mcp"
 KEY = os.environ["APIM_SUBSCRIPTION_KEY"]
 
 HEADERS = {
