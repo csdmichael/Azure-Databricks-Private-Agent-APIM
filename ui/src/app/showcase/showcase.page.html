@@ -1,0 +1,272 @@
+<section class="showcase">
+  <header class="showcase-hero">
+    <p class="hero-kicker">Microsoft solution showcase</p>
+    <h1>High-fidelity PowerPoint from private Azure Databricks data</h1>
+    <p class="hero-lede">
+      A Copilot Studio agent answers business questions over Unity Catalog through AI/BI Genie and returns a
+      real, executive-ready PowerPoint file &mdash; with Databricks and API Management both locked to
+      private network access only.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" [href]="repoUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+        GitHub repository
+      </a>
+      <a class="btn" [href]="setupGuideUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Setup guide
+      </a>
+      <a class="btn" routerLink="/chat">
+        <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+        Open the demo app
+      </a>
+    </div>
+  </header>
+
+  <div class="tabbar" role="tablist" aria-label="Showcase sections">
+    @for (tab of tabs; track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'tab-' + tab.id"
+        [class.is-active]="activeTab() === tab.id"
+        [attr.aria-selected]="activeTab() === tab.id"
+        [attr.aria-controls]="'panel-' + tab.id"
+        (click)="setTab(tab.id)"
+      >
+        <ion-icon [name]="tab.icon" aria-hidden="true"></ion-icon>
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  <!-- Videos -->
+  <section
+    class="tab-panel"
+    id="panel-videos"
+    role="tabpanel"
+    aria-labelledby="tab-videos"
+    [hidden]="activeTab() !== 'videos'"
+  >
+    <div class="video-layout">
+      <div class="video-stage">
+        <div class="video-frame" #videoFrame>
+          <video
+            #videoPlayer
+            controls
+            playsinline
+            preload="metadata"
+            [src]="selectedVideoSrc()"
+            [attr.aria-label]="'Video ' + selectedVideo().sequence + ': ' + selectedVideo().title"
+            (canplay)="onVideoCanPlay()"
+            (ended)="playNext()"
+            (error)="onVideoError()"
+          >
+            Your browser does not support HTML video.
+          </video>
+          <div class="video-frame__topline">
+            <span>Video {{ selectedVideo().sequence }}</span>
+            <button type="button" title="Enter full screen" aria-label="Enter full screen" (click)="enterFullscreen()">
+              <ion-icon name="expand-outline" aria-hidden="true"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <dl class="video-stats" aria-label="Solution at a glance">
+          <div><dt>0</dt><dd>Public endpoints</dd></div>
+          <div><dt>4</dt><dd>Genie connector tools</dd></div>
+          <div><dt>9</dt><dd>Slides per deck</dd></div>
+        </dl>
+
+        <div class="video-details">
+          <div>
+            <p class="video-kicker">Now playing &middot; {{ selectedVideo().duration }}</p>
+            <h3>{{ selectedVideo().title }}</h3>
+            <p>{{ selectedVideo().description }}</p>
+          </div>
+          <ion-toggle labelPlacement="start" [checked]="autoplayNext()" (ionChange)="setAutoplayNext($event)">
+            Autoplay next
+          </ion-toggle>
+        </div>
+
+        @if (autoplayBlocked() && !videoError()) {
+          <div class="video-message" role="status">
+            <ion-icon name="volume-high-outline" aria-hidden="true"></ion-icon>
+            <span>Sound is on. Your browser requires one click to start audible playback.</span>
+            <button type="button" (click)="playSelectedVideo()">Play with sound</button>
+          </div>
+        }
+        @if (videoError()) {
+          <div class="video-message video-message--pending" role="status">
+            <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+            <span>
+              This video has not been published yet. Add <code>{{ selectedVideo().file }}</code> under
+              <code>docs/Videos</code> in the repository and it will play here.
+            </span>
+          </div>
+        }
+      </div>
+
+      <aside class="playlist" aria-label="Video playlist">
+        <div class="playlist__header">
+          <div>
+            <span>Solution series</span>
+            <strong>{{ videos.length }} videos</strong>
+          </div>
+          <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+        </div>
+        <ol>
+          @for (video of videos; track video.sequence; let i = $index) {
+            <li>
+              <button
+                type="button"
+                [class.is-active]="selectedVideoIndex() === i"
+                [attr.aria-current]="selectedVideoIndex() === i"
+                (click)="selectVideo(i)"
+              >
+                <span class="playlist__seq">{{ video.sequence }}</span>
+                <span class="playlist__body">
+                  <strong>{{ video.title }}</strong>
+                  <small>{{ video.duration }}</small>
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Business case -->
+  <section
+    class="tab-panel"
+    id="panel-business-case"
+    role="tabpanel"
+    aria-labelledby="tab-business-case"
+    [hidden]="activeTab() !== 'business-case'"
+  >
+    <div class="placeholder-card">
+      <ion-icon name="analytics-outline" aria-hidden="true"></ion-icon>
+      <h2>Business case</h2>
+      <p>
+        The enterprise business case for this solution has not been published yet. Once the deck and
+        summary are added to <code>docs/Business Case</code> in the repository, they appear here as
+        downloads.
+      </p>
+      <div class="placeholder-card__actions">
+        <a class="btn btn-primary" [href]="businessCasePdfUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Business case (PDF)
+        </a>
+        <a class="btn" [href]="businessCasePptxUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Business case (PPTX)
+        </a>
+        <a class="btn" [href]="businessCaseFolderUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+          Open the folder
+        </a>
+      </div>
+      <p class="placeholder-card__note">
+        Expected file names:
+        <code>Databricks-Private-Agent-Business-Case.pdf</code> and
+        <code>Databricks-Private-Agent-Business-Case.pptx</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section
+    class="tab-panel"
+    id="panel-features"
+    role="tabpanel"
+    aria-labelledby="tab-features"
+    [hidden]="activeTab() !== 'features'"
+  >
+    <div class="feature-grid">
+      @for (feature of features; track feature.title) {
+        <article class="feature-card">
+          <ion-icon [name]="feature.icon" aria-hidden="true"></ion-icon>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section
+    class="tab-panel"
+    id="panel-architecture"
+    role="tabpanel"
+    aria-labelledby="tab-architecture"
+    [hidden]="activeTab() !== 'architecture'"
+  >
+    <figure class="architecture">
+      <img
+        [src]="architectureImageUrl"
+        alt="End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie"
+        loading="lazy"
+      />
+      <figcaption>
+        The request leaves Copilot Studio through a delegated subnet, crosses a virtual network peering
+        into the API Management VNet, reaches the gateway on its private endpoint, and is proxied to
+        Databricks using API Management's managed identity. Nothing traverses the public internet.
+      </figcaption>
+    </figure>
+    <div class="architecture-links">
+      <a class="btn" [href]="setupGuideUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Full setup guide
+      </a>
+      <a class="btn" [href]="skillUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="layers-outline" aria-hidden="true"></ion-icon>
+        Deck skill specification
+      </a>
+    </div>
+  </section>
+
+  <!-- Try it -->
+  <section
+    class="tab-panel"
+    id="panel-try-it"
+    role="tabpanel"
+    aria-labelledby="tab-try-it"
+    [hidden]="activeTab() !== 'try-it'"
+  >
+    <div class="try-grid">
+      <article class="try-card">
+        <h3>1. Explore the demo app</h3>
+        <p>Ask questions against the sample semiconductor dataset and download generated files.</p>
+        <a class="btn btn-primary" routerLink="/chat">
+          <ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon>
+          Open the chat
+        </a>
+      </article>
+      <article class="try-card">
+        <h3>2. Read the setup guide</h3>
+        <p>Connect a Power Platform managed environment to an existing private Databricks and API Management estate.</p>
+        <a class="btn" [href]="setupGuideUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Setup guide
+        </a>
+      </article>
+      <article class="try-card">
+        <h3>3. Build your own agent</h3>
+        <p>Create an agent on the GitHub Copilot harness and upload the reusable deck skill.</p>
+        <a class="btn" [href]="copilotStudioUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+          Copilot Studio
+        </a>
+      </article>
+      <article class="try-card">
+        <h3>4. Get in touch</h3>
+        <p>Questions about applying this pattern to your own estate.</p>
+        <a class="btn" [href]="contactUrl">
+          <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon>
+          Contact
+        </a>
+      </article>
+    </div>
+  </section>
+</section>

@@ -8,6 +8,9 @@ high-fidelity, downloadable PowerPoint deck.
 Databricks and API Management both have **public network access disabled**. Nothing in
 the data path traverses the public internet.
 
+> **Live showcase:** <https://caldova-databricks-showcase.azurewebsites.net>
+> — video series, business case, features, architecture, and a link into the demo app.
+
 ![End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent on the GitHub Copilot harness, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie](docs/azure-databricks-private-agent-apim-architecture.png)
 
 ---
@@ -102,6 +105,7 @@ Replace the identifiers with your own where they differ.
 
 | What | URL |
 |---|---|
+| **Showcase site** | <https://caldova-databricks-showcase.azurewebsites.net> |
 | Azure portal | <https://portal.azure.com/> |
 | Power Platform admin center | <https://admin.powerplatform.microsoft.com/> |
 | This environment in the admin center | <https://admin.powerplatform.microsoft.com/manage/environments/environment/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/hub> |
@@ -159,6 +163,9 @@ geo: environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5` is `canada`, so the VNet
 | [bicep/apim-diagnostics](bicep/apim-diagnostics) | Log Analytics workspace and APIM diagnostic settings |
 | [connector](connector) | Power Platform custom connector definitions (Swagger 2.0) |
 | [skills](skills) | Reusable Copilot Studio skills |
+| [ui/src/app/showcase](ui/src/app/showcase) | Showcase page hosted on the B1 App Service |
+| [docs/Videos](docs/Videos) | Showcase video series (placeholder) |
+| [docs/Business Case](docs/Business%20Case) | Business case downloads (placeholder) |
 | [apim](apim) | Databricks SQL and Genie APIs, policies, MCP projection |
 | [api](api) | FastAPI service that calls Databricks through APIM |
 | [ui](ui) | Angular + Ionic front end |

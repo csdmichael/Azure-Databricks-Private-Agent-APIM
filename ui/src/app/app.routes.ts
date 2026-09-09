@@ -2,6 +2,10 @@ import { Routes } from '@angular/router';
 
 export const APP_ROUTES: Routes = [
   {
+    path: 'showcase',
+    loadComponent: () => import('./showcase/showcase.page').then((m) => m.ShowcasePage),
+  },
+  {
     path: 'chat',
     loadComponent: () => import('./chat/chat.page').then((m) => m.ChatPage),
   },
@@ -9,6 +13,6 @@ export const APP_ROUTES: Routes = [
     path: 'packages',
     loadComponent: () => import('./packages/packages.page').then((m) => m.PackagesPage),
   },
-  { path: '', redirectTo: 'chat', pathMatch: 'full' },
-  { path: '**', redirectTo: 'chat' },
+  { path: '', redirectTo: 'showcase', pathMatch: 'full' },
+  { path: '**', redirectTo: 'showcase' },
 ];
