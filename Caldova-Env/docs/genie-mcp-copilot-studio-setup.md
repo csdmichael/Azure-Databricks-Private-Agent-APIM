@@ -1,4 +1,4 @@
-# Connect a Power Platform Managed Environment privately to Databricks Genie MCP through API Management
+# Connect a Power Platform Managed Environment privately to Databricks Genie through API Management
 
 This guide is for a customer who **already has**:
 
@@ -8,8 +8,17 @@ This guide is for a customer who **already has**:
 
 It does not deploy Databricks or API Management and does not load data. It
 connects the pieces so a Copilot Studio agent can query private Databricks data
-through a Genie MCP server and generate high-fidelity PowerPoint decks surfaced
+through a **Power Platform custom connector** and build executive decks surfaced
 in Microsoft 365 Copilot.
+
+> **Read this before you start.** An MCP server will *not* work over this
+> private path. Power Platform VNet support covers Dataverse plugins and
+> **connectors**, including custom connectors — it does **not** cover MCP
+> servers. An MCP tool added to an agent in a VNet-injected environment shows
+> `No tools available.` at authoring time and
+> `that tool is not available in this chat environment` at runtime. This guide
+> therefore uses a **custom connector**, which is the supported path. See
+> [Section 11](#11-step-9--import-the-custom-connector).
 
 Every screenshot referenced below lives in [images](images). See
 [images/README.md](images/README.md) for the exact capture list.
@@ -25,8 +34,8 @@ flowchart LR
   end
 
   subgraph CS["Copilot Studio agent"]
-    TOOL["Genie MCP tool"]
-    PPT["Deck generation"]
+    TOOL["Custom connector tools<br/>ask / follow-up / status / result"]
+    PPT["Deck content"]
   end
 
   subgraph PP["Power Platform managed environment"]
@@ -36,7 +45,7 @@ flowchart LR
 
   subgraph APIMNET["Existing West US APIM VNet"]
     APIMPE["Gateway private endpoint"]
-    APIM["API Management<br/>Genie MCP server"]
+    APIM["API Management<br/>Genie REST API"]
   end
 
   subgraph DBXNET["Existing West US 2 Databricks VNet"]
