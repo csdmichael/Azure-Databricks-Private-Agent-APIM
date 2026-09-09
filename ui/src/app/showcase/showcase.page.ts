@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, ViewChild, computed, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { IonIcon, IonToggle } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -40,10 +41,30 @@ interface FeatureItem {
   description: string;
 }
 
+interface MetricItem {
+  value: string;
+  label: string;
+  detail: string;
+}
+
+interface ScenarioRow {
+  assumption: string;
+  pilot: string;
+  businessUnit: string;
+  enterprise: string;
+}
+
+interface UseCaseItem {
+  team: string;
+  focus: string;
+  output: string;
+}
+
 const REPO_ROOT = 'https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM';
 const RAW_ROOT = 'https://raw.githubusercontent.com/csdmichael/Azure-Databricks-Private-Agent-APIM/main';
 const MEDIA_ROOT = `https://media.githubusercontent.com/media/csdmichael/Azure-Databricks-Private-Agent-APIM/main/docs/Videos`;
-const BUSINESS_CASE_ROOT = `${RAW_ROOT}/docs/Business%20Case`;
+const BUSINESS_CASE_ASSETS = 'assets/business-case';
+const BUSINESS_CASE_FILE = 'private-data-to-powerpoint-business-case-final';
 
 @Component({
   selector: 'app-showcase',
@@ -56,6 +77,8 @@ export class ShowcasePage implements AfterViewInit {
   @ViewChild('videoPlayer') private videoPlayer?: ElementRef<HTMLVideoElement>;
   @ViewChild('videoFrame') private videoFrame?: ElementRef<HTMLElement>;
 
+  private readonly sanitizer = inject(DomSanitizer);
+
   readonly activeTab = signal<ShowcaseTab>('videos');
   readonly selectedVideoIndex = signal(0);
   readonly autoplayNext = signal(true);
@@ -66,8 +89,8 @@ export class ShowcasePage implements AfterViewInit {
   readonly setupGuideUrl = `${REPO_ROOT}/blob/main/docs/setup-guide.md`;
   readonly skillUrl = `${REPO_ROOT}/blob/main/skills/executive-deck-builder/SKILL.md`;
   readonly architectureImageUrl = `${RAW_ROOT}/docs/azure-databricks-private-agent-apim-architecture.png`;
-  readonly businessCasePdfUrl = `${BUSINESS_CASE_ROOT}/Databricks-Private-Agent-Business-Case.pdf`;
-  readonly businessCasePptxUrl = `${BUSINESS_CASE_ROOT}/Databricks-Private-Agent-Business-Case.pptx`;
+  readonly businessCasePdfUrl = `${BUSINESS_CASE_ASSETS}/${BUSINESS_CASE_FILE}.pdf`;
+  readonly businessCasePptxUrl = `${BUSINESS_CASE_ASSETS}/${BUSINESS_CASE_FILE}.pptx`;
   readonly businessCaseFolderUrl = `${REPO_ROOT}/tree/main/docs/Business%20Case`;
   readonly copilotStudioUrl = 'https://copilotstudio.microsoft.com/';
   readonly linkedInUrl = 'https://www.linkedin.com/in/michael-yaacoub-7a46436/';
@@ -175,6 +198,39 @@ export class ShowcasePage implements AfterViewInit {
 
   readonly selectedVideo = computed(() => this.videos[this.selectedVideoIndex()]);
   readonly selectedVideoSrc = computed(() => `${MEDIA_ROOT}/${this.selectedVideo().file}`);
+
+  readonly businessCaseEmbedUrl = computed(() =>
+    this.sanitizer.bypassSecurityTrustResourceUrl(`${this.businessCasePdfUrl}#view=FitH`),
+  );
+
+  // Figures below mirror the business-unit scenario in the published business case deck.
+  readonly businessMetrics: MetricItem[] = [
+    { value: '$892.5K', label: 'Annual run-rate benefit', detail: 'Before one-time implementation cost' },
+    { value: '243%', label: 'Year-one ROI', detail: 'Net benefit divided by total year-one cost' },
+    { value: '2.4 months', label: 'Estimated payback', detail: 'At 100 active business users' },
+    { value: '$74.4K', label: 'Net monthly benefit', detail: 'Capacity value less recurring cost' },
+    { value: '1,125', label: 'Productive hours released monthly', detail: '$84.4K of monthly capacity value' },
+    { value: '60%', label: 'Less employee time per deck', detail: 'Five hours down to two' },
+  ];
+
+  readonly scenarios: ScenarioRow[] = [
+    { assumption: 'Active users', pilot: '25', businessUnit: '100', enterprise: '300' },
+    { assumption: 'Decks per user per month', pilot: '4', businessUnit: '5', enterprise: '5' },
+    { assumption: 'Hours saved per deck', pilot: '2.5', businessUnit: '3.0', enterprise: '3.5' },
+    { assumption: 'Loaded labor cost', pilot: '$75/hour', businessUnit: '$75/hour', enterprise: '$75/hour' },
+    { assumption: 'Productive usage factor', pilot: '70%', businessUnit: '75%', enterprise: '80%' },
+    { assumption: 'Monthly operating cost', pilot: '$5,000', businessUnit: '$10,000', enterprise: '$25,000' },
+    { assumption: 'One-time implementation', pilot: '$60,000', businessUnit: '$175,000', enterprise: '$350,000' },
+  ];
+
+  readonly useCases: UseCaseItem[] = [
+    { team: 'Sales', focus: 'Pipeline reviews', output: 'Account plans and forecast decks' },
+    { team: 'Finance', focus: 'Performance analysis', output: 'Budget and variance decks' },
+    { team: 'Supply chain', focus: 'Inventory and demand', output: 'Supplier and fulfillment reviews' },
+    { team: 'Operations', focus: 'Service and quality', output: 'Weekly operating reviews' },
+    { team: 'Product', focus: 'Portfolio performance', output: 'Launch and adoption updates' },
+    { team: 'Leadership', focus: 'Cross-functional metrics', output: 'Executive and board briefings' },
+  ];
 
   constructor() {
     addIcons({

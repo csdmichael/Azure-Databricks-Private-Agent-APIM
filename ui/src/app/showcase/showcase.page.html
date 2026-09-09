@@ -145,34 +145,130 @@
     aria-labelledby="tab-business-case"
     [hidden]="activeTab() !== 'business-case'"
   >
-    <div class="placeholder-card">
-      <ion-icon name="analytics-outline" aria-hidden="true"></ion-icon>
-      <h2>Business case</h2>
-      <p>
-        The enterprise business case for this solution has not been published yet. Once the deck and
-        summary are added to <code>docs/Business Case</code> in the repository, they appear here as
-        downloads.
-      </p>
-      <div class="placeholder-card__actions">
+    <header class="case-header">
+      <div>
+        <p class="case-kicker">Illustrative business case</p>
+        <h2>Private data to executive PowerPoint</h2>
+        <p>
+          Low-code business case for enterprise adoption, modelled on a business unit of
+          <strong>100 active users</strong>. Every figure below is editable and should be recalibrated
+          with pilot usage and time-study data.
+        </p>
+      </div>
+      <div class="case-header__actions">
         <a class="btn btn-primary" [href]="businessCasePdfUrl" target="_blank" rel="noopener noreferrer">
           <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
-          Business case (PDF)
+          Download PDF
         </a>
         <a class="btn" [href]="businessCasePptxUrl" target="_blank" rel="noopener noreferrer">
           <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
-          Business case (PPTX)
-        </a>
-        <a class="btn" [href]="businessCaseFolderUrl" target="_blank" rel="noopener noreferrer">
-          <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
-          Open the folder
+          Download PPTX
         </a>
       </div>
-      <p class="placeholder-card__note">
-        Expected file names:
-        <code>Databricks-Private-Agent-Business-Case.pdf</code> and
-        <code>Databricks-Private-Agent-Business-Case.pptx</code>.
-      </p>
+    </header>
+
+    <div class="metric-grid">
+      @for (metric of businessMetrics; track metric.label) {
+        <article class="metric-card">
+          <strong>{{ metric.value }}</strong>
+          <span>{{ metric.label }}</span>
+          <small>{{ metric.detail }}</small>
+        </article>
+      }
     </div>
+
+    <div class="case-split">
+      <section class="case-block">
+        <h3>What changes</h3>
+        <p class="case-block__lede">
+          Each completed deck releases about three hours of employee capacity. The largest savings come
+          from data preparation, chart creation, and revision cycles.
+        </p>
+        <dl class="change-list">
+          <div>
+            <dt>Data preparation</dt>
+            <dd>The agent calls governed APIs instead of manual exports.</dd>
+          </div>
+          <div>
+            <dt>Analysis</dt>
+            <dd>Genie translates business questions into governed queries.</dd>
+          </div>
+          <div>
+            <dt>Presentation</dt>
+            <dd>The deck skill creates native slides and charts.</dd>
+          </div>
+          <div>
+            <dt>Review</dt>
+            <dd>Users validate insights and refine the narrative.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="case-block">
+        <h3>Where it applies</h3>
+        <p class="case-block__lede">
+          One reusable low-code pattern serves many business functions. Teams share the same governed
+          connector and deck skill while changing prompts, data permissions, and templates.
+        </p>
+        <ul class="usecase-list">
+          @for (item of useCases; track item.team) {
+            <li>
+              <strong>{{ item.team }}</strong>
+              <span>{{ item.focus }}</span>
+              <small>{{ item.output }}</small>
+            </li>
+          }
+        </ul>
+      </section>
+    </div>
+
+    <section class="case-block">
+      <h3>Assumptions that drive the model</h3>
+      <p class="case-block__lede">
+        Five assumptions determine most of the financial value. The core formula is
+        <em>users &times; deck volume &times; hours saved &times; loaded hourly cost &times; productive usage</em>.
+      </p>
+      <div class="table-wrap">
+        <table class="scenario-table">
+          <thead>
+            <tr>
+              <th scope="col">Assumption</th>
+              <th scope="col">Pilot</th>
+              <th scope="col">Business unit</th>
+              <th scope="col">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of scenarios; track row.assumption) {
+              <tr>
+                <th scope="row">{{ row.assumption }}</th>
+                <td>{{ row.pilot }}</td>
+                <td class="is-highlight">{{ row.businessUnit }}</td>
+                <td>{{ row.enterprise }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="case-note">
+        Capacity value measures time redirected to higher-value work. It is not a headcount reduction
+        commitment.
+      </p>
+    </section>
+
+    <section class="case-block">
+      <h3>Full deck</h3>
+      <div class="pdf-frame">
+        <iframe
+          [src]="businessCaseEmbedUrl()"
+          title="Private data to executive PowerPoint business case"
+          loading="lazy"
+        ></iframe>
+      </div>
+      <p class="case-note">
+        If the viewer does not load in your browser, use the download buttons above.
+      </p>
+    </section>
   </section>
 
   <!-- Features -->

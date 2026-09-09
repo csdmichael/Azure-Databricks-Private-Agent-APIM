@@ -1,17 +1,55 @@
 # Business Case
 
-Placeholder folder for the enterprise business case behind the private Azure Databricks
-agent solution.
+Enterprise business case for the private Azure Databricks to executive PowerPoint solution.
 
-The showcase page links directly to the files below. Drop them here and the buttons on the
-**Business case** tab start working — no code change required.
-
-| Expected file | Linked from |
+| File | Format |
 |---|---|
-| `Databricks-Private-Agent-Business-Case.pdf` | Showcase → Business case → *Business case (PDF)* |
-| `Databricks-Private-Agent-Business-Case.pptx` | Showcase → Business case → *Business case (PPTX)* |
+| `private-data-to-powerpoint-business-case-final.pdf` | 11-page PDF |
+| `private-data-to-powerpoint-business-case-final.pptx` | Editable PowerPoint |
 
-If you use different file names, update `businessCasePdfUrl` and `businessCasePptxUrl` in
-[../../ui/src/app/showcase/showcase.page.ts](../../ui/src/app/showcase/showcase.page.ts).
+## Headline figures
 
-Large binaries are best committed through Git LFS so the raw URLs stay fast.
+Modelled on a business unit of **100 active users**.
+
+| Metric | Value |
+|---|---|
+| Annual run-rate benefit | $892.5K |
+| Year-one ROI | 243% |
+| Estimated payback | 2.4 months |
+| Net monthly benefit | $74.4K |
+| Productive hours released monthly | 1,125 ($84.4K capacity value) |
+| Employee time per deck | 5 hours down to 2 |
+
+Net year-one benefit is $717.5K after the $175K implementation estimate.
+
+## Assumptions
+
+| Assumption | Pilot | Business unit | Enterprise |
+|---|---|---|---|
+| Active users | 25 | 100 | 300 |
+| Decks per user per month | 4 | 5 | 5 |
+| Hours saved per deck | 2.5 | 3.0 | 3.5 |
+| Loaded labor cost | $75/hour | $75/hour | $75/hour |
+| Productive usage factor | 70% | 75% | 80% |
+| Monthly operating cost | $5,000 | $10,000 | $25,000 |
+| One-time implementation | $60,000 | $175,000 | $350,000 |
+
+Core formula: *users × deck volume × hours saved × loaded hourly cost × productive usage*.
+
+Capacity value measures time redirected to higher-value work. It is not a headcount
+reduction commitment. Recalibrate with pilot usage and time-study data before using these
+numbers with a customer.
+
+## Where these files are surfaced
+
+The showcase page renders the metrics, the assumption table, and an inline PDF viewer on
+its **Business case** tab: <https://caldova-databricks-showcase.azurewebsites.net>
+
+The web app serves its own copy from
+[../../ui/src/assets/business-case](../../ui/src/assets/business-case) so the PDF loads
+same-origin with the correct content type. **If you update the files here, copy them there
+as well and redeploy**, otherwise the site keeps serving the previous version.
+
+Figures shown on the page are maintained in
+[../../ui/src/app/showcase/showcase.page.ts](../../ui/src/app/showcase/showcase.page.ts)
+(`businessMetrics`, `scenarios`, and `useCases`).
