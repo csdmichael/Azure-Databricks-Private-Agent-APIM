@@ -8,8 +8,8 @@
   run time from APIM and kept in-process only.
 
 .EXAMPLE
-  ./scripts/provision-agents.ps1                 # both agents, with smoke tests
-  ./scripts/provision-agents.ps1 -Agent genie -SkipTest
+  ./provision-agents.ps1                 # both agents, with smoke tests
+  ./provision-agents.ps1 -Agent genie -SkipTest
 #>
 [CmdletBinding()]
 param(
@@ -24,7 +24,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 $env:AZURE_SUBSCRIPTION_ID = $SubscriptionId
 $env:AZURE_RESOURCE_GROUP = $ResourceGroup
@@ -47,7 +47,7 @@ $testArgs = @()
 if ($SkipTest) { $testArgs += "--skip-test" }
 
 try {
-    Push-Location (Join-Path $repoRoot "foundry")
+    Push-Location $PSScriptRoot
     if ($Agent -in @("all", "databricks")) {
         Write-Host "== databricks-agent-mcp ==" -ForegroundColor Cyan
     & $PythonExe "provision_agent.py" @testArgs --output-dir (Join-Path $repoRoot "artifacts")
