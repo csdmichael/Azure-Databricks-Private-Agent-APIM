@@ -135,7 +135,7 @@ $token = $null
 `Geo` must be a supported Power Platform region, `Managed` must be `Standard`,
 and `Dataverse` must be `True`.
 
-![Power Platform admin center environment details showing region and Managed environment state](images/10-power-platform-environment.png)
+![Power Platform admin center environment details showing region and Managed environment state](images/01-power-platform-environment.png)
 
 Map `Geo` to the required Azure region pair:
 
@@ -189,7 +189,7 @@ The template used here is
 It creates both VNets, both delegated subnets, all four peerings, the private
 DNS links, and the enterprise policy in one pass.
 
-![Azure portal subnet configuration showing delegation to Microsoft.PowerPlatform/enterprisePolicies](images/08-pp-vnet-canadacentral-subnets.png)
+![Azure portal subnet configuration showing delegation to Microsoft.PowerPlatform/enterprisePolicies](images/02-pp-vnet-canadacentral-subnets.png)
 
 A delegated subnet cannot be shared with another enterprise policy, and nothing
 else may be deployed into it.
@@ -208,7 +208,7 @@ foreach ($v in $ApimVnetName, "pp-vnet-$RegionA", "pp-vnet-$RegionB") {
 }
 ```
 
-![Azure portal peering blade showing the peerings on the APIM VNet](images/07-vnet-peerings.png)
+![Azure portal peering blade showing the peerings on the APIM VNet](images/04-vnet-peerings.png)
 
 If a peering shows `Disconnected`, delete and recreate **both** sides. A
 one-sided peering never carries traffic.
@@ -232,7 +232,7 @@ az network private-dns record-set a list -g $NetworkRg -z privatelink.azure-api.
 Expect the APIM record to resolve to a private address in the APIM private
 endpoint subnet.
 
-![Private DNS zone privatelink.azure-api.net showing the gateway A record and virtual network links](images/15-private-dns-apim.png)
+![Private DNS zone privatelink.azure-api.net showing the gateway A record and virtual network links](images/05-private-dns-apim.png)
 
 Reference:
 [Azure Private Endpoint DNS integration scenarios](https://learn.microsoft.com/azure/private-link/private-endpoint-dns-integration-scenarios).
@@ -251,7 +251,7 @@ az resource show `
   --query "{name:name,location:location,kind:kind,vnets:properties.networkInjection.virtualNetworks}" -o json
 ```
 
-![Azure portal enterprise policy overview showing the Canada location and Microsoft.PowerPlatform/enterprisePolicies type](images/16-enterprise-policy.png)
+![Azure portal enterprise policy overview showing the Canada location and Microsoft.PowerPlatform/enterprisePolicies type](images/06-enterprise-policy.png)
 
 ---
 
@@ -371,7 +371,7 @@ az deployment group create `
 
 The MCP endpoint is `https://<apim>.azure-api.net/databricks-genie-mcp/mcp`.
 
-![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](images/06-apim-mcp-servers.png)
+![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](images/09-apim-mcp-servers.png)
 
 Confirm the tool list from a host inside a peered VNet:
 
@@ -424,9 +424,9 @@ through a custom connector.
    subscription key. Store the key only in the connection — never in agent
    instructions, environment variables, source control, or chat.
 
-![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](images/13-connector-security.png)
+![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](images/12-connector-security.png)
 
-![Custom connector Definition tab showing the four actions and the request URL with path parameters](images/14-connector-definition.png)
+![Custom connector Definition tab showing the four actions and the request URL with path parameters](images/13-connector-definition.png)
 
 > **Typed request bodies matter.** The APIM export gives `POST` bodies only an
 > `example`, which produces a single opaque `body` string input. Replace it with
@@ -457,12 +457,12 @@ create files. Agents on the GitHub Copilot harness consume Copilot Credits.
 3. Keep the agent instructions short: identity, the Genie call sequence, and a
    line delegating deck work to the skill.
 
-![Copilot Studio Build page showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](images/03-agent-build.png)
+![Copilot Studio Build page showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](images/14-agent-build.png)
 
 Ask for a deck. The agent runs several Genie queries, writes the file, verifies
 it, and returns a download card.
 
-![Copilot Studio preview showing the agent returning a .pptx file as a downloadable card alongside the regional revenue table](images/04-deck-delivered.png)
+![Copilot Studio preview showing the agent returning a .pptx file as a downloadable card alongside the regional revenue table](images/15-deck-delivered.png)
 
 > **Connection state gotcha.** Every new conversation starts `Stale`. Open the
 > card's connection-manager link, choose **Review**, **Submit**, then **Retry in

@@ -8,26 +8,33 @@ high-fidelity, downloadable PowerPoint deck.
 Databricks and API Management both have **public network access disabled**. Nothing in
 the data path traverses the public internet.
 
+![End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent on the GitHub Copilot harness, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie](docs/azure-databricks-private-agent-apim-architecture.png)
+
 ---
 
 ## Contents
 
-- [Architecture](#architecture)
+- [How it works](#how-it-works)
+- [Technologies used](#technologies-used)
+- [Portals and URLs](#portals-and-urls)
 - [Current environment](#current-environment)
 - [Address plan](#address-plan)
 - [Repository layout](#repository-layout)
 - [Deploy](#deploy)
-- [Deployed resources](#deployed-resources)
-  - [Azure resource group](#azure-resource-group)
-  - [API Management](#api-management)
-  - [Virtual network peerings](#virtual-network-peerings)
-  - [Power Platform](#power-platform)
-- [The Copilot Studio agent](#the-copilot-studio-agent)
-  - [Agent configuration](#agent-configuration)
-  - [Deck output](#deck-output)
-  - [The deck skill](#the-deck-skill)
+- [Setup walkthrough](#setup-walkthrough)
+  - [1. Power Platform managed environment](#1-power-platform-managed-environment)
+  - [2. Delegated virtual networks](#2-delegated-virtual-networks)
+  - [3. Virtual network peerings](#3-virtual-network-peerings)
+  - [4. Private DNS](#4-private-dns)
+  - [5. Enterprise policy](#5-enterprise-policy)
+  - [6. Lock down API Management](#6-lock-down-api-management)
+  - [7. Publish the Databricks APIs](#7-publish-the-databricks-apis)
+  - [8. Import the custom connector](#8-import-the-custom-connector)
+  - [9. Build the Copilot Studio agent](#9-build-the-copilot-studio-agent)
+  - [10. Generate the deck](#10-generate-the-deck)
+  - [11. Final resource group](#11-final-resource-group)
 - [Why a custom connector and not an MCP server](#why-a-custom-connector-and-not-an-mcp-server)
-- [Custom connector](#custom-connector)
+- [The deck skill](#the-deck-skill)
 - [Observability](#observability)
 - [Key design decisions](#key-design-decisions)
 - [Setup guide](#setup-guide)
@@ -35,50 +42,75 @@ the data path traverses the public internet.
 
 ---
 
-## Architecture
+## How it works
 
-```mermaid
-flowchart LR
-  subgraph M365["Microsoft 365 Copilot / Teams"]
-    USER["User asks for a deck"]
-  end
+The diagram above reads left to right, in eight numbered hops.
 
-  subgraph CS["Copilot Studio agent (GitHub Copilot harness)"]
-    TOOLS["4 connector tools<br/>ask / follow-up / status / result"]
-    SKILL["executive-deck-builder skill"]
-    PPTX["Real .pptx in sandbox"]
-  end
+1. **A user asks for a deck** in Microsoft 365 Copilot or Teams, in plain language.
+2. **The Copilot Studio agent** picks up the request. It runs on the **GitHub Copilot
+   harness**, which gives it a governed sandbox and the `executive-deck-builder` skill.
+3. **The agent calls its custom connector tools.** Because the Power Platform environment
+   is VNet-injected, that call leaves through a **delegated subnet** rather than the
+   public internet.
+4. **Traffic crosses a VNet peering** into the API Management VNet. Peering is not
+   transitive, so each Power Platform regional VNet peers *directly* with the APIM VNet.
+5. **APIM receives the request on its private endpoint** at `10.191.1.4`. Its public
+   gateway is disabled, so this is the only way in.
+6. **APIM authenticates to Databricks with its managed identity** and crosses a global
+   peering into the Databricks VNet. No Databricks token or key is ever stored in Power
+   Platform.
+7. **Databricks answers through AI/BI Genie**, which resolves the natural-language
+   question against Unity Catalog using a serverless SQL warehouse, and returns grounded
+   rows.
+8. **The agent builds a real `.pptx`** from those rows in its sandbox and returns it as a
+   download card in the chat.
 
-  subgraph PP["Power Platform managed environment (canada)"]
-    PPC["Canada Central VNet 10.194.0.0/16<br/>delegated subnet"]
-    PPE["Canada East VNet 10.195.0.0/16<br/>delegated subnet"]
-  end
+The bands across the bottom of the diagram are the cross-cutting controls: **identity**
+(managed identity into Databricks, Entra ID for users), **private networking** (private
+endpoints, delegated subnets, peering, private DNS), **AI gateway controls** (APIM
+policies, subscription keys, rate limiting), and **observability** (APIM diagnostics into
+Log Analytics).
 
-  subgraph APIMNET["West US - APIM VNet 10.191.0.0/16"]
-    APIMPE["Gateway private endpoint 10.191.1.4"]
-    APIM["API Management StandardV2<br/>public access disabled"]
-  end
+---
 
-  subgraph DBXNET["West US 2 - Databricks VNet 10.190.0.0/16"]
-    DBXPE["databricks_ui_api +<br/>browser_authentication endpoints"]
-    DBX["Databricks Premium<br/>VNet injected, SCC, public access disabled"]
-    UC["Unity Catalog + SQL warehouse + Genie"]
-  end
+## Technologies used
 
-  USER --> TOOLS --> PP
-  SKILL --> PPTX --> USER
-  PPC <-->|"peering"| APIMNET
-  PPE <-->|"peering"| APIMNET
-  APIMNET <-->|"global peering"| DBXNET
-  APIMPE --> APIM
-  APIM -->|"managed identity"| DBXPE
-  DBXPE --> DBX --> UC
-```
+| Technology | Role in this solution | Where to configure |
+|---|---|---|
+| **Azure Databricks** (Premium, VNet injected) | Hosts the data. Unity Catalog, a serverless SQL warehouse, and the AI/BI Genie space. Public access disabled. | [Azure portal](https://portal.azure.com/) |
+| **Azure Databricks AI/BI Genie** | Turns natural-language questions into governed SQL over a curated schema. | Databricks workspace → **Genie** |
+| **Unity Catalog** | Catalog, schema, tables, and the grants APIM's managed identity needs. | Databricks workspace → **Catalog** |
+| **Azure API Management** (StandardV2) | The only proxy in front of Databricks. Publishes the SQL and Genie REST APIs, holds the policies, and authenticates to Databricks with a managed identity. Public access disabled. | [Azure portal](https://portal.azure.com/) |
+| **Azure Private Link / Private Endpoints** | Private ingress to both APIM and Databricks. | Azure portal → each resource → **Networking** |
+| **Azure Private DNS zones** | `privatelink.azure-api.net` and `privatelink.azuredatabricks.net`, linked to every VNet that must resolve them. | Azure portal → **Private DNS zones** |
+| **Azure Virtual Network peering** | Connects the Power Platform, APIM, and Databricks VNets. | Azure portal → VNet → **Peerings** |
+| **Power Platform managed environment** | The Dataverse-backed environment that gets subnet-injected. Must be a Managed Environment. | [Power Platform admin center](https://admin.powerplatform.microsoft.com/) |
+| **Power Platform enterprise policy** (`NetworkInjection`) | Binds the delegated subnets to the environment. Its geo must match the environment geo. | Azure portal + `Microsoft.PowerPlatform.EnterprisePolicies` module |
+| **Power Apps custom connector** | The supported way to reach a private endpoint from Copilot Studio. Exposes the four Genie operations. | [Power Apps → Custom connectors](https://make.powerapps.com/) |
+| **Microsoft Copilot Studio** (GitHub Copilot harness) | Hosts the agent, its tools, and the deck skill. The harness supplies the sandbox that writes the `.pptx`. | [Copilot Studio](https://copilotstudio.microsoft.com/) |
+| **Copilot Studio skills** | Portable `SKILL.md` carrying the deck specification. | Copilot Studio → agent → **Skills** |
+| **Microsoft 365 Copilot / Teams** | Where users actually talk to the agent. | Copilot Studio → **Channels** |
+| **Azure Monitor / Log Analytics** | APIM gateway diagnostics for tracing every call. | Azure portal → **Log Analytics workspaces** |
+| **Terraform** | Deploys the Databricks workspace, NSGs, private endpoints, and DNS. | [terraform](terraform) |
+| **Bicep** | Deploys APIM, the Power Platform VNets, the enterprise policy, and diagnostics. | [bicep](bicep) |
 
-VNet peering is not transitive, so each Power Platform VNet peers **directly** with the
-APIM VNet. APIM is the only application proxy in front of Databricks, and it
-authenticates with its managed identity, so no Databricks token or key is ever stored in
-Power Platform.
+---
+
+## Portals and URLs
+
+Replace the identifiers with your own where they differ.
+
+| What | URL |
+|---|---|
+| Azure portal | <https://portal.azure.com/> |
+| Power Platform admin center | <https://admin.powerplatform.microsoft.com/> |
+| This environment in the admin center | <https://admin.powerplatform.microsoft.com/manage/environments/environment/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/hub> |
+| Power Apps maker portal | <https://make.powerapps.com/> |
+| Power Apps custom connectors | <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors> |
+| Power Apps connections | <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/connections> |
+| Copilot Studio | <https://copilotstudio.microsoft.com/> |
+| Databricks workspace | <https://adb-7405616934814750.10.azuredatabricks.net> |
+| APIM gateway (private only) | `https://caldova-apim-westus.azure-api.net` |
 
 ---
 
@@ -96,6 +128,7 @@ Power Platform.
 | SQL warehouse | `a3c7c9526aa58992` (serverless 2X-Small, auto-stop 5 min) |
 | Genie space | `01f1abe9e51e19ddbb15297aee9a5850` |
 | Log Analytics | `caldova-apim-logs-westus` |
+| Copilot Studio agent | `Genie Deck Builder Pro` (`0b4034e0-53b9-4ae8-a506-11e3269fa451`) |
 
 ---
 
@@ -132,7 +165,7 @@ geo: environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5` is `canada`, so the VNet
 | [databricks](databricks) | Sample dataset SQL and exploration notebook |
 | [scripts](scripts) | Deployment, data-load, connector, and test helpers |
 | [docs/setup-guide.md](docs/setup-guide.md) | Step-by-step guide for an existing Databricks + APIM estate |
-| [old mcaps](old%20mcaps) | Archived MCAPS proof of concept, reference only |
+| [old mcaps](old%20mcaps) | Archived MCAPS proof of concept and the Microsoft Foundry agents |
 
 The SQL under [databricks/sql](databricks/sql) deliberately keeps the original catalog
 token, because [scripts/load-catalog-data.ps1](scripts/load-catalog-data.ps1) rewrites it
@@ -169,85 +202,130 @@ private endpoint exists, which is another reason the lockdown flip is a separate
 
 ---
 
-## Deployed resources
+## Setup walkthrough
 
-### Azure resource group
+The screenshots below follow the order you actually perform the setup.
 
-All resources live in a single resource group.
+### 1. Power Platform managed environment
 
-![Azure resource group m365-myaacoub showing the Databricks workspace, API Management service, virtual networks, private endpoints, private DNS zones, and the Power Platform enterprise policy](docs/images/01-resource-group.png)
+Start here. The environment must be a **Managed Environment with Dataverse**, and its
+**geo** determines every Azure region choice that follows. Adding Dataverse is
+irreversible, so never use the tenant default environment.
 
-### API Management
+Portal: <https://admin.powerplatform.microsoft.com/>
 
-Public network access is disabled; the gateway is reachable only through its private
-endpoint at `10.191.1.4`.
+![Power Platform admin center showing the Caldova Private managed environment](docs/images/01-power-platform-environment.png)
 
-![API Management networking blade for caldova-apim-westus showing public network access disabled and the gateway private endpoint](docs/images/02-apim-private-networking.png)
+### 2. Delegated virtual networks
 
-Two APIs are published, the Databricks SQL API and the Genie API.
+Create one VNet per region in the environment's geo pair. Each needs a subnet delegated to
+`Microsoft.PowerPlatform/enterprisePolicies`, and both subnets must expose the same usable
+address count.
 
-![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/05-apim-apis.png)
+![Subnets blade for caldova-pp-vnet-canadacentral showing the delegated subnet](docs/images/02-pp-vnet-canadacentral-subnets.png)
 
-Both APIs are also projected as MCP servers. These belong to the archived Microsoft
-Foundry path, documented in
-[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md); they are **not** usable
-from Copilot Studio over the private network, for the reason explained
-[below](#why-a-custom-connector-and-not-an-mcp-server).
+![Subnets blade for caldova-pp-vnet-canadaeast showing the delegated subnet](docs/images/03-pp-vnet-canadaeast-subnets.png)
 
-![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp with their server URLs](docs/images/06-apim-mcp-servers.png)
+### 3. Virtual network peerings
 
-### Virtual network peerings
+Peer each Power Platform VNet **directly** with the APIM VNet, and the APIM VNet with the
+Databricks VNet. Peering is not transitive, so a hub-and-spoke shortcut will not work.
 
-The APIM VNet peers with the Databricks VNet and with both Power Platform VNets.
+![Peerings blade for the APIM virtual network](docs/images/04-vnet-peerings.png)
 
-![Peerings blade for the APIM virtual network showing connections to the Databricks VNet and both Power Platform VNets](docs/images/07-vnet-peerings.png)
+### 4. Private DNS
 
-### Power Platform
+Link `privatelink.azure-api.net` to the APIM VNet and to both Power Platform VNets, and
+`privatelink.azuredatabricks.net` to the APIM VNet. Without these links the private
+endpoint names resolve to public addresses and the calls fail.
 
-The managed environment is linked to the network-injection enterprise policy.
+![Private DNS zone privatelink.azure-api.net showing the gateway A record and virtual network links](docs/images/05-private-dns-apim.png)
 
-![Power Platform admin center showing the Caldova Private managed environment](docs/images/10-power-platform-environment.png)
+### 5. Enterprise policy
 
-Each regional VNet exposes a subnet delegated to
-`Microsoft.PowerPlatform/enterprisePolicies`.
+Create the `NetworkInjection` enterprise policy in the geo that matches the environment,
+then link it to the environment. This is the step that actually injects the subnets.
 
-![Subnets blade for caldova-pp-vnet-canadacentral showing the delegated subnet](docs/images/08-pp-vnet-canadacentral-subnets.png)
+![Azure portal enterprise policy overview showing the Canada location](docs/images/06-enterprise-policy.png)
 
-![Subnets blade for caldova-pp-vnet-canadaeast showing the delegated subnet](docs/images/09-pp-vnet-canadaeast-subnets.png)
+### 6. Lock down API Management
 
-Policy resource ID:
+Once the private endpoint exists and DNS resolves, disable public network access. From
+this point APIM answers only on `10.191.1.4`.
 
-```text
-/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/caldova-pp-network-injection-canada
-```
+![API Management networking blade showing public network access disabled and the gateway private endpoint](docs/images/07-apim-private-networking.png)
 
----
+### 7. Publish the Databricks APIs
 
-## The Copilot Studio agent
+Import the SQL and Genie REST APIs, attach the policies, and grant APIM's managed identity
+access to Databricks.
 
-**`Genie Deck Builder Pro`** runs on the **GitHub Copilot harness**, which natively
-creates and edits Word, Excel, PowerPoint, and PDF files in a governed sandbox. That is
-what makes a real `.pptx` download possible without any additional Azure compute.
+![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/08-apim-apis.png)
 
-> The harness matters. An agent on the **standard** harness has no sandbox and will tell
-> you it cannot create files. Create the agent from the Copilot Studio home page with the
-> **New experience** toggle on. Agents on this harness consume Copilot Credits.
+Both APIs can also be projected as MCP servers. Those belong to the archived Microsoft
+Foundry path in [old mcaps/foundry/README.md](old%20mcaps/foundry/README.md) — they are
+**not** usable from Copilot Studio over the private network. See
+[why](#why-a-custom-connector-and-not-an-mcp-server).
 
-### Agent configuration
+![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](docs/images/09-apim-mcp-servers.png)
 
-Four connector tools, one skill, and instructions that delegate all deck work to the
-skill.
+### 8. Import the custom connector
 
-![Copilot Studio Build page for Genie Deck Builder Pro showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](docs/images/03-agent-build.png)
+Create the connector in the linked environment from the Swagger 2.0 definition in
+[connector](connector).
 
-### Deck output
+Portal: <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors>
 
-The agent queries Genie, writes the file, verifies it, and returns a download card.
+![Power Apps Custom connectors list showing Databricks-Genie-Private-APIM](docs/images/10-powerapps-custom-connector.png)
 
-![Copilot Studio preview showing the agent returning 2025_Revenue_by_Region_Executive_Deck.pptx as a downloadable file, with the regional revenue table](docs/images/04-deck-delivered.png)
+Point it at the APIM host with `/databricks-genie` as the base URL.
 
-A representative run produced a nine-slide deck with four native PowerPoint charts, a
-data table, a shapes-and-connectors diagram, KPI tiles, and speaker notes on every slide:
+![Custom connector General tab showing host caldova-apim-westus.azure-api.net and base URL /databricks-genie](docs/images/11-connector-general.png)
+
+Use API key authentication with the `Ocp-Apim-Subscription-Key` header. Only the parameter
+name lives in the connector; the key value goes in the connection.
+
+![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](docs/images/12-connector-security.png)
+
+Confirm the four actions and their path parameters.
+
+![Custom connector Definition tab showing Actions (4) and the request URL with conversationId and messageId path parameters](docs/images/13-connector-definition.png)
+
+| Tool | Operation |
+|---|---|
+| Ask Genie (start conversation) | `POST /genie/ask` |
+| Ask Genie follow-up | `POST /genie/conversations/{conversationId}/messages` |
+| Get Genie message status | `GET /genie/conversations/{conversationId}/messages/{messageId}` |
+| Get Genie query result | `GET /genie/conversations/{conversationId}/messages/{messageId}/result` |
+
+> **Typed request bodies matter.** The APIM export gives `POST` bodies only an `example`,
+> which produces a single opaque `body` string input. Replace it with a typed schema so the
+> agent gets a real `Question` input:
+> `{"type":"object","required":["content"],"properties":{"content":{"type":"string"}}}`.
+
+### 9. Build the Copilot Studio agent
+
+Create the agent from the Copilot Studio home page with the **New experience** toggle on,
+so it runs on the **GitHub Copilot harness**. That harness natively creates Word, Excel,
+PowerPoint, and PDF files in a governed sandbox, which is what makes a real `.pptx`
+download possible with no extra Azure compute.
+
+An agent on the **standard** harness has no sandbox and will tell you it cannot create
+files. Agents on the GitHub Copilot harness consume Copilot Credits.
+
+Portal: <https://copilotstudio.microsoft.com/>
+
+![Copilot Studio Build page for Genie Deck Builder Pro showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](docs/images/14-agent-build.png)
+
+### 10. Generate the deck
+
+Ask for a deck. The agent runs several Genie queries, writes the file, verifies it, and
+returns a download card.
+
+![Copilot Studio preview showing the agent returning 2025_Revenue_by_Region_Executive_Deck.pptx as a downloadable file](docs/images/15-deck-delivered.png)
+
+A representative run produced a nine-slide deck with four native PowerPoint charts, a data
+table, a shapes-and-connectors diagram, KPI tiles, and speaker notes on every slide:
 
 | Region | Revenue (USD) | Share | Units | Avg selling price |
 |---|---|---|---|---|
@@ -257,26 +335,21 @@ data table, a shapes-and-connectors diagram, KPI tiles, and speaker notes on eve
 | LATAM | $28,452,604.92 | 10.5% | 2,132,707 | 13.351 |
 | **Total** | **$271,297,836.50** | 100.0% | 20,229,847 | 13.411 |
 
-The agent queried for 2024 comparatives, found none, and stated that year-over-year
-growth is not computable rather than inventing it.
+The agent queried for 2024 comparatives, found none, and stated that year-over-year growth
+is not computable rather than inventing it.
 
-### The deck skill
+> **Connection state gotcha.** Every new conversation starts `Stale`. Open the card's
+> connection-manager link, choose **Review**, **Submit**, then **Retry in that same
+> conversation**. Also confirm the connection manager shows a **single** row covering all
+> four tools — if the tools are split across two connector registrations, authorizing one
+> group leaves the other `Stale` permanently. Neither is a network or key problem; APIM
+> returns `200` throughout.
 
-[skills/executive-deck-builder/SKILL.md](skills/executive-deck-builder/SKILL.md) is a
-portable `SKILL.md` — YAML front matter plus Markdown — that can be uploaded to any agent
-on this harness. It specifies:
+### 11. Final resource group
 
-- 16:9 canvas, explicit placement on the blank layout, margins, and overflow caps
-- A Microsoft header band, horizontal rule, and footer with slide numbers
-- Native chart objects only, with chart type per purpose, axis titles, data labels, and
-  number formats per unit
-- Table, KPI tile, and diagram construction rules
-- The nine-slide structure and assertion-style slide titles
-- A verification step that reopens the saved file and asserts its contents
+Everything lands in one resource group.
 
-> The header logo is drawn programmatically from four colored squares. Replace it with
-> official brand artwork for anything customer-facing; the skill already accepts a
-> supplied logo image.
+![Azure resource group m365-myaacoub showing the Databricks workspace, API Management service, virtual networks, private endpoints, private DNS zones, and the enterprise policy](docs/images/16-resource-group.png)
 
 ---
 
@@ -292,56 +365,26 @@ both reproduced here:
 - Runtime: `that tool is not available in this chat environment`
 
 The custom connector is the supported path to a private endpoint, so the agent uses it.
-The MCP servers in APIM remain published for the archived Microsoft Foundry path, which
-reaches them differently. See
-[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md).
 
 ---
 
-## Custom connector
+## The deck skill
 
-`Databricks-Genie-Private-APIM` exposes four operations that map to the Genie
-conversation lifecycle.
+[skills/executive-deck-builder/SKILL.md](skills/executive-deck-builder/SKILL.md) is a
+portable `SKILL.md` — YAML front matter plus Markdown — that can be uploaded to any agent
+on this harness. It specifies:
 
-![Power Apps Custom connectors list showing Databricks-Genie-Private-APIM](docs/images/11-powerapps-custom-connector.png)
+- 16:9 canvas, explicit placement on the blank layout, margins, and overflow caps
+- A Microsoft header band, horizontal rule, and footer with slide numbers
+- Native chart objects only, with chart type per purpose, axis titles, data labels, and
+  number formats per unit
+- Table, KPI tile, and diagram construction rules
+- The nine-slide structure and assertion-style slide titles
+- A verification step that reopens the saved file and asserts its contents
 
-The connector points at the APIM host with `/databricks-genie` as its base URL.
-
-![Custom connector General tab showing host caldova-apim-westus.azure-api.net and base URL /databricks-genie](docs/images/12-connector-general.png)
-
-Authentication is API key in a header. Only the parameter name is stored in the
-connector; the key value lives in the connection.
-
-![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](docs/images/13-connector-security.png)
-
-The definition carries the four actions and their path parameters.
-
-![Custom connector Definition tab showing Actions (4) - result, ask, message, follow-up - and the GET request URL with conversationId and messageId path parameters](docs/images/14-connector-definition.png)
-
-| Tool | Operation |
-|---|---|
-| Ask Genie (start conversation) | `POST /genie/ask` |
-| Ask Genie follow-up | `POST /genie/conversations/{conversationId}/messages` |
-| Get Genie message status | `GET /genie/conversations/{conversationId}/messages/{messageId}` |
-| Get Genie query result | `GET /genie/conversations/{conversationId}/messages/{messageId}/result` |
-
-Definitions live in [connector](connector). The connection uses API key auth with the
-`Ocp-Apim-Subscription-Key` header. Store the key only in the connection — never in agent
-instructions, environment variables, or source control.
-
-### Connection gotchas
-
-Two failure modes cost real time here, and both present as the same misleading message,
-`Let's get you connected first`:
-
-1. **Duplicate connector registrations.** If the agent's tools end up split across two
-   connectors, authorizing one group leaves the other `Stale` permanently. The connection
-   manager must show a **single** row covering all four tools.
-2. **Every new conversation starts `Stale`.** Open the card's connection-manager link,
-   choose **Review**, **Submit**, then **Retry in that same conversation**. Starting a new
-   conversation resets it.
-
-Neither is a network or key problem. APIM returned `200` throughout.
+> The header logo is drawn programmatically from four colored squares. Replace it with
+> official brand artwork for anything customer-facing; the skill already accepts a supplied
+> logo image.
 
 ---
 
@@ -385,10 +428,9 @@ Databricks backend.
 
 ## Setup guide
 
-[docs/setup-guide.md](docs/setup-guide.md) walks through connecting a Power Platform
-managed environment to an **existing** private Databricks and API Management estate:
-region and geo validation, delegated VNets, peering, DNS, the enterprise policy, granting
-APIM access to Databricks, the custom connector, and the agent.
+[docs/setup-guide.md](docs/setup-guide.md) is the detailed, command-by-command version of
+the walkthrough above, written for a customer who already has private Databricks and API
+Management and needs to connect a Power Platform managed environment to them.
 
 ---
 
@@ -398,8 +440,7 @@ APIM access to Databricks, the custom connector, and the agent.
 subscription. Those Azure resources have been deleted; the folder is retained for history
 and is not wired into any deployment path.
 
-It also holds the **Microsoft Foundry** prompt agents, which reach the same Databricks
-data through the APIM MCP servers and Code Interpreter rather than through the private
-custom connector. See
-[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md). Its workflow is manual
-dispatch only and does not run on commits.
+It also holds the **Microsoft Foundry** prompt agents, which reach the same Databricks data
+through the APIM MCP servers and Code Interpreter rather than through the private custom
+connector. See [old mcaps/foundry/README.md](old%20mcaps/foundry/README.md). Its workflow
+is manual dispatch only and does not run on commits.
