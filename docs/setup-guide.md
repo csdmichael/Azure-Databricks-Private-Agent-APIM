@@ -20,8 +20,7 @@ in Microsoft 365 Copilot.
 > therefore uses a **custom connector**, which is the supported path. See
 > [Section 11](#11-step-9--import-the-custom-connector).
 
-Every screenshot referenced below lives in [images](images). See
-[images/README.md](images/README.md) for the exact capture list.
+Screenshots referenced below live in [images](images).
 
 ---
 
@@ -136,7 +135,7 @@ $token = $null
 `Geo` must be a supported Power Platform region, `Managed` must be `Standard`,
 and `Dataverse` must be `True`.
 
-![Power Platform admin center environment details showing region and Managed environment state](images/01-environment-details.png)
+![Power Platform admin center environment details showing region and Managed environment state](images/10-power-platform-environment.png)
 
 Map `Geo` to the required Azure region pair:
 
@@ -190,7 +189,7 @@ The template used here is
 It creates both VNets, both delegated subnets, all four peerings, the private
 DNS links, and the enterprise policy in one pass.
 
-![Azure portal subnet configuration showing delegation to Microsoft.PowerPlatform/enterprisePolicies](images/02-subnet-delegation.png)
+![Azure portal subnet configuration showing delegation to Microsoft.PowerPlatform/enterprisePolicies](images/08-pp-vnet-canadacentral-subnets.png)
 
 A delegated subnet cannot be shared with another enterprise policy, and nothing
 else may be deployed into it.
@@ -209,7 +208,7 @@ foreach ($v in $ApimVnetName, "pp-vnet-$RegionA", "pp-vnet-$RegionB") {
 }
 ```
 
-![Azure portal peering blade showing Connected and FullyInSync peerings on the APIM VNet](images/03-vnet-peerings.png)
+![Azure portal peering blade showing the peerings on the APIM VNet](images/07-vnet-peerings.png)
 
 If a peering shows `Disconnected`, delete and recreate **both** sides. A
 one-sided peering never carries traffic.
@@ -233,7 +232,7 @@ az network private-dns record-set a list -g $NetworkRg -z privatelink.azure-api.
 Expect the APIM record to resolve to a private address in the APIM private
 endpoint subnet.
 
-![Private DNS zone showing the APIM gateway A record and virtual network links](images/04-private-dns.png)
+![Private DNS zone privatelink.azure-api.net showing the gateway A record and virtual network links](images/15-private-dns-apim.png)
 
 Reference:
 [Azure Private Endpoint DNS integration scenarios](https://learn.microsoft.com/azure/private-link/private-endpoint-dns-integration-scenarios).
@@ -252,7 +251,7 @@ az resource show `
   --query "{name:name,location:location,kind:kind,vnets:properties.networkInjection.virtualNetworks}" -o json
 ```
 
-![Azure portal enterprise policy overview showing kind NetworkInjection and both delegated subnets](images/05-enterprise-policy.png)
+![Azure portal enterprise policy overview showing the Canada location and Microsoft.PowerPlatform/enterprisePolicies type](images/16-enterprise-policy.png)
 
 ---
 
@@ -291,7 +290,8 @@ $token = $null
 Confirm the operation in **Power Platform admin center → Environments →
 `<environment>` → History**.
 
-![Power Platform admin center History tab showing the subnet injection operation succeeded](images/06-subnet-injection-history.png)
+Confirm the subnet injection operation shows **Succeeded** in the environment's
+**History** tab.
 
 ---
 
@@ -371,7 +371,7 @@ az deployment group create `
 
 The MCP endpoint is `https://<apim>.azure-api.net/databricks-genie-mcp/mcp`.
 
-![API Management MCP servers blade listing the Databricks Genie MCP server](images/07-apim-mcp-server.png)
+![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](images/06-apim-mcp-servers.png)
 
 Confirm the tool list from a host inside a peered VNet:
 
@@ -400,81 +400,88 @@ Reference: [Expose a REST API as an MCP server](https://learn.microsoft.com/azur
 
 ---
 
-## 11. Step 9 — Add the MCP server to a Copilot Studio agent
+## 11. Step 9 — Import the custom connector
 
 Work inside the environment you linked in Step 6. Agents in any other
 environment will not have the private network path.
 
-1. Open [Copilot Studio](https://copilotstudio.microsoft.com/) and select the
-   linked environment in the top-right environment picker.
-2. Open your agent, go to **Tools**, and select **Add a tool**.
-3. Select **New tool → Model Context Protocol**.
-4. Enter the MCP server URL
-   `https://<apim>.azure-api.net/databricks-genie-mcp/mcp`.
-5. Choose **API key** authentication with header name
-   `Ocp-Apim-Subscription-Key`.
-6. Paste the APIM subscription key into the connection. Store it only in the
-   connection — never in agent instructions, environment variables, source
-   control, or chat.
-7. Create the connection and add the tool to the agent.
+An MCP server will **not** work here. Power Platform virtual network support
+covers connectors, not MCP servers, so the private endpoint is only reachable
+through a custom connector.
 
-![Copilot Studio Add a tool dialog with Model Context Protocol selected](images/08-copilot-studio-add-mcp.png)
+1. Open [Power Apps](https://make.powerapps.com/) and select the linked
+   environment.
+2. Go to **Custom connectors → New custom connector → Import an OpenAPI file**
+   and upload the Swagger 2.0 definition from
+   [../connector](../connector).
+3. On **General**, confirm the host is `<apim>.azure-api.net` and the base URL
+   is `/databricks-genie`.
+4. On **Security**, choose **API Key**, parameter name
+   `Ocp-Apim-Subscription-Key`, location **Header**.
+5. On **Definition**, confirm the four actions: `ask`, `follow-up`, `message`,
+   `result`.
+6. Create the connector, then create a connection and paste the APIM
+   subscription key. Store the key only in the connection — never in agent
+   instructions, environment variables, source control, or chat.
 
-![Copilot Studio connection configuration using Ocp-Apim-Subscription-Key header authentication](images/09-copilot-studio-connection.png)
+![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](images/13-connector-security.png)
+
+![Custom connector Definition tab showing the four actions and the request URL with path parameters](images/14-connector-definition.png)
+
+> **Typed request bodies matter.** The APIM export gives `POST` bodies only an
+> `example`, which produces a single opaque `body` string input. Replace it with
+> a typed schema so the agent gets a real `Question` input:
+> `{"type":"object","required":["content"],"properties":{"content":{"type":"string"}}}`.
+> Without this the agent sends a bare string and the backend returns
+> `INVALID_PARAMETER_VALUE: Field 'content' is required`.
 
 Reference:
-[Connect an agent to an existing MCP server](https://learn.microsoft.com/microsoft-copilot-studio/mcp-add-existing-server-to-agent).
-
-### Agent instructions that make the tool work
-
-Add explicit instructions, because the `body` passthrough is not
-self-describing:
-
-```text
-When the user asks a data question, call the Genie `ask` tool.
-Set the `body` input to JSON in exactly this form:
-  {"content": "<the user's question in natural language>"}
-Then poll the `message` tool with the returned conversationId and messageId
-until status is COMPLETED, and call `result` to retrieve the rows.
-Never invent numbers. Only report values returned by the tool.
-```
+[Create a custom connector from an OpenAPI definition](https://learn.microsoft.com/connectors/custom-connectors/define-openapi-definition).
 
 ---
 
-## 12. Step 10 — Generate the PowerPoint deck
+## 12. Step 10 — Build the agent and generate the deck
 
-Genie returns tabular results. Turn them into a deck one of two ways.
+Create the agent from the Copilot Studio home page with the **New experience**
+toggle on, so it runs on the **GitHub Copilot harness**. That harness natively
+creates Word, Excel, PowerPoint, and PDF files in a governed sandbox, which is
+what makes a real `.pptx` download possible with no extra Azure compute.
 
-**Option A — Copilot Studio builds the deck.** Add a second tool that renders
-slides from JSON, then instruct the agent to pass Genie's rows into it. This
-keeps everything in the agent and gives the most control over layout.
+An agent on the **standard** harness has no sandbox and will tell you it cannot
+create files. Agents on the GitHub Copilot harness consume Copilot Credits.
 
-**Option B — Microsoft 365 Copilot builds the deck.** Publish the agent to
-Microsoft 365 Copilot and let the user ask Copilot to turn the returned
-analysis into slides. Less layout control, no extra tool to maintain.
+1. Add all four connector tools and select the connection you created.
+2. Upload [../skills/executive-deck-builder/SKILL.md](../skills/executive-deck-builder/SKILL.md)
+   under **Skills**. It carries the canvas, branding, chart, table, and
+   nine-slide rules.
+3. Keep the agent instructions short: identity, the Genie call sequence, and a
+   line delegating deck work to the skill.
 
-For high fidelity, have the agent emit a slide plan before rendering:
+![Copilot Studio Build page showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](images/03-agent-build.png)
 
-```text
-Produce a slide plan first: one object per slide with title, chart type,
-x-axis field, y-axis field, and the exact rows to plot.
-Only then call the rendering tool. Do not summarize away precision.
-```
+Ask for a deck. The agent runs several Genie queries, writes the file, verifies
+it, and returns a download card.
 
-![Copilot Studio test pane showing a Genie answer and the generated slide plan](images/10-agent-test-genie.png)
+![Copilot Studio preview showing the agent returning a .pptx file as a downloadable card alongside the regional revenue table](images/04-deck-delivered.png)
+
+> **Connection state gotcha.** Every new conversation starts `Stale`. Open the
+> card's connection-manager link, choose **Review**, **Submit**, then **Retry in
+> that same conversation**. Starting a new conversation resets it. Also confirm
+> the connection manager shows a **single** row covering all four tools — if the
+> tools are split across two connector registrations, authorizing one group
+> leaves the other `Stale` permanently.
 
 ---
 
 ## 13. Step 11 — Publish to Microsoft 365 Copilot
 
 1. In Copilot Studio, select **Publish**.
-2. Open **Channels** and enable **Microsoft 365 Copilot**.
+2. Open **Channels** and enable **Microsoft 365 Copilot** and **Teams**.
 3. Submit for admin approval if your tenant requires it.
 4. Approve the agent in the Microsoft 365 admin center under
    **Settings → Integrated apps**.
-5. Open Microsoft 365 Copilot, select the agent, and ask a data question.
-
-![Microsoft 365 Copilot chat showing the agent returning Databricks-sourced analysis and a generated deck](images/11-m365-copilot-result.png)
+5. Open Microsoft 365 Copilot, select the agent, and ask for a deck. The created
+   file card renders natively in every channel the agent runs in.
 
 ---
 
