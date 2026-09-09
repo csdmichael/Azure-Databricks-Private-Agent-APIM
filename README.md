@@ -224,7 +224,25 @@ irreversible, so never use the tenant default environment.
 
 Portal: <https://admin.powerplatform.microsoft.com/>
 
-![Power Platform admin center showing the Caldova Private managed environment](docs/images/01-power-platform-environment.png)
+Confirm the environment's region, type, and that **Managed environments** is enabled.
+
+![Power Platform admin center showing the Caldova Private managed environment with its region and managed environment state](docs/images/01.a-power-platform-environment.png)
+
+Virtual network support is configured under **Security → Data and privacy**. The
+**Azure Virtual Network policies** entry is the one that matters here — it protects items
+made in Power Platform inside your virtual network without exposing them over the public
+internet. This is the tenant-level surface that binds an enterprise policy to an
+environment.
+
+![Power Platform admin center Data protection and privacy page with Azure Virtual Network policies highlighted](docs/images/01.b-power-platform-environment-Data%20Protection.png)
+
+Opening that entry lists every environment eligible for subnet injection and the policy
+attached to it. Use this as the verification step after linking: the environment should
+show **Dataverse: Yes**, **Managed: Yes**, the geo you expect, and the enterprise policy
+name in the **Policy** column. An environment missing Dataverse or Managed status will not
+appear as eligible.
+
+![Virtual Network policies panel listing the Caldova Private environment with Dataverse Yes, Managed Yes, Canada region, and the attached enterprise policy](docs/images/01.c-power-platform-environment-VirtualNetworkPolicies.png)
 
 ### 2. Delegated virtual networks
 
