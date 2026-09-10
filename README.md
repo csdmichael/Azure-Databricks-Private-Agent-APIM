@@ -174,7 +174,7 @@ geo: environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5` is `canada`, so the VNet
 | [connector](connector) | Power Platform custom connector definitions (Swagger 2.0) |
 | [skills](skills) | Reusable Copilot Studio skills |
 | [ui/src/app/showcase](ui/src/app/showcase) | Showcase page hosted on the B1 App Service |
-| [docs/Videos](docs/Videos) | Showcase video series (placeholder) |
+| [docs/Videos](docs/Videos) | Seven-part showcase video series |
 | [docs/Business Case](docs/Business%20Case) | Business case PDF, PPTX, and the financial model |
 | [apim](apim) | Databricks SQL and Genie APIs, policies, MCP projection |
 | [api](api) | FastAPI service that calls Databricks through APIM |
