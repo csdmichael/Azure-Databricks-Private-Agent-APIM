@@ -118,14 +118,14 @@ export class ShowcasePage implements AfterViewInit {
     { id: 'architecture', label: 'Architecture', icon: 'layers-outline' },
   ];
 
-  // Placeholder entries. Drop the matching files into docs/Videos to activate them.
+  // Entries without a published file show a "not published yet" notice naming the missing file.
   readonly videos: VideoItem[] = [
     {
       sequence: '01',
       title: 'Solution overview',
       description:
         'What the solution does end to end: a natural-language question in Microsoft 365 Copilot returns an executive PowerPoint built from private Databricks data.',
-      duration: 'Coming soon',
+      duration: '11:32',
       file: '01-solution-overview.mp4',
     },
     {
@@ -133,7 +133,7 @@ export class ShowcasePage implements AfterViewInit {
       title: 'Private networking walkthrough',
       description:
         'Delegated subnets, virtual network peering, private DNS, and the enterprise policy that injects Power Platform into the network.',
-      duration: 'Coming soon',
+      duration: '5:45',
       file: '02-private-networking.mp4',
     },
     {
