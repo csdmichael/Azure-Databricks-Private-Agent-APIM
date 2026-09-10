@@ -119,55 +119,62 @@ export class ShowcasePage implements AfterViewInit {
     { id: 'architecture', label: 'Architecture', icon: 'layers-outline' },
   ];
 
-  // Entries without a published file show a "not published yet" notice naming the missing file.
   readonly videos: VideoItem[] = [
     {
       sequence: '01',
-      title: 'Solution overview',
+      title: 'Architecture overview',
       description:
-        'What the solution does end to end: a natural-language question in Microsoft 365 Copilot returns an executive PowerPoint built from private Databricks data.',
-      duration: '11:32',
-      file: '01-solution-overview.mp4',
+        'How Microsoft 365 Copilot, Copilot Studio, API Management, and Azure Databricks work together to create high-fidelity PowerPoint presentations from governed data.',
+      duration: '6:14',
+      file: '01. Architecure Overview - High Fidelity Powerpoint in Databricks.mp4',
     },
     {
       sequence: '02',
-      title: 'Private networking walkthrough',
+      title: 'Network infrastructure requirements',
       description:
-        'Delegated subnets, virtual network peering, private DNS, and the enterprise policy that injects Power Platform into the network.',
-      duration: '5:45',
-      file: '02-private-networking.mp4',
+        'The delegated subnets, virtual network peerings, private endpoints, private DNS, and enterprise policy required for the private data path.',
+      duration: '6:51',
+      file: '02. Network Infra requirements.mp4',
     },
     {
       sequence: '03',
-      title: 'API Management and Databricks',
+      title: 'MCP security and API Gateway',
       description:
-        'Publishing the Genie API, locking the gateway to its private endpoint, and authenticating to Databricks with a managed identity.',
-      duration: 'Coming soon',
-      file: '03-apim-databricks.mp4',
+        'Securing model tool calls through API Management, private networking, managed identity, and centralized API gateway controls.',
+      duration: '3:37',
+      file: '03. MCP security and API Gateway.mp4',
     },
     {
       sequence: '04',
-      title: 'The custom connector',
+      title: 'Building Databricks custom connectors',
       description:
-        'Importing the Swagger definition, configuring API key security, and why a custom connector is required instead of an MCP server.',
-      duration: 'Coming soon',
-      file: '04-custom-connector.mp4',
+        'Building Power Platform custom connectors that expose the private Databricks operations to Copilot Studio.',
+      duration: '2:50',
+      file: '04. Building Custom Connectors for Databricks in Copilot - PowerPlatform.mp4',
     },
     {
       sequence: '05',
       title: 'Building the Copilot Studio agent',
       description:
         'Creating the agent on the GitHub Copilot harness, attaching the four Genie tools, and uploading the executive deck skill.',
-      duration: 'Coming soon',
-      file: '05-copilot-studio-agent.mp4',
+      duration: '10:22',
+      file: '05. Building  the Agent in Copilot Studio.mp4',
     },
     {
       sequence: '06',
-      title: 'Generating the deck',
+      title: 'Publishing the agent to Microsoft 365',
       description:
-        'A live run: three Genie queries, a verified nine-slide PowerPoint with native charts, and the download card in chat.',
-      duration: 'Coming soon',
-      file: '06-deck-generation.mp4',
+        'Publishing the Copilot Studio agent to Microsoft 365 Copilot and Teams so users can access it in their daily workflow.',
+      duration: '7:43',
+      file: '06. Publishing the Agent from Copilot Studio to M365 Copilot and Teams.mp4',
+    },
+    {
+      sequence: '07',
+      title: 'Business case and value proposition',
+      description:
+        'The expected productivity gains, implementation costs, return on investment, and broader business value of the solution.',
+      duration: '3:18',
+      file: '07. Business Case and Value Proposition.mp4',
     },
   ];
 
@@ -211,7 +218,7 @@ export class ShowcasePage implements AfterViewInit {
   ];
 
   readonly selectedVideo = computed(() => this.videos[this.selectedVideoIndex()]);
-  readonly selectedVideoSrc = computed(() => `${MEDIA_ROOT}/${this.selectedVideo().file}`);
+  readonly selectedVideoSrc = computed(() => `${MEDIA_ROOT}/${encodeURIComponent(this.selectedVideo().file)}`);
 
   readonly businessCaseEmbedUrl = computed(() =>
     this.sanitizer.bypassSecurityTrustResourceUrl(`${this.businessCasePdfUrl}#view=FitH`),

@@ -1,24 +1,20 @@
 # Videos
 
-Placeholder folder for the showcase video series.
+Recordings for the seven-part showcase video series.
 
-The showcase page expects these file names. Drop the recordings here and each playlist
-entry starts playing — no code change required.
-
-| Expected file | Video | Status |
-|---|---|---|
-| `01-solution-overview.mp4` | Solution overview | Published (11:32) |
-| `02-private-networking.mp4` | Private networking walkthrough | Published (5:45) |
-| `03-apim-databricks.mp4` | API Management and Databricks | Not recorded |
-| `04-custom-connector.mp4` | The custom connector | Not recorded |
-| `05-copilot-studio-agent.mp4` | Building the Copilot Studio agent | Not recorded |
-| `06-deck-generation.mp4` | Generating the deck | Not recorded |
-
-Until a file exists the player shows a "not published yet" notice naming the missing file.
-
-To change the list, edit the `videos` array in
+The showcase page streams these Git LFS files through GitHub's media host. The playlist
+metadata is defined in
 [../../ui/src/app/showcase/showcase.page.ts](../../ui/src/app/showcase/showcase.page.ts).
 
+| File | Video | Duration |
+|---|---|---|
+| `01. Architecure Overview - High Fidelity Powerpoint in Databricks.mp4` | Architecture overview | 6:14 |
+| `02. Network Infra requirements.mp4` | Network infrastructure requirements | 6:51 |
+| `03. MCP security and API Gateway.mp4` | MCP security and API Gateway | 3:37 |
+| `04. Building Custom Connectors for Databricks in Copilot - PowerPlatform.mp4` | Building Databricks custom connectors | 2:50 |
+| `05. Building  the Agent in Copilot Studio.mp4` | Building the Copilot Studio agent | 10:22 |
+| `06. Publishing the Agent from Copilot Studio to M365 Copilot and Teams.mp4` | Publishing the agent to Microsoft 365 | 7:43 |
+| `07. Business Case and Value Proposition.mp4` | Business case and value proposition | 3:18 |
+
 `*.mp4` in this folder is already tracked by Git LFS via the repository `.gitattributes`,
-so committing a new recording needs no extra setup — just remember to update the matching
-`duration` field so the playlist shows the running time instead of "Coming soon".
+so new recordings are stored outside the regular Git object database.
