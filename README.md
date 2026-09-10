@@ -14,12 +14,11 @@ the data path traverses the public internet.
 > **Business case:** $892.5K annual run-rate benefit, 243% year-one ROI, 2.4 month payback
 > at 100 active users. Full model in [docs/Business Case](docs/Business%20Case).
 
-![End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent on the GitHub Copilot harness, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie](docs/azure-databricks-private-agent-apim-architecture.png)
-
 ---
 
 ## Contents
 
+- [Architecture](#architecture)
 - [How it works](#how-it-works)
 - [Technologies used](#technologies-used)
 - [Portals and URLs](#portals-and-urls)
@@ -48,9 +47,17 @@ the data path traverses the public internet.
 
 ---
 
+## Architecture
+
+![High-level architecture: Microsoft 365 users access a Copilot Studio agent in a VNet-enabled Power Platform managed environment, which reaches private Azure API Management and Azure Databricks services](docs/HL%20Architecture.png)
+
+![End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent on the GitHub Copilot harness, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie](docs/azure-databricks-private-agent-apim-architecture.png)
+
+---
+
 ## How it works
 
-The diagram above reads left to right, in eight numbered hops.
+The detailed diagram above reads left to right, in eight numbered hops.
 
 1. **A user asks for a deck** in Microsoft 365 Copilot or Teams, in plain language.
 2. **The Copilot Studio agent** picks up the request. It runs on the **GitHub Copilot
