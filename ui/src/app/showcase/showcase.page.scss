@@ -995,9 +995,14 @@ img {
   }
 
   .tabbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin: 20px 0 18px;
+    overflow-x: visible;
 
     button {
+      justify-content: center;
+      min-width: 0;
       padding: 10px 12px;
       font-size: 0.86rem;
     }
