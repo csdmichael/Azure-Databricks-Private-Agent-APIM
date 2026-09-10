@@ -352,6 +352,17 @@
   >
     <figure class="architecture">
       <img
+        [src]="highLevelArchitectureImageUrl"
+        alt="High-level architecture: Microsoft 365 users access a Copilot Studio agent in a VNet-enabled Power Platform managed environment, which reaches private API Management and Databricks services"
+        loading="lazy"
+      />
+      <figcaption>
+        High-level view of the managed Power Platform environment, private API Management gateway,
+        and private Azure Databricks workspace used to generate presentations from governed data.
+      </figcaption>
+    </figure>
+    <figure class="architecture">
+      <img
         [src]="architectureImageUrl"
         alt="End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie"
         loading="lazy"

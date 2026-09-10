@@ -735,6 +735,10 @@ img {
   }
 }
 
+.architecture + .architecture {
+  margin-top: 16px;
+}
+
 .architecture-links {
   display: flex;
   flex-wrap: wrap;

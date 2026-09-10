@@ -102,6 +102,7 @@ export class ShowcasePage implements AfterViewInit {
   readonly repoUrl = REPO_ROOT;
   readonly setupGuideUrl = `${REPO_ROOT}/blob/main/docs/setup-guide.md`;
   readonly skillUrl = `${REPO_ROOT}/blob/main/skills/executive-deck-builder/SKILL.md`;
+  readonly highLevelArchitectureImageUrl = 'assets/architecture/HL%20Architecture.png';
   readonly architectureImageUrl = `${RAW_ROOT}/docs/azure-databricks-private-agent-apim-architecture.png`;
   readonly businessCasePdfUrl = `${BUSINESS_CASE_ASSETS}/${BUSINESS_CASE_FILE}.pdf`;
   readonly businessCasePptxUrl = `${BUSINESS_CASE_ASSETS}/${BUSINESS_CASE_FILE}.pptx`;

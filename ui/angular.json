@@ -26,6 +26,11 @@
                 "output": "assets"
               },
               {
+                "glob": "HL Architecture.png",
+                "input": "../docs",
+                "output": "assets/architecture"
+              },
+              {
                 "glob": "staticwebapp.config.json",
                 "input": "src",
                 "output": "."
