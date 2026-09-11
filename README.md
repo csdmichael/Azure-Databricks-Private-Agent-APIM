@@ -288,10 +288,28 @@ then link it to the environment. This is the step that actually injects the subn
 
 ### 6. Lock down API Management
 
+Deploy API Management on the **Standard v2** tier, which supports the private endpoint
+and virtual network integration used by this architecture.
+
+![API Management overview showing caldova-apim-westus online in West US on the Standard v2 tier](docs/images/07.00.%20APIM-Tier.png)
+
+Confirm the service is online and exposes the expected gateway host before applying the
+network lockdown.
+
+![API Management overview confirming the caldova-apim-westus gateway URL and Standard v2 tier](docs/images/07.01-apim-private-networking.png)
+
+Associate a dedicated NSG with the private-endpoint subnet and verify that it is attached
+to one subnet.
+
+![Network security group overview for the APIM private-endpoint subnet showing one associated subnet and the default security rules](docs/images/07.02.%20APIM-NSG-Private-EndPoints.png)
+
+Associate a separate NSG with the APIM virtual network integration subnet and verify its
+subnet association as well.
+
+![Network security group overview for the APIM West US integration subnet showing one associated subnet and the default security rules](docs/images/07.03.%20APIM-NSG-WestUS-Integration.png)
+
 Once the private endpoint exists and DNS resolves, disable public network access. From
 this point APIM answers only on `10.191.1.4`.
-
-![API Management networking blade showing public network access disabled and the gateway private endpoint](docs/images/07-apim-private-networking.png)
 
 ### 7. Publish the Databricks APIs
 
