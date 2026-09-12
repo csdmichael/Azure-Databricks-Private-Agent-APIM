@@ -2,7 +2,7 @@
 
 This guide explains how to replicate the Copilot Studio -> private APIM -> private Azure Function -> Databricks Genie user-token flow. It covers trust, networking, configuration, permissions, request history and operational verification.
 
-> **Current status:** The private Function, additive APIM OBO API, Databricks account federation policy and separate OAuth custom connector are deployed. All four connector operations passed live tests using the administrator's OAuth connection. Databricks returned the administrator's identity from `current_user()` and a successful table aggregate. APIM and Function success events share correlation IDs in Log Analytics. Denied-user behavior, least-privilege grants and agent cutover are **not yet certified**. The static Showcase includes the OBO guide link; analytics/history APIs remain inactive. The original managed-identity API remains unchanged and does not prove per-user authorization.
+> **Current status:** The private Function, additive APIM OBO API, Databricks account federation policy and separate OAuth custom connector are deployed. All four connector operations passed live tests using the administrator's OAuth connection. Databricks returned the administrator's identity from `current_user()` and a successful table aggregate. APIM and Function success events share correlation IDs in Log Analytics. Showcase statistics and per-request history APIs are now deployed and administrator-tested; anonymous and forged-identity requests return 401. Denied-user behavior, least-privilege Databricks grants and agent cutover are **not yet certified**. The original managed-identity API remains unchanged and does not prove per-user authorization.
 
 ## Deployment evidence
 
@@ -16,7 +16,7 @@ Verified on 2026-09-12:
 | Federation policy | `54c34637-fef5-4fbf-8136-8c2aa6b529ea`, tenant v2 issuer, exact API GUID audience, `preferred_username` subject |
 | Power Platform connector | `Databricks Genie OBO Private`, environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5`; generated per-connector redirect registered in Entra |
 | Trace ingestion | APIM anonymous request recorded `request_started` and `request_completed` with correlation `83cc15f7-5d18-43ae-ab3b-c8371ef502fa`, final status 401; a separate Function anonymous call recorded `genie_token_exchange`, status 401 |
-| Existing Showcase | Static Angular site redeployed with the OBO guide link; history/statistics APIs are not operational |
+| Existing Showcase | IISNode/Express runtime deployed as `d973109ccf0e4a8b8494a6dd892f8e96`; statistics and history returned HTTP 200 for the signed-in administrator |
 
 ### Live delegated-user test
 
@@ -46,7 +46,7 @@ The allowed administrator already has the Databricks `account_admin` role. A suc
 - Local verification: six broker tests and twelve analytics/history/server tests pass. The Angular production build passes. These do not replace live authorization tests.
 - The account federation policy was re-read without modification and matches the configured issuer, audience and subject claim.
 - Consent is currently scoped to the administrator. A second user who cannot acquire the API token demonstrates a consent failure, not APIM or Databricks denial. Any additional consent or account provisioning needs an explicit, narrowly scoped approval and that user's interactive sign-in.
-- The connector screenshot above is actual test evidence. Azure configuration screenshots remain outstanding because the portal's Function blade did not finish loading. Configuration tables and source links are provided instead; they are not screenshots.
+- The connector screenshot above is actual test evidence. The supplied APIM policy-editor screenshot is included below. Other Azure configuration screenshots remain outstanding; configuration tables and source links are not substitutes for those screenshots.
 - Publishing this code does not publish a changed Copilot Studio agent. Agent cutover remains blocked on the acceptance checklist below.
 
 ## URLs
@@ -54,8 +54,8 @@ The allowed administrator already has the Databricks `account_admin` role. A suc
 | Experience | Reference URL |
 | --- | --- |
 | Showcase | https://caldova-databricks-showcase.azurewebsites.net/showcase |
-| Administrator request history (UI only; API inactive) | https://caldova-databricks-showcase.azurewebsites.net/history |
-| Administrator visit statistics (UI only; API inactive) | https://caldova-databricks-showcase.azurewebsites.net/stats |
+| Administrator request history | https://caldova-databricks-showcase.azurewebsites.net/history |
+| Administrator visit statistics | https://caldova-databricks-showcase.azurewebsites.net/stats |
 | Privacy notice | https://caldova-databricks-showcase.azurewebsites.net/privacy |
 | New private API | `https://caldova-apim-westus.azure-api.net/databricks-genie-obo` |
 
@@ -69,7 +69,7 @@ APIM's managed identity authenticates APIM **to the Function only**. The origina
 
 ## Architecture
 
-The identity path below is deployed and administrator-tested. The Showcase Node server, history queries and Cosmos visit capture describe the implemented target design, **not active production features**. The shared plan currently serves the Showcase as a static site alongside the private Function.
+The identity path below is deployed and administrator-tested. The Showcase Node server now queries request history and captures visits in Cosmos using its own managed identity. It shares the existing Windows B1 plan with the private Function; these are separate applications and identities.
 
 ```mermaid
 flowchart TB
@@ -94,7 +94,7 @@ flowchart TB
     subnet[Outbound integration subnet - Microsoft.Web delegation]
     subgraph shared[Existing Windows B1 Showcase plan]
       fn[Functions v4 Node broker - independently verify both JWTs]
-      web[Planned activation: Showcase Node and Angular - EasyAuth plus admin allowlist]
+      web[Showcase Node and Angular - EasyAuth plus admin allowlist]
     end
     dbxpe[Databricks private endpoint - public disabled]
     sts[Databricks token service - account federation policy]
@@ -256,6 +256,50 @@ npm test --prefix functions/genie-token-exchange
 
 Publish `host.json`, package metadata, compiled `dist/src` and production dependencies from a machine able to reach private SCM. Exclude local settings and tests. A direct call without both valid tokens must return 401, not a token.
 
+### Function execution, step by step
+
+The Function is a small security broker, not a Genie proxy or an agent. It never receives the question body, runs SQL, chooses tables or grants access. APIM retains the original operation and body while the broker returns a Databricks user access token. The broker uses `jose` for cryptographic JWT verification and the Azure Functions Node programming model for HTTP hosting.
+
+1. **Load configuration once per worker.** The HTTP handler lazily creates the broker from application settings. Missing settings fail closed with `503 broker_unavailable`. The workspace is a fixed HTTPS Azure Databricks origin: embedded credentials, custom ports, query strings, fragments and non-root paths are rejected. No request can select an arbitrary token-service URL.
+2. **Require two independent tokens.** `Authorization: Bearer <APIM-MI-token>` authenticates the calling service. `x-user-assertion: <original-Entra-user-token>` carries the delegated user. Empty tokens or tokens longer than 32,768 characters are rejected. A Function key is not substituted for either identity.
+3. **Verify the APIM caller.** The broker obtains tenant signing keys from Entra JWKS, with a five-second discovery timeout. It allows RS256 only, verifies the signature, configured audience and tenant issuer, and requires `exp`, `iat`, `nbf`, `tid` and `oid`. The caller object ID must equal `APIM_PRINCIPAL_ID`; a caller token containing a delegated `scp` is rejected. Tenant v1 and v2 caller issuers are supported, but the audience still must match `BROKER_AUDIENCE` exactly.
+4. **Independently verify the end user.** The user token must have the tenant v2 issuer, dedicated API GUID audience, valid signature/time claims and required `tid`, `oid`, `azp`, `scp` and `preferred_username`. The authorized client must be in `ALLOWED_CLIENT_IDS`; scope must include `Genie.Access`; application-only tokens and empty usernames/object IDs are rejected. APIM's earlier validation is not taken on trust. The broker does not duplicate APIM's single-user allowlist: APIM enforces that policy, while the broker restricts who may call it and which delegated tokens may be exchanged.
+5. **Exchange the unchanged assertion.** The broker POSTs form-encoded RFC 8693 parameters to the private workspace's `/oidc/v1/token`. Redirects are forbidden and the exchange has a ten-second timeout. There is no retry loop, refresh-token flow, PAT, client secret or service-principal fallback in this broker. Databricks independently verifies its federation policy and maps `preferred_username` to the Databricks user.
+6. **Validate the token-service response.** The broker requires a nonempty access token without CR/LF, a Bearer token type and a positive finite numeric `expires_in`. It returns only these three fields. Reported expiry is the smaller of the Databricks lifetime and the remaining user assertion lifetime; this does not alter or revoke the lifetime encoded in the Databricks token itself. APIM uses it for the current request and does not cache it.
+7. **Finish with a sanitized audit event.** A `finally` block logs the outcome even when validation, configuration or exchange fails. It includes correlation ID, invocation ID, status, code and elapsed milliseconds, but no tokens, username, request body or upstream error text. APIM supplies verified identity in its separate events; the dashboard joins by correlation ID.
+
+The outgoing form has this shape. Angle-bracket values below are placeholders, never log values:
+
+```text
+POST https://<workspace>/oidc/v1/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+subject_token_type=urn:ietf:params:oauth:token-type:jwt
+subject_token=<original signed Entra user access token>
+scope=all-apis
+```
+
+The actual form is URL-encoded by `URLSearchParams`. **`client_id` is intentionally absent**: this is account-wide user federation, not service-principal federation. `all-apis` is an OAuth scope, not a Unity Catalog grant. Genie-space permissions, SQL warehouse access and table/row/column authorization are still enforced for the mapped user by Databricks.
+
+### Errors and operational boundaries
+
+| Function result | Cause | APIM behavior |
+| --- | --- | --- |
+| `200` with user token | Both JWTs and exchange response passed checks | Replace backend Authorization and call Genie |
+| `401 invalid_token` | Missing, malformed, expired or untrusted caller/user token; wrong identity/client/scope | Return 403 for broker identity rejection; do not call Genie |
+| `403 exchange_rejected` | Databricks token service returned 400, 401 or 403 | Return 403; no fallback |
+| `502 exchange_unavailable` | Timeout, network failure or forbidden redirect | Return 502 |
+| `502 exchange_rejected` | Other unsuccessful token-service HTTP status | Return 502 |
+| `502 invalid_exchange_response` | Invalid JSON/token metadata or assertion expired during exchange | Return 502 |
+| `503 broker_unavailable` | Configuration or unexpected handler failure | Return 502 |
+
+An invalid token rejected directly by APIM is 401, distinct from the broker rejection mapping above. Function responses always set `Cache-Control: no-store` and `Pragma: no-cache`. APIM adds no-store and correlation headers on normal outbound responses; its early `return-response` paths currently do not add those headers. Search Log Analytics for failure evidence rather than assuming every rejection carries a correlation response header.
+
+The Function host timeout is one minute; APIM waits up to 20 seconds for the broker. Two JWT verifications can require signing-key discovery before the ten-second Databricks call, so a slow dependency can exhaust APIM's budget first. The worker may reuse signing keys and the broker object, but it stores no shared user-token cache. Application Insights sampling and dependency tracking are disabled in the host configuration; user-level Function logs remain Information while the default is Warning. This limits accidental telemetry capture, but operators must also keep APIM body/header diagnostics disabled.
+
+The Function's system-assigned identity accesses its private host storage. It is **not** the Databricks user and does not supply the Databricks bearer. Sharing the existing B1 plan avoids a second compute plan but shares capacity with Showcase; private endpoints, storage and monitoring still have costs. Inbound private endpoint access, outbound VNet integration and storage/DNS reachability are separate prerequisites. A healthy public Showcase is not proof that the private broker is reachable.
+
 ## 4. APIM configuration
 
 Source: [API template](../../apim/obo.bicep), [API policy](../../apim/policies/genie-obo-api-policy.xml), [audit fragment](../../apim/policies/genie-obo-audit-fragment.xml).
@@ -267,6 +311,49 @@ Source: [API template](../../apim/obo.bicep), [API policy](../../apim/policies/g
 5. Verify all operation policies inherit `<base />`. JWT checks cover issuer, audience, tenant, connector `azp`, delegated scope and signature/expiry; verified `oid` is allowlisted and rate-limited.
 6. APIM sends its MI token in Authorization, the user token in `x-user-assertion`, and its generated `RequestId` in `x-correlation-id`. It replaces backend Authorization with the returned user token. Do not cache tokens or log either token-bearing message.
 7. Deploy against the service to validate policy expressions. XML parsing/Bicep compilation alone cannot certify APIM C# syntax.
+
+### Policy excerpt and walkthrough
+
+![User-supplied Azure portal screenshot showing the delegated Genie API policy, JWT validation and four operations](apim-policy-portal.png)
+
+The supplied screenshot shows **caldova-apim-westus > APIs > Databricks Genie - delegated user > All operations > Policies**. It exposes named-value references, not secret values. This is the editor view before the explanatory comments were added; the visible Save button alone does not prove the editor contents were deployed. The source policy and deployment verification are the configuration authority.
+
+The following excerpt corresponds to the JWT checks visible in the APIM policy editor. It is followed by the broker-call block from the same inbound policy. These are **excerpts**, not a replacement for the complete [commented API policy](../../apim/policies/genie-obo-api-policy.xml), which also includes the user allowlist, rate limit, response handling and failure paths.
+
+```xml
+<!-- Require this tenant's API token, issued to the connector with delegated Genie.Access. -->
+<validate-jwt header-name="Authorization" require-scheme="Bearer"
+              require-expiration-time="true" require-signed-tokens="true"
+              failed-validation-httpcode="401"
+              failed-validation-error-message="A valid delegated Genie token is required."
+              output-token-variable-name="genie-user-jwt">
+  <openid-config url="https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0/.well-known/openid-configuration" />
+  <audiences><audience>{{genie-obo-api-client-id}}</audience></audiences>
+  <issuers><issuer>https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0</issuer></issuers>
+  <required-claims>
+    <claim name="tid" match="all"><value>{{genie-obo-tenant-id}}</value></claim>
+    <claim name="azp" match="all"><value>{{genie-obo-connector-client-id}}</value></claim>
+    <claim name="scp" match="any" separator=" "><value>Genie.Access</value></claim>
+  </required-claims>
+</validate-jwt>
+
+<!-- After the verified-user allowlist and per-user rate limit: -->
+<send-request mode="new" response-variable-name="genie-exchange" timeout="20" ignore-error="true">
+  <set-url>{{genie-obo-broker-url}}</set-url>
+  <set-method>POST</set-method>
+  <set-header name="x-correlation-id" exists-action="override">
+    <value>@(context.RequestId.ToString())</value>
+  </set-header>
+  <set-header name="x-user-assertion" exists-action="override">
+    <value>@(context.Request.Headers.GetValueOrDefault("Authorization", "").Substring(7))</value>
+  </set-header>
+  <authentication-managed-identity resource="api://{{genie-obo-api-client-id}}" />
+</send-request>
+```
+
+Named values resolve deployment-specific configuration; they are not literal JWT claim values. The API **GUID** is the validated v2 audience, while `api://<GUID>` identifies the resource requested for APIM's managed-identity token. `azp` identifies the approved OAuth connector application; `oid` identifies the user and is checked in the next allowlist block. A valid signature alone does not establish either application authorization or data permission.
+
+After the broker succeeds, APIM replaces Authorization with the returned Databricks user token and removes `x-user-assertion`, `Ocp-Apim-Subscription-Key` and the `subscription-key` query parameter before forwarding the original Genie operation. The policy emits `request_started`, `identity_validated`, `token_exchange_completed` and `request_completed` through the [audit fragment](../../apim/policies/genie-obo-audit-fragment.xml). The first event has no trusted identity. The Function contributes a separate exchange event with the same generated request ID; the final API outcome remains independent of exchange success.
 
 | Operation | Method and API-relative path |
 | --- | --- |
@@ -283,7 +370,7 @@ Bind all four Copilot Studio actions to the same new connector and use **end-use
 
 ## 6. Correlated request history
 
-**Activation pending:** structured APIM and Function logs are live in Log Analytics. The following describes the implemented dashboard, whose backend is not currently hosted. Use the KQL below to inspect live events directly until dashboard acceptance passes.
+**Live verification:** the administrator history API returned HTTP 200 with eight observed requests: six successful, one failed and one incomplete. Six exchanges succeeded and one failed. The response contained both APIM and Function events, the displayed KQL, and known correlation `d9d8436b-e6c6-421b-976e-5c56df09c8d9`. Counts are a 2026-09-12 snapshot, not fixed totals. Anonymous and forged `X-MS-CLIENT-PRINCIPAL` requests returned 401.
 
 The [history page](https://caldova-databricks-showcase.azurewebsites.net/history) defaults to 30 UTC dates, newest first. Choose an inclusive date range (maximum 90 days), API outcome and verified username/object-ID filter. Expand a parent request for its APIM and Function events. Correlation uses the generated request ID, never user/time alone.
 
@@ -308,11 +395,13 @@ AppTraces
 
 ## 7. Visitor statistics
 
-**Activation pending:** the static Showcase does not currently record visits in Cosmos. Once the analytics server is deployed and validated, it records document GETs with normalized public IP, UTC timestamp, path without query parameters, and local GeoIP country/state/city. IPs are not sent to a geolocation vendor. Cosmos is serverless, private-only, key authentication disabled, `/day` partitioned with 90-day TTL. The site's MI is scoped to its database.
+**Live verification:** the administrator statistics API returned HTTP 200 with five persisted visits, one distinct public IP and 30 UTC daily buckets at initial verification on 2026-09-12. It records document GETs with normalized public IP, UTC timestamp, path without query parameters, and local GeoIP country/state/city. IPs are not sent to a geolocation vendor. Cosmos is serverless, private-only, key authentication disabled, `/day` partitioned with 90-day TTL. The site's MI is scoped to its database. Requests without a usable public address remain Unknown rather than being assigned an invented location.
 
 Statistics and history require tenant EasyAuth plus an explicit admin object-ID allowlist. Unique IPs are distinct across the selected range, not summed across days or locations; they are not people. Month/year aggregation covers retained records, not all-time history. Bots may count; client-side navigation and persistence failures prevent a claim of lossless visit capture.
 
 Use [analytics infrastructure](../../bicep/showcase-analytics/main.bicep) and the [deployment script](../../scripts/deploy-showcase-analytics.ps1), replacing reference defaults and fixed workspace settings. `-SkipInfrastructure -ResumeConfiguration` resumes configuration after successful infrastructure deployment without another secret rotation. A full infrastructure run creates a six-month EasyAuth secret; track rotation.
+
+For code-only updates to the configured site, use `-SkipInfrastructure`; skip the build only after separately building and testing the current code. The script downloads and checks the currently mounted rollback ZIP, validates archive paths, uploads without changing the existing run-from-package setting, and verifies health, the SPA and anonymous API denial. It restores the previous package on failure. Kudu upload success alone is insufficient. IISNode requires the dedicated `iisnode.js` entry point because its interceptor requires the module rather than executing it as the main module. Keep raw visitor records out of public screenshots and repository evidence.
 
 ## Acceptance and cutover
 

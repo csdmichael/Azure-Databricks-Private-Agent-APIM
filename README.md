@@ -103,10 +103,13 @@ and correlated APIM/Function request history with KQL.
 are deployed. All four connector operations passed administrator tests: Databricks
 returned the signed-in user's identity and a successful table aggregate, with
 correlated APIM/Function audit events. Denied-user validation, least-privilege grants
-and agent cutover remain pending. The static Showcase includes the OBO guide link;
-visit statistics and the request-history backend are not currently active. Their
-implementation is included for a separately validated activation. The existing
-managed-identity API remains unchanged.
+and agent cutover remain pending. The Showcase now hosts administrator-protected
+[visit statistics](https://caldova-databricks-showcase.azurewebsites.net/stats) and
+[per-request token-exchange history](https://caldova-databricks-showcase.azurewebsites.net/history).
+Both APIs passed live administrator checks and reject anonymous or forged identity
+headers. The OBO guide includes the actual APIM policy screenshot, commented policy
+excerpts and an in-depth Function walkthrough. The existing managed-identity API
+remains unchanged.
 
 ---
 
