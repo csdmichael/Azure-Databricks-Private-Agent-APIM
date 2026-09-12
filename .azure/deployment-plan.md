@@ -129,6 +129,14 @@ settings and memory, not source, command output or deployment artifacts.
 	Post-deploy gates: health and Showcase HTTP 200, anonymous admin APIs 401,
 	eight playlist rows, both new media URLs HTTP 200, and browser playback for
 	episodes 07 and 08 across desktop and mobile viewports.
+- The first deployment attempt through legacy `/api/zipdeploy` reset during the
+	80,487,865-byte upload and created no Kudu deployment record. Automatic rollback
+	restored mounted package `20260912044416.zip`; health and Showcase returned 200,
+	and Azure reported the app Running with Normal availability.
+- The deployment script now uses the documented Kudu publish API with `type=zip`,
+	`clean=true`, `restart=false`, HTTP/1.1 and a disabled `Expect` handshake. The
+	script retains its explicit restart, deployment-status check and automatic
+	rollback. All 12 server tests and PowerShell parsing passed after the change.
 
 2026-09-12 architecture PNG content-only refresh:
 - User requested Showcase Architecture tab addition, README diagram replacement,
