@@ -172,11 +172,19 @@ export class ShowcasePage implements AfterViewInit {
     },
     {
       sequence: '07',
+      title: 'Authentication, OBO, and token exchange',
+      description:
+        'How the signed-in user token flows through API Management and the private broker, then exchanges into a Databricks token that preserves the user identity and Unity Catalog permissions.',
+      duration: '18:47',
+      file: '07. Authentication - OBO flow and JWT to DBX Token Exchange.mp4',
+    },
+    {
+      sequence: '08',
       title: 'Business case and value proposition',
       description:
         'The expected productivity gains, implementation costs, return on investment, and broader business value of the solution.',
       duration: '3:18',
-      file: '07. Business Case and Value Proposition.mp4',
+      file: '08. Business Case and Value Proposition.mp4',
     },
   ];
 
