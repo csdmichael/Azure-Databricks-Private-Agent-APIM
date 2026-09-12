@@ -71,60 +71,7 @@ APIM's managed identity authenticates APIM **to the Function only**. The origina
 
 The identity path below is deployed and administrator-tested. The Showcase Node server now queries request history and captures visits in Cosmos using its own managed identity. It shares the existing Windows B1 plan with the private Function; these are separate applications and identities.
 
-```mermaid
-flowchart TB
-  subgraph clients[Microsoft cloud services]
-    user[End user] --> studio[Copilot Studio agent]
-    studio --> connector[Custom connector - per-user OAuth connection]
-    entra[Entra ID - tenant v2 issuer and JWKS]
-    connector <-->|Authorization code and Genie.Access scope| entra
-  end
-  subgraph pp[Power Platform managed environment]
-    injection[Enterprise policy - delegated regional subnets]
-  end
-  connector -->|User access token over HTTPS| injection
-  subgraph gateway[APIM VNet - West US reference region]
-    apimpe[Private gateway endpoint - public disabled]
-    apim[APIM - validate issuer, aud, tid, azp, scp and oid]
-    apimpe --> apim
-  end
-  injection -->|Peering and private DNS| apimpe
-  subgraph data[Databricks VNet - West US 2 reference region]
-    fnpe[Function private endpoint - sites and SCM DNS]
-    subnet[Outbound integration subnet - Microsoft.Web delegation]
-    subgraph shared[Existing Windows B1 Showcase plan]
-      fn[Functions v4 Node broker - independently verify both JWTs]
-      web[Showcase Node and Angular - EasyAuth plus admin allowlist]
-    end
-    dbxpe[Databricks private endpoint - public disabled]
-    sts[Databricks token service - account federation policy]
-    genie[Genie space and SQL warehouse - user permissions]
-    uc[Unity Catalog - approved tables and data policies]
-    cosmospe[Cosmos private endpoint]
-    fnpe --> fn --> subnet --> dbxpe
-    dbxpe --> sts
-    dbxpe --> genie --> uc
-    web --> subnet --> cosmospe
-  end
-  apim -->|MI Authorization + x-user-assertion + generated correlation ID| fnpe
-  fn -->|RFC 8693 - original user subject_token| sts
-  fn -->|Short-lived user token - no-store response| apim
-  apim -->|Genie request with user bearer| dbxpe
-  subgraph operations[Operations and administration]
-    ai[Shared workspace-based Application Insights]
-    logs[Log Analytics - retention and ingestion limits]
-    cosmos[Serverless Cosmos - visits by UTC day - 90-day TTL]
-    admin[Approved administrator]
-  end
-  apim -.->|Structured lifecycle events - no bodies or secret headers| ai
-  fn -.->|Exchange outcome, correlation and duration - no JWT| ai
-  ai --> logs
-  web -->|Managed identity - fixed KQL query| logs
-  cosmospe --> cosmos
-  admin -->|Tenant sign-in| web
-  entra -.->|Signing-key discovery| fn
-  entra -.->|Signing-key discovery| apim
-```
+![Delegated user identity architecture for private Databricks Genie, showing per-user OAuth through APIM and the Azure Function token broker](Databricks-OBO-Token-Exchange.png)
 
 VNet integration is outbound; private endpoints are inbound. The Function needs both. Entra discovery and Azure Monitor ingestion use their own service endpoints; the diagram does not imply that these are private links. Link private DNS zones to each calling VNet, not just the endpoint VNet.
 
