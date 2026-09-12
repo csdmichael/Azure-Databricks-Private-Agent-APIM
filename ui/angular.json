@@ -31,6 +31,11 @@
                 "output": "assets/architecture"
               },
               {
+                "glob": "Databricks-OBO-Token-Exchange.png",
+                "input": "../docs/obo",
+                "output": "assets/architecture"
+              },
+              {
                 "glob": "staticwebapp.config.json",
                 "input": "src",
                 "output": "."

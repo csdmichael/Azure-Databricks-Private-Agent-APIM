@@ -374,7 +374,23 @@
         Databricks using API Management's managed identity. Nothing traverses the public internet.
       </figcaption>
     </figure>
+    <figure class="architecture">
+      <img
+        [src]="oboArchitectureImageUrl"
+        alt="Delegated user identity for private Databricks Genie: per-user Entra OAuth through API Management and a private Azure Function, with RFC 8693 token exchange and user-level data permissions"
+        loading="lazy"
+      />
+      <figcaption>
+        Delegated user identity: APIM authenticates to the private Function with its managed identity,
+        while the original user's Entra JWT is exchanged for a Databricks user token.
+        Genie enforces the mapped user's data permissions.
+      </figcaption>
+    </figure>
     <div class="architecture-links">
+      <a class="btn" [href]="oboGuideUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Delegated identity guide
+      </a>
       <a class="btn" [href]="setupGuideUrl" target="_blank" rel="noopener noreferrer">
         <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
         Full setup guide

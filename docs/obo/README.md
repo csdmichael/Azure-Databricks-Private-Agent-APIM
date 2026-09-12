@@ -75,35 +75,6 @@ The identity path below is deployed and administrator-tested. The Showcase Node 
 
 VNet integration is outbound; private endpoints are inbound. The Function needs both. Entra discovery and Azure Monitor ingestion use their own service endpoints; the diagram does not imply that these are private links. Link private DNS zones to each calling VNet, not just the endpoint VNet.
 
-```mermaid
-sequenceDiagram
-  actor User
-  participant PP as Per-user connector
-  participant APIM
-  participant FN as Private Function
-  participant STS as Databricks token service
-  participant Genie
-  participant Logs
-  User->>PP: Business question
-  PP->>APIM: Genie operation + delegated access token
-  APIM->>Logs: request_started + generated RequestId
-  APIM->>APIM: JWT validation, oid allowlist, rate limit
-  APIM->>Logs: identity_validated + verified user
-  APIM->>FN: APIM MI token + original assertion + RequestId
-  FN->>FN: Independently verify caller and user
-  FN->>STS: RFC 8693 exchange, no client_id
-  STS-->>FN: Token mapped to Databricks user
-  FN->>Logs: genie_token_exchange outcome
-  FN-->>APIM: User token, no-store
-  APIM->>Logs: token_exchange_completed
-  APIM->>Genie: Operation with user bearer
-  Genie->>Genie: Enforce space, warehouse and Unity Catalog permissions
-  Genie-->>APIM: Data or permission failure
-  APIM->>Logs: request_completed, API status and duration
-  APIM-->>PP: Response and correlation ID
-  PP-->>User: Answer or access denied
-```
-
 ## Prerequisites
 
 Obtain Azure deployment and role-assignment permissions, Entra registration/consent permissions, Power Platform environment administration, Databricks **account administrator** privileges for federation, and workspace/data-owner privileges for grants. Azure Contributor alone does not confer these other roles.
