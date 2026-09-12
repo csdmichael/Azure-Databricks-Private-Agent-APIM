@@ -104,6 +104,22 @@ settings and memory, not source, command output or deployment artifacts.
 
 ## Section 7: Validation Proof
 
+2026-09-12 architecture PNG content-only refresh:
+- User requested Showcase Architecture tab addition, README diagram replacement,
+	sequence diagram removal, commit, publication and deployment.
+- npm --prefix ui run build -- --configuration production: passed, hash
+	2c29133e44842877. Bundled PNG byte-for-byte equals docs/obo source image.
+- npm --prefix showcase-server test: all 12 tests passed.
+- README check: exactly one PNG in Architecture; sequence diagram removed.
+- Azure CLI authentication matches approved subscription and tenant. Existing
+	Showcase is Running in West US 2 with unchanged managed identity.
+- git diff --check passed. No infrastructure, RBAC, application settings or
+	backend changes; existing role verification remains applicable. Docker,
+	quota, ARM validate/what-if and resource-policy changes are not applicable.
+- Deploy existing script with -SkipInfrastructure -SkipBuild; preserve mounted
+	runtime package for rollback. Verify health, anonymous API denial and diagram
+	rendering across desktop/mobile after deployment.
+
 Current activation gates: Node wrapper/named-pipe test, twelve server tests,
 Angular production build, deployment-script parse, approved Azure target and
 existing nonsecret configuration, scoped Cosmos/Log Analytics permissions.
