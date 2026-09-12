@@ -1,0 +1,32 @@
+<section class="traffic">
+  <header class="traffic-heading"><div><a href="/showcase">Showcase</a><h1>API request history</h1><p>Genie requests and token exchanges <span class="zone">UTC</span></p></div><button class="icon-button" title="Refresh history" aria-label="Refresh history" (click)="load()" [disabled]="loading()"><ion-icon name="refresh-outline" /></button></header>
+  @if (authStatus() === 401) {
+    <div class="state"><h2>Administrator sign-in</h2><a class="primary" href="/.auth/login/aad?post_login_redirect_uri=/history">Sign in with Microsoft</a></div>
+  } @else if (authStatus() === 403) {
+    <div class="state" role="alert"><h2>Access restricted</h2><a href="/.auth/logout?post_logout_redirect_uri=/history">Sign out</a></div>
+  } @else {
+    <form class="filters" (ngSubmit)="load()">
+      <label>From<input type="date" name="start" [(ngModel)]="start" [min]="oldest" [max]="end" required /></label>
+      <label>To<input type="date" name="end" [(ngModel)]="end" [min]="start" [max]="today" required /></label>
+      <label>API outcome<select name="outcome" [(ngModel)]="outcome"><option value="all">All</option><option value="success">Success</option><option value="failure">Failure</option><option value="pending">Incomplete</option></select></label>
+      <label>User<input type="search" name="user" [(ngModel)]="user" maxlength="200" placeholder="Name or object ID" /></label>
+      <button class="primary" type="submit" [disabled]="loading()">Apply</button>
+    </form>
+    @if (loading()) { <div class="state" role="status">Loading request history...</div> }
+    @if (error()) { <div class="error" role="alert">{{ error() }}</div> }
+    @if (data(); as history) {
+      <dl class="totals"><div><dt>API requests</dt><dd>{{ history.stats.requests | number }}</dd></div><div><dt>Successful / failed API calls</dt><dd class="split-total">{{ history.stats.success | number }} / {{ history.stats.failure | number }}</dd></div><div><dt>Successful / failed exchanges</dt><dd class="split-total">{{ history.stats.exchangeSuccess | number }} / {{ history.stats.exchangeFailure | number }}</dd></div><div><dt>Average API duration</dt><dd>{{ history.stats.averageDurationMs === null ? '-' : (history.stats.averageDurationMs | number) }}<small> ms</small></dd></div></dl>
+      <div class="section-heading request-heading"><h2>Requests <span class="count">Newest first · {{ history.stats.pending }} incomplete</span></h2><div class="table-tools"><button class="icon-button" title="Expand all requests" aria-label="Expand all requests" (click)="expandAll(true)"><ion-icon name="expand-outline" /></button><button class="icon-button" title="Collapse all requests" aria-label="Collapse all requests" (click)="expandAll(false)"><ion-icon name="contract-outline" /></button></div></div>
+      @for (request of history.requests; track request.correlationId) {
+        <details class="request" [open]="expanded().has(request.correlationId)" (toggle)="toggle(request.correlationId, $event)">
+          <summary><span class="request-time">{{ request.timestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC' }}</span><span class="request-user">{{ request.user || request.userId || 'Unverified user' }}<small>{{ request.method }} {{ request.operation || 'Broker only' }}</small></span><span class="outcome" [class.failure]="request.outcome === 'failure'" [class.success]="request.outcome === 'success'">API: {{ request.outcome === 'pending' ? 'incomplete' : request.outcome }} {{ request.status || '' }}<small>Exchange: {{ request.exchangeOutcome }}</small></span></summary>
+          <div class="request-detail"><dl class="identity"><div><dt>Request ID</dt><dd>{{ request.correlationId }}</dd></div><div><dt>User object ID</dt><dd>{{ request.userId || 'Not verified' }}</dd></div></dl>
+          @if (request.incomplete) { <p class="incomplete">Completion not observed in the selected range.</p> }
+          <div class="table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Source</th><th>Event</th><th>Outcome</th><th>Status</th><th>Duration (ms)</th></tr></thead><tbody>@for (event of request.events; track $index) {<tr><td class="timestamp">{{ event.timestamp | date:'HH:mm:ss.SSS':'UTC' }}</td><td>{{ event.source }}</td><td>{{ event.stage || 'token_exchange_completed' }}<small class="event-code">{{ event.code }} {{ event.invocationId }}</small></td><td>{{ event.outcome }}</td><td>{{ event.status || '-' }}</td><td>{{ event.durationMs | number:'1.0-0' }}</td></tr>}</tbody></table></div></div>
+        </details>
+      } @empty { <div class="empty">No matching request events in this date range.</div> }
+      <details class="query"><summary>KQL query</summary><pre><code>{{ history.kql }}</code></pre></details>
+      <footer class="data-note"><span>Updated {{ history.generatedAt | date:'yyyy-MM-dd HH:mm:ss':'UTC' }} UTC</span><span>Telemetry can arrive late. Counts reflect matching observed requests, not guaranteed delivery.</span><a href="/.auth/logout?post_logout_redirect_uri=/history">Sign out</a></footer>
+    }
+  }
+</section>

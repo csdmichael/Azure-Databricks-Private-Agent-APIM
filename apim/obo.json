@@ -1,0 +1,285 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "18391118143062897198"
+    }
+  },
+  "parameters": {
+    "apimServiceName": {
+      "type": "string",
+      "defaultValue": "caldova-apim-westus"
+    },
+    "tenantId": {
+      "type": "string",
+      "defaultValue": "[tenant().tenantId]"
+    },
+    "apiClientId": {
+      "type": "string"
+    },
+    "connectorClientId": {
+      "type": "string"
+    },
+    "allowedUserId": {
+      "type": "string",
+      "defaultValue": "715bb744-31d0-4f76-ac85-7193bcf5a4eb"
+    },
+    "brokerUrl": {
+      "type": "string"
+    },
+    "insightsName": {
+      "type": "string",
+      "defaultValue": "caldova-genie-obo-insights"
+    }
+  },
+  "variables": {
+    "$fxv#0": "<fragment>\r\n  <trace source=\"genie-obo\" severity=\"information\">\r\n    <message>@{\r\n      var jwt = context.Variables.GetValueOrDefault&lt;Jwt&gt;(\"genie-user-jwt\");\r\n      return new JObject(\r\n        new JProperty(\"event\", \"genie_request\"),\r\n        new JProperty(\"source\", \"apim\"),\r\n        new JProperty(\"correlationId\", context.RequestId.ToString()),\r\n        new JProperty(\"stage\", context.Variables.GetValueOrDefault&lt;string&gt;(\"audit-stage\", \"request_started\")),\r\n        new JProperty(\"outcome\", context.Variables.GetValueOrDefault&lt;string&gt;(\"audit-outcome\", \"pending\")),\r\n        new JProperty(\"status\", context.Variables.GetValueOrDefault&lt;int&gt;(\"audit-status\", 0)),\r\n        new JProperty(\"userId\", jwt == null ? \"\" : jwt.Claims.GetValueOrDefault(\"oid\", \"\")),\r\n        new JProperty(\"user\", jwt == null ? \"\" : jwt.Claims.GetValueOrDefault(\"preferred_username\", \"\")),\r\n        new JProperty(\"operation\", context.Operation.Id),\r\n        new JProperty(\"method\", context.Request.Method),\r\n        new JProperty(\"durationMs\", context.Elapsed.TotalMilliseconds)\r\n      ).ToString(Newtonsoft.Json.Formatting.None);\r\n    }</message>\r\n  </trace>\r\n</fragment>",
+    "$fxv#1": "<policies>\r\n  <inbound>\r\n    <base />\r\n    <include-fragment fragment-id=\"genie-obo-audit\" />\r\n    <validate-jwt header-name=\"Authorization\" require-scheme=\"Bearer\" require-expiration-time=\"true\" require-signed-tokens=\"true\" failed-validation-httpcode=\"401\" failed-validation-error-message=\"A valid delegated Genie token is required.\" output-token-variable-name=\"genie-user-jwt\">\r\n      <openid-config url=\"https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0/.well-known/openid-configuration\" />\r\n      <audiences><audience>{{genie-obo-api-client-id}}</audience></audiences>\r\n      <issuers><issuer>https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0</issuer></issuers>\r\n      <required-claims>\r\n        <claim name=\"tid\" match=\"all\"><value>{{genie-obo-tenant-id}}</value></claim>\r\n        <claim name=\"azp\" match=\"all\"><value>{{genie-obo-connector-client-id}}</value></claim>\r\n        <claim name=\"scp\" match=\"any\" separator=\" \"><value>Genie.Access</value></claim>\r\n      </required-claims>\r\n    </validate-jwt>\r\n    <set-variable name=\"audit-stage\" value=\"identity_validated\" />\r\n    <include-fragment fragment-id=\"genie-obo-audit\" />\r\n    <choose>\r\n      <when condition='@(((Jwt)context.Variables[\"genie-user-jwt\"]).Claims.GetValueOrDefault(\"oid\", \"\") != \"{{genie-obo-allowed-user-id}}\")'>\r\n        <set-variable name=\"audit-stage\" value=\"request_completed\" />\r\n        <set-variable name=\"audit-outcome\" value=\"failure\" />\r\n        <set-variable name=\"audit-status\" value=\"@(403)\" />\r\n        <include-fragment fragment-id=\"genie-obo-audit\" />\r\n        <return-response><set-status code=\"403\" reason=\"Forbidden\" /><set-body>{\"error\":\"User is not authorized for this Genie API.\"}</set-body></return-response>\r\n      </when>\r\n    </choose>\r\n    <rate-limit-by-key calls=\"30\" renewal-period=\"60\" counter-key='@(((Jwt)context.Variables[\"genie-user-jwt\"]).Claims.GetValueOrDefault(\"oid\", \"\"))' />\r\n    <send-request mode=\"new\" response-variable-name=\"genie-exchange\" timeout=\"20\" ignore-error=\"true\">\r\n      <set-url>{{genie-obo-broker-url}}</set-url>\r\n      <set-method>POST</set-method>\r\n      <set-header name=\"x-correlation-id\" exists-action=\"override\"><value>@(context.RequestId.ToString())</value></set-header>\r\n      <set-header name=\"x-user-assertion\" exists-action=\"override\"><value>@(context.Request.Headers.GetValueOrDefault(\"Authorization\", \"\").Substring(7))</value></set-header>\r\n      <authentication-managed-identity resource=\"api://{{genie-obo-api-client-id}}\" />\r\n    </send-request>\r\n    <set-variable name=\"audit-stage\" value=\"token_exchange_completed\" />\r\n    <set-variable name=\"audit-status\" value='@(context.Variables.GetValueOrDefault&lt;IResponse&gt;(\"genie-exchange\") == null ? 502 : ((IResponse)context.Variables[\"genie-exchange\"]).StatusCode)' />\r\n    <set-variable name=\"audit-outcome\" value='@((int)context.Variables[\"audit-status\"] == 200 ? \"success\" : \"failure\")' />\r\n    <include-fragment fragment-id=\"genie-obo-audit\" />\r\n    <choose>\r\n      <when condition='@(context.Variables.GetValueOrDefault&lt;IResponse&gt;(\"genie-exchange\") == null)'>\r\n        <set-variable name=\"audit-stage\" value=\"request_completed\" />\r\n        <include-fragment fragment-id=\"genie-obo-audit\" />\r\n        <return-response><set-status code=\"502\" reason=\"Token broker unavailable\" /><set-body>{\"error\":\"Token broker unavailable.\"}</set-body></return-response>\r\n      </when>\r\n      <when condition='@(((IResponse)context.Variables[\"genie-exchange\"]).StatusCode != 200)'>\r\n        <set-variable name=\"audit-stage\" value=\"request_completed\" />\r\n        <set-variable name=\"audit-status\" value='@(((IResponse)context.Variables[\"genie-exchange\"]).StatusCode == 401 || ((IResponse)context.Variables[\"genie-exchange\"]).StatusCode == 403 ? 403 : 502)' />\r\n        <include-fragment fragment-id=\"genie-obo-audit\" />\r\n        <return-response><set-status code='@((int)context.Variables[\"audit-status\"])' reason=\"Token exchange failed\" /><set-body>{\"error\":\"User token exchange failed.\"}</set-body></return-response>\r\n      </when>\r\n    </choose>\r\n    <set-header name=\"Authorization\" exists-action=\"override\"><value>@(\"Bearer \" + (string)((IResponse)context.Variables[\"genie-exchange\"]).Body.As&lt;JObject&gt;()[\"access_token\"])</value></set-header>\r\n    <set-header name=\"x-user-assertion\" exists-action=\"delete\" />\r\n    <set-header name=\"Ocp-Apim-Subscription-Key\" exists-action=\"delete\" />\r\n    <set-query-parameter name=\"subscription-key\" exists-action=\"delete\" />\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound>\r\n    <base />\r\n    <set-variable name=\"audit-stage\" value=\"request_completed\" />\r\n    <set-variable name=\"audit-status\" value=\"@(context.Response.StatusCode)\" />\r\n    <set-variable name=\"audit-outcome\" value='@(context.Response.StatusCode &lt; 400 ? \"success\" : \"failure\")' />\r\n    <include-fragment fragment-id=\"genie-obo-audit\" />\r\n    <set-header name=\"Cache-Control\" exists-action=\"override\"><value>no-store</value></set-header>\r\n    <set-header name=\"x-correlation-id\" exists-action=\"override\"><value>@(context.RequestId.ToString())</value></set-header>\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n    <set-variable name=\"audit-stage\" value=\"request_completed\" />\r\n    <set-variable name=\"audit-outcome\" value=\"failure\" />\r\n    <set-variable name=\"audit-status\" value='@(context.LastError.Source == \"validate-jwt\" ? 401 : (context.LastError.Source == \"rate-limit-by-key\" ? 429 : 502))' />\r\n    <include-fragment fragment-id=\"genie-obo-audit\" />\r\n    <return-response><set-status code='@((int)context.Variables[\"audit-status\"])' reason=\"Genie request failed\" /><set-body>{\"error\":\"Genie request failed.\"}</set-body></return-response>\r\n  </on-error>\r\n</policies>",
+    "$fxv#2": "<!-- POST /genie/ask : start a Genie conversation on the configured space. Body: { \"content\": \"natural-language question\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/start-conversation\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#3": "<!-- POST /genie/conversations/{conversationId}/messages : ask a follow-up. Body: { \"content\": \"...\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#4": "<!-- GET /genie/conversations/{conversationId}/messages/{messageId} : poll message status and read the text/query attachments. -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#5": "<!-- GET /genie/conversations/{conversationId}/messages/{messageId}/result : fetch the SQL result Genie generated. -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}/query-result\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "settings": [
+      {
+        "name": "genie-obo-tenant-id",
+        "value": "[parameters('tenantId')]"
+      },
+      {
+        "name": "genie-obo-api-client-id",
+        "value": "[parameters('apiClientId')]"
+      },
+      {
+        "name": "genie-obo-connector-client-id",
+        "value": "[parameters('connectorClientId')]"
+      },
+      {
+        "name": "genie-obo-allowed-user-id",
+        "value": "[parameters('allowedUserId')]"
+      },
+      {
+        "name": "genie-obo-broker-url",
+        "value": "[parameters('brokerUrl')]"
+      }
+    ],
+    "operations": [
+      {
+        "name": "ask",
+        "method": "POST",
+        "path": "/genie/ask",
+        "parameters": [],
+        "policy": "[variables('$fxv#2')]"
+      },
+      {
+        "name": "follow-up",
+        "method": "POST",
+        "path": "/genie/conversations/{conversationId}/messages",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "policy": "[variables('$fxv#3')]"
+      },
+      {
+        "name": "message",
+        "method": "GET",
+        "path": "/genie/conversations/{conversationId}/messages/{messageId}",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "messageId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "policy": "[variables('$fxv#4')]"
+      },
+      {
+        "name": "result",
+        "method": "GET",
+        "path": "/genie/conversations/{conversationId}/messages/{messageId}/result",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "messageId",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "policy": "[variables('$fxv#5')]"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service/loggers",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'genie-obo-insights')]",
+      "properties": {
+        "loggerType": "applicationInsights",
+        "credentials": {
+          "instrumentationKey": "[reference(resourceId('Microsoft.Insights/components', parameters('insightsName')), '2020-02-02').InstrumentationKey]"
+        },
+        "resourceId": "[resourceId('Microsoft.Insights/components', parameters('insightsName'))]",
+        "isBuffered": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/policyFragments",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'genie-obo-audit')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#0')]"
+      }
+    },
+    {
+      "copy": {
+        "name": "namedValues",
+        "count": "[length(variables('settings'))]"
+      },
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), variables('settings')[copyIndex()].name)]",
+      "properties": {
+        "displayName": "[variables('settings')[copyIndex()].name]",
+        "value": "[variables('settings')[copyIndex()].value]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-genie-obo')]",
+      "properties": {
+        "displayName": "Databricks Genie - delegated user",
+        "description": "Private Genie API with per-user Entra tokens and Databricks token federation.",
+        "path": "databricks-genie-obo",
+        "protocols": [
+          "https"
+        ],
+        "subscriptionRequired": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie-obo', 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('$fxv#1')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie-obo')]",
+        "[resourceId('Microsoft.ApiManagement/service/policyFragments', parameters('apimServiceName'), 'genie-obo-audit')]",
+        "namedValues"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/diagnostics",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie-obo', 'applicationinsights')]",
+      "properties": {
+        "loggerId": "[resourceId('Microsoft.ApiManagement/service/loggers', parameters('apimServiceName'), 'genie-obo-insights')]",
+        "alwaysLog": "allErrors",
+        "sampling": {
+          "samplingType": "fixed",
+          "percentage": 100
+        },
+        "verbosity": "information",
+        "logClientIp": false,
+        "httpCorrelationProtocol": "W3C",
+        "frontend": {
+          "request": {
+            "headers": [],
+            "body": {
+              "bytes": 0
+            }
+          },
+          "response": {
+            "headers": [],
+            "body": {
+              "bytes": 0
+            }
+          }
+        },
+        "backend": {
+          "request": {
+            "headers": [],
+            "body": {
+              "bytes": 0
+            }
+          },
+          "response": {
+            "headers": [],
+            "body": {
+              "bytes": 0
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie-obo')]",
+        "[resourceId('Microsoft.ApiManagement/service/loggers', parameters('apimServiceName'), 'genie-obo-insights')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "operation",
+        "count": "[length(variables('operations'))]"
+      },
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks-genie-obo', variables('operations')[copyIndex()].name)]",
+      "properties": {
+        "displayName": "[variables('operations')[copyIndex()].name]",
+        "method": "[variables('operations')[copyIndex()].method]",
+        "urlTemplate": "[variables('operations')[copyIndex()].path]",
+        "templateParameters": "[variables('operations')[copyIndex()].parameters]",
+        "responses": [
+          {
+            "statusCode": 200
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie-obo')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "operationPolicy",
+        "count": "[length(variables('operations'))]"
+      },
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}/{2}/{3}', parameters('apimServiceName'), 'databricks-genie-obo', variables('operations')[copyIndex()].name, 'policy')]",
+      "properties": {
+        "format": "rawxml",
+        "value": "[variables('operations')[copyIndex()].policy]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks-genie-obo', variables('operations')[copyIndex()].name)]"
+      ]
+    }
+  ],
+  "outputs": {
+    "apiUrl": {
+      "type": "string",
+      "value": "[format('https://{0}.azure-api.net/databricks-genie-obo', parameters('apimServiceName'))]"
+    }
+  }
+}

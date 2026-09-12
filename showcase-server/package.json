@@ -1,0 +1,14 @@
+{
+  "name": "caldova-showcase-server",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=24" },
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "dependencies": {
+    "@azure/cosmos": "^4.9.0",
+    "@azure/identity": "^4.13.0",
+    "express": "^5.1.0",
+    "geoip-lite": "^2.0.3",
+    "ipaddr.js": "^2.2.0"
+  }
+}

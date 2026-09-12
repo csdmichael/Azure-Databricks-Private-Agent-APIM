@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { enableProdMode } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
-import { provideRouter, withHashLocation } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { provideIonicAngular } from '@ionic/angular/standalone';
 
 import { AppComponent } from './app/app.component';
@@ -12,10 +12,14 @@ if (environment.production) {
   enableProdMode();
 }
 
+if (window.location.hash.startsWith('#/')) {
+  window.history.replaceState(null, '', window.location.hash.slice(1));
+}
+
 bootstrapApplication(AppComponent, {
   providers: [
     provideIonicAngular({ mode: 'md' }),
-    provideRouter(APP_ROUTES, withHashLocation()),
+    provideRouter(APP_ROUTES),
     provideHttpClient(),
   ],
 }).catch((error) => console.error(error));

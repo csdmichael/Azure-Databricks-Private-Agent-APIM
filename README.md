@@ -20,6 +20,7 @@ the data path traverses the public internet.
 
 - [Architecture](#architecture)
 - [How it works](#how-it-works)
+- [Delegated user identity (OBO)](#delegated-user-identity-obo)
 - [Technologies used](#technologies-used)
 - [Portals and URLs](#portals-and-urls)
 - [Current environment](#current-environment)
@@ -86,6 +87,26 @@ The bands across the bottom of the diagram are the cross-cutting controls: **ide
 endpoints, delegated subnets, peering, private DNS), **AI gateway controls** (APIM
 policies, subscription keys, rate limiting), and **observability** (APIM diagnostics into
 Log Analytics).
+
+---
+
+## Delegated user identity (OBO)
+
+The [OBO configuration guide](docs/obo/README.md) describes the new per-user path:
+Copilot Studio obtains a delegated Entra token, private APIM validates it, and a
+private Azure Function exchanges it through Databricks OAuth federation. Databricks
+then evaluates the user's workspace and data permissions instead of APIM's managed
+identity. The guide includes architecture, configuration tables, security checks,
+and correlated APIM/Function request history with KQL.
+
+**Verified:** The private broker, additive APIM API, federation and OAuth connector
+are deployed. All four connector operations passed administrator tests: Databricks
+returned the signed-in user's identity and a successful table aggregate, with
+correlated APIM/Function audit events. Denied-user validation, least-privilege grants
+and agent cutover remain pending. The static Showcase includes the OBO guide link;
+visit statistics and the request-history backend are not currently active. Their
+implementation is included for a separately validated activation. The existing
+managed-identity API remains unchanged.
 
 ---
 
