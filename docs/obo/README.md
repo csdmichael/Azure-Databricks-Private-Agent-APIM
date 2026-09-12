@@ -2,6 +2,32 @@
 
 This guide explains how to replicate the Copilot Studio -> private APIM -> private Azure Function -> Databricks Genie user-token flow. It covers trust, networking, configuration, permissions, request history and operational verification.
 
+## Architecture
+
+The identity path below is deployed and administrator-tested. The Showcase Node server now queries request history and captures visits in Cosmos using its own managed identity. It shares the existing Windows B1 plan with the private Function; these are separate applications and identities.
+
+![Delegated user identity architecture for private Databricks Genie, showing per-user OAuth through APIM and the Azure Function token broker](Databricks-OBO-Token-Exchange.png)
+
+VNet integration is outbound; private endpoints are inbound. The Function needs both. Entra discovery and Azure Monitor ingestion use their own service endpoints; the diagram does not imply that these are private links. Link private DNS zones to each calling VNet, not just the endpoint VNet.
+
+## Table of contents
+
+- [Architecture](#architecture)
+- [Deployment evidence](#deployment-evidence)
+- [URLs](#urls)
+- [Authentication model](#authentication-model)
+- [Prerequisites](#prerequisites)
+- [1. Entra registrations](#1-entra-registrations)
+- [2. Databricks account policy and permissions](#2-databricks-account-policy-and-permissions)
+- [3. Private Azure Function configuration](#3-private-azure-function-configuration)
+- [4. APIM configuration](#4-apim-configuration)
+- [5. Power Platform connector](#5-power-platform-connector)
+- [6. Correlated request history](#6-correlated-request-history)
+- [7. Visitor statistics](#7-visitor-statistics)
+- [Acceptance and cutover](#acceptance-and-cutover)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
+
 > **Current status:** The private Function, additive APIM OBO API, Databricks account federation policy and separate OAuth custom connector are deployed. All four connector operations passed live tests using the administrator's OAuth connection. Databricks returned the administrator's identity from `current_user()` and a successful table aggregate. APIM and Function success events share correlation IDs in Log Analytics. Showcase statistics and per-request history APIs are now deployed and administrator-tested; anonymous and forged-identity requests return 401. Denied-user behavior, least-privilege Databricks grants and agent cutover are **not yet certified**. The original managed-identity API remains unchanged and does not prove per-user authorization.
 
 ## Deployment evidence
@@ -66,14 +92,6 @@ Replace reference names, identities, addresses and regions with customer-approve
 "OBO" describes acting for the end user. The actual exchange uses **Databricks OAuth token federation, RFC 8693**, not the Microsoft Entra OBO grant. Power Platform obtains a delegated Entra token for the dedicated API; the Function exchanges it at the Databricks workspace `/oidc/v1/token` endpoint.
 
 APIM's managed identity authenticates APIM **to the Function only**. The original user's assertion determines the Databricks identity. The exchange omits `client_id`, which would select service-principal federation. There is no PAT, application-identity fallback or shared token cache.
-
-## Architecture
-
-The identity path below is deployed and administrator-tested. The Showcase Node server now queries request history and captures visits in Cosmos using its own managed identity. It shares the existing Windows B1 plan with the private Function; these are separate applications and identities.
-
-![Delegated user identity architecture for private Databricks Genie, showing per-user OAuth through APIM and the Azure Function token broker](Databricks-OBO-Token-Exchange.png)
-
-VNet integration is outbound; private endpoints are inbound. The Function needs both. Entra discovery and Azure Monitor ingestion use their own service endpoints; the diagram does not imply that these are private links. Link private DNS zones to each calling VNet, not just the endpoint VNet.
 
 ## Prerequisites
 
