@@ -1,0 +1,382 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "13429146456369756292"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "westus2"
+    },
+    "functionName": {
+      "type": "string",
+      "defaultValue": "caldova-genie-obo-fn"
+    },
+    "planName": {
+      "type": "string",
+      "defaultValue": "caldova-showcase-plan"
+    },
+    "storageName": {
+      "type": "string",
+      "defaultValue": "[format('genieobo{0}', uniqueString(resourceGroup().id))]"
+    },
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "caldova-dbx-vnet-westus2"
+    },
+    "apimVnetName": {
+      "type": "string",
+      "defaultValue": "caldova-apim-westus-vnet"
+    },
+    "apimName": {
+      "type": "string",
+      "defaultValue": "caldova-apim-westus"
+    },
+    "insightsName": {
+      "type": "string",
+      "defaultValue": "caldova-genie-obo-insights"
+    },
+    "tenantId": {
+      "type": "string",
+      "defaultValue": "[tenant().tenantId]"
+    },
+    "apiClientId": {
+      "type": "string"
+    },
+    "connectorClientId": {
+      "type": "string"
+    },
+    "workspaceUrl": {
+      "type": "string",
+      "defaultValue": "https://adb-7405616934814750.10.azuredatabricks.net"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('storageName')]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "defaultToOAuthAuthentication": true,
+        "publicNetworkAccess": "Disabled",
+        "networkAcls": {
+          "defaultAction": "Deny",
+          "bypass": "None"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', parameters('storageName'), 'default')]",
+      "properties": {
+        "deleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}/{2}', parameters('storageName'), 'default', 'deployments')]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2024-06-01",
+      "name": "[format('privatelink.blob.{0}', environment().suffixes.storage)]",
+      "location": "global"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', format('privatelink.blob.{0}', environment().suffixes.storage), 'genie-obo-databricks')]",
+      "location": "global",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-blob-pe', parameters('functionName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "blob",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]",
+              "groupIds": [
+                "blob"
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', format('{0}-blob-pe', parameters('functionName')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "blob",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-blob-pe', parameters('functionName')))]",
+        "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('functionName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]",
+        "httpsOnly": true,
+        "publicNetworkAccess": "Disabled",
+        "virtualNetworkSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'genie-obo-integration')]",
+        "siteConfig": {
+          "alwaysOn": true,
+          "use32BitWorkerProcess": false,
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "scmMinTlsVersion": "1.2",
+          "netFrameworkVersion": "v8.0",
+          "appSettings": [
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "node"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "~22"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
+            },
+            {
+              "name": "AzureWebJobsStorage__accountName",
+              "value": "[parameters('storageName')]"
+            },
+            {
+              "name": "AzureWebJobsStorage__credential",
+              "value": "managedidentity"
+            },
+            {
+              "name": "ENTRA_TENANT_ID",
+              "value": "[parameters('tenantId')]"
+            },
+            {
+              "name": "ENTRA_API_CLIENT_ID",
+              "value": "[parameters('apiClientId')]"
+            },
+            {
+              "name": "BROKER_AUDIENCE",
+              "value": "[parameters('apiClientId')]"
+            },
+            {
+              "name": "APIM_PRINCIPAL_ID",
+              "value": "[reference(resourceId('Microsoft.ApiManagement/service', parameters('apimName')), '2023-09-01-preview', 'full').identity.principalId]"
+            },
+            {
+              "name": "ALLOWED_CLIENT_IDS",
+              "value": "[parameters('connectorClientId')]"
+            },
+            {
+              "name": "DATABRICKS_WORKSPACE_URL",
+              "value": "[parameters('workspaceUrl')]"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('insightsName')), '2020-02-02').ConnectionString]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageName')), resourceId('Microsoft.Web/sites', parameters('functionName')), 'host-blob-owner')]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+      "apiVersion": "2023-12-01",
+      "name": "[format('{0}/{1}', parameters('functionName'), 'scm')]",
+      "properties": {
+        "allow": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+      "apiVersion": "2023-12-01",
+      "name": "[format('{0}/{1}', parameters('functionName'), 'ftp')]",
+      "properties": {
+        "allow": false
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2024-06-01",
+      "name": "privatelink.azurewebsites.net",
+      "location": "global"
+    },
+    {
+      "copy": {
+        "name": "webLinks",
+        "count": "[length(createArray(createObject('name', parameters('vnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))), createObject('name', parameters('apimVnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('apimVnetName')))))]"
+      },
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', 'privatelink.azurewebsites.net', format('genie-obo-{0}', createArray(createObject('name', parameters('vnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))), createObject('name', parameters('apimVnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('apimVnetName'))))[copyIndex()].name))]",
+      "location": "global",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[createArray(createObject('name', parameters('vnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))), createObject('name', parameters('apimVnetName'), 'id', resourceId('Microsoft.Network/virtualNetworks', parameters('apimVnetName'))))[copyIndex()].id]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.azurewebsites.net')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-pe', parameters('functionName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "sites",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.Web/sites', parameters('functionName'))]",
+              "groupIds": [
+                "sites"
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('functionName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', format('{0}-pe', parameters('functionName')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "sites",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.azurewebsites.net')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-pe', parameters('functionName')))]",
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.azurewebsites.net')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "brokerUrl": {
+      "type": "string",
+      "value": "[format('https://{0}/api/exchange', reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01').defaultHostName)]"
+    },
+    "functionResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Web/sites', parameters('functionName'))]"
+    },
+    "functionPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01', 'full').identity.principalId]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[parameters('storageName')]"
+    },
+    "deploymentContainerId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageName'), 'default', 'deployments')]"
+    }
+  }
+}

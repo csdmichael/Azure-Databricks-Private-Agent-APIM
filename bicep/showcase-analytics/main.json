@@ -1,0 +1,273 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "6753510996890023305"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "westus2"
+    },
+    "webAppName": {
+      "type": "string",
+      "defaultValue": "caldova-databricks-showcase"
+    },
+    "webPrincipalId": {
+      "type": "string"
+    },
+    "authClientId": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string",
+      "defaultValue": "[tenant().tenantId]"
+    },
+    "cosmosName": {
+      "type": "string",
+      "defaultValue": "[format('caldova-showcase-{0}', uniqueString(resourceGroup().id))]"
+    },
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "caldova-dbx-vnet-westus2"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', parameters('vnetName'), 'genie-obo-integration')]",
+      "properties": {
+        "addressPrefix": "10.190.5.0/24",
+        "delegations": [
+          {
+            "name": "web",
+            "properties": {
+              "serviceName": "Microsoft.Web/serverFarms"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2024-05-15",
+      "name": "[parameters('cosmosName')]",
+      "location": "[parameters('location')]",
+      "kind": "GlobalDocumentDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "capabilities": [
+          {
+            "name": "EnableServerless"
+          }
+        ],
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        },
+        "publicNetworkAccess": "Disabled",
+        "disableLocalAuth": true,
+        "minimalTlsVersion": "Tls12",
+        "backupPolicy": {
+          "type": "Periodic",
+          "periodicModeProperties": {
+            "backupIntervalInMinutes": 480,
+            "backupRetentionIntervalInHours": 24,
+            "backupStorageRedundancy": "Local"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}', parameters('cosmosName'), 'showcase-analytics')]",
+      "properties": {
+        "resource": {
+          "id": "showcase-analytics"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}/{2}', parameters('cosmosName'), 'showcase-analytics', 'visits')]",
+      "properties": {
+        "resource": {
+          "id": "visits",
+          "partitionKey": {
+            "paths": [
+              "/day"
+            ],
+            "kind": "Hash",
+            "version": 2
+          },
+          "defaultTtl": 7776000,
+          "indexingPolicy": {
+            "automatic": true,
+            "indexingMode": "consistent",
+            "includedPaths": [
+              {
+                "path": "/day/?"
+              }
+            ],
+            "excludedPaths": [
+              {
+                "path": "/*"
+              }
+            ]
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('cosmosName'), 'showcase-analytics')]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+      "apiVersion": "2024-05-15",
+      "name": "[format('{0}/{1}', parameters('cosmosName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')), parameters('webPrincipalId'), 'showcase-data'))]",
+      "properties": {
+        "principalId": "[parameters('webPrincipalId')]",
+        "roleDefinitionId": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')))]",
+        "scope": "[format('{0}/dbs/showcase-analytics', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('cosmosName'), 'showcase-analytics')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2024-06-01",
+      "name": "privatelink.documents.azure.com",
+      "location": "global"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2024-06-01",
+      "name": "[format('{0}/{1}', 'privatelink.documents.azure.com', 'showcase-analytics')]",
+      "location": "global",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "showcase-analytics-cosmos-pe",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "cosmos",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]",
+              "groupIds": [
+                "Sql"
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', 'showcase-analytics-cosmos-pe', 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "cosmos",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', 'showcase-analytics-cosmos-pe')]",
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/config",
+      "apiVersion": "2023-12-01",
+      "name": "[format('{0}/{1}', parameters('webAppName'), 'authsettingsV2')]",
+      "properties": {
+        "platform": {
+          "enabled": true,
+          "runtimeVersion": "~1"
+        },
+        "globalValidation": {
+          "requireAuthentication": false,
+          "unauthenticatedClientAction": "AllowAnonymous"
+        },
+        "identityProviders": {
+          "azureActiveDirectory": {
+            "enabled": true,
+            "registration": {
+              "clientId": "[parameters('authClientId')]",
+              "clientSecretSettingName": "SHOWCASE_AUTH_CLIENT_SECRET",
+              "openIdIssuer": "[format('https://login.microsoftonline.com/{0}/v2.0', parameters('tenantId'))]"
+            },
+            "validation": {
+              "allowedAudiences": [
+                "[parameters('authClientId')]",
+                "[format('api://{0}', parameters('authClientId'))]"
+              ]
+            }
+          }
+        },
+        "login": {
+          "tokenStore": {
+            "enabled": true
+          }
+        },
+        "httpSettings": {
+          "requireHttps": true
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "cosmosEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')), '2024-05-15').documentEndpoint]"
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "value": "[parameters('cosmosName')]"
+    },
+    "subnetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'genie-obo-integration')]"
+    }
+  }
+}

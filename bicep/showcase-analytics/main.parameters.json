@@ -1,0 +1,8 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "webPrincipalId": { "value": "f10124fb-9db1-4a6c-b80a-6164254a4cb6" },
+    "authClientId": { "value": "396bfb97-534e-4a67-86d5-494d69a8a2f3" }
+  }
+}
