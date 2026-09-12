@@ -37,7 +37,7 @@ test('IISNode entry starts when required by a wrapper', () => {
   assert.match(config, /type="Rewrite" url="iisnode\.js"/);
   const deployment = readFileSync(path.resolve(__dirname, '../../scripts/deploy-showcase-analytics.ps1'), 'utf8');
   assert.match(deployment, /foreach \(\$name in @\('iisnode\.js'/);
-  assert.match(deployment, /--http1\.1.+-H 'Expect:'.+-T "@\$zipPath"/);
+  assert.match(deployment, /--http1\.1.+-H 'Expect:'.+-T \$zipPath/);
   assert.match(deployment, /api\/publish\?type=zip&clean=true&restart=false/);
 });
 

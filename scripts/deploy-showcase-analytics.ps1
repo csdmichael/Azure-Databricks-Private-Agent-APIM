@@ -126,7 +126,7 @@ try {
         if ($settings.properties.WEBSITE_RUN_FROM_PACKAGE -ne '1') { throw 'Rollback-protected deployment requires WEBSITE_RUN_FROM_PACKAGE=1.' }
     } finally { $settings = $null }
     try {
-        & curl.exe --silent --show-error --fail --http1.1 -X POST -H "Authorization: Bearer $armToken" -H 'Content-Type: application/zip' -H 'Expect:' -T "@$zipPath" --connect-timeout 30 --max-time 1200 --output NUL "$scm/api/publish?type=zip&clean=true&restart=false"
+        & curl.exe --silent --show-error --fail --http1.1 -X POST -H "Authorization: Bearer $armToken" -H 'Content-Type: application/zip' -H 'Expect:' -T $zipPath --connect-timeout 30 --max-time 1200 --output NUL "$scm/api/publish?type=zip&clean=true&restart=false"
         if ($LASTEXITCODE -ne 0) { throw 'Kudu publish upload failed.' }
         $latest = Invoke-RestMethod -Uri "$scm/api/deployments/latest" -Headers $headers -TimeoutSec 60
         if ($latest.status -ne 4) { throw 'Kudu deployment did not succeed.' }
