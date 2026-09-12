@@ -129,7 +129,19 @@ Power Platform must use a Managed Environment with Dataverse and a linked enterp
 
 ## 1. Entra registrations
 
-Reference-tenant portal links: [resource app overview](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false), [Expose an API](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/ProtectAnAPI/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false), [resource app manifest](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Manifest/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false), [connector app overview](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false), [Authentication](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false), [API permissions](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false), and [Certificates & secrets](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Credentials/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false). Customer deployments must replace the application IDs and tenant context in these URLs.
+Reference-tenant browser URLs:
+
+| View | Browser URL |
+| --- | --- |
+| Resource app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
+| Resource app > Expose an API | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/ProtectAnAPI/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
+| Resource app > Manifest | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Manifest/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
+| Connector app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
+| Connector app > Authentication | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
+| Connector app > API permissions | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
+| Connector app > Certificates & secrets | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Credentials/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
+
+Customer deployments must replace the application IDs and tenant context in these URLs.
 
 1. Create a single-tenant resource application. Under **Expose an API**, use `api://<api-client-id>` and an administrator-consented delegated scope `Genie.Access`.
 2. Set `api.requestedAccessTokenVersion` to `2`. The v2 access token audience must equal the API's client **GUID**; the requested scope is `api://<api-client-id>/Genie.Access`.
@@ -172,7 +184,9 @@ The credential capture intentionally masks both the value and secret ID while re
 
 ## 2. Databricks account policy and permissions
 
-Open the reference account at [Security > Authentication](https://accounts.azuredatabricks.net/security/authentication?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0). For another customer, replace the `account_id` query value with the UUID from that customer's Databricks account-console URL.
+**Browser URL:** <https://accounts.azuredatabricks.net/security/authentication?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0>
+
+For another customer, replace the `account_id` query value with the UUID from that customer's Databricks account-console URL.
 
 In the account console, open **Security > Authentication > Federation policies > Create policy**. Configure:
 
@@ -193,7 +207,7 @@ This is an account-wide federation policy, **not** a service principal's Credent
 
 Provision the allowed user in the account/workspace, grant required SQL entitlements, **CAN USE** on the warehouse and minimum Genie-space access. Grant only `USE CATALOG`, `USE SCHEMA`, and `SELECT` on approved tables. Audit inherited groups, ownership and administrator rights before claiming a second user is denied. Do not revoke unrelated grants blindly.
 
-Open the reference account at [User management > Users](https://accounts.azuredatabricks.net/user-management/users?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0).
+**Browser URL:** <https://accounts.azuredatabricks.net/user-management/users?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0>
 
 ![Databricks account user list showing the approved administrator and current account-admin role](databricks-account-user.png)
 
@@ -207,7 +221,9 @@ GRANT SELECT ON TABLE `<catalog>`.`<schema>`.`<table>` TO `<approved-principal>`
 
 No row filters or column masks are created by the broker. Configure and test them in Unity Catalog where required. OAuth `all-apis` does not grant table privileges. Reference acceptance users: allow `admin@Caldova37587778.onmicrosoft.com`, deny `myaacoub@Caldova37587778.onmicrosoft.com`.
 
-Open the [reference workspace](https://adb-7405616934814750.10.azuredatabricks.net/?o=7405616934814750) from an approved private network. The same URL from the public capture session is rejected, which is useful network evidence but does not prove workspace or data authorization.
+**Browser URL:** <https://adb-7405616934814750.10.azuredatabricks.net/?o=7405616934814750>
+
+Open the reference workspace from an approved private network. The same URL from the public capture session is rejected, which is useful network evidence but does not prove workspace or data authorization.
 
 ![Databricks workspace response denying access from the public network](databricks-public-access-denied.png)
 
@@ -215,7 +231,16 @@ Open the [reference workspace](https://adb-7405616934814750.10.azuredatabricks.n
 
 Source: [broker](../../functions/genie-token-exchange/src/broker.ts), [HTTP function](../../functions/genie-token-exchange/src/functions/exchange.ts), [host logging](../../functions/genie-token-exchange/host.json).
 
-Reference portal links: [App Service plan](https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/appserviceplan), [Configuration](https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/configuration), [Identity](https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/msi), and [Networking](https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/networkingHub). Replace tenant, subscription, resource-group and app names for a customer deployment.
+Reference-tenant browser URLs:
+
+| View | Browser URL |
+| --- | --- |
+| App Service plan | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/appserviceplan> |
+| Configuration | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/configuration> |
+| Identity | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/msi> |
+| Networking | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/networkingHub> |
+
+Replace tenant, subscription, resource-group and app names for a customer deployment.
 
 1. Create a Windows Function App on the existing compatible plan, Functions v4, Node 22 or supported newer runtime, 64-bit, Always On, HTTPS only, TLS 1.2+, and FTPS disabled.
 2. Enable managed identity and configure supported Functions host storage with least privilege. Storage must remain reachable after lockdown; Cosmos is not Functions host storage.
@@ -320,7 +345,9 @@ Source: [API template](../../apim/obo.bicep), [API policy](../../apim/policies/g
 
 ### Policy excerpt and walkthrough
 
-Open the reference service at [APIM > APIs](https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.ApiManagement/service/caldova-apim-westus/apis), then select **Databricks Genie - delegated user > All operations > Policies**.
+**Browser URL:** <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.ApiManagement/service/caldova-apim-westus/apis>
+
+Select **Databricks Genie - delegated user > All operations > Policies**. During this documentation pass, the APIM portal extension returned HTTP 500 before its diagnostics blade rendered, so diagnostics remain verified from the deployed template and live telemetry but not newly captured.
 
 ![User-supplied Azure portal screenshot showing the delegated Genie API policy, JWT validation and four operations](apim-policy-portal.png)
 
@@ -374,7 +401,25 @@ After the broker succeeds, APIM replaces Authorization with the returned Databri
 
 Create a Swagger 2.0 custom connector in the linked Managed Environment, using the new APIM base path and OAuth instead of a subscription key. Configure tenant-specific Entra authorization/token endpoints, connector client ID/secret and delegated API scope. Register its generated redirect URI in Entra. Provide real body schemas with required `content`, not examples alone.
 
-Open the reference environment at [Power Apps > Custom connectors](https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors), select **Databricks Genie OBO Private**, and open **Test**.
+**Browser URL:** <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors>
+
+Select **Databricks Genie OBO Private > Edit**. The **General** tab confirms HTTPS, the APIM gateway host and the dedicated OBO base path.
+
+![Power Platform custom connector General tab showing the HTTPS APIM host and OBO base URL](connector-general.png)
+
+The **Security** tab uses OAuth 2.0 with Microsoft Entra ID and the separate connector client. The secret field is masked in both captures.
+
+![Power Platform custom connector Security tab showing OAuth 2.0, Entra ID and the connector client ID with the secret masked](connector-security.png)
+
+The lower Security view confirms the API resource URI, delegated `Genie.Access` scope, generated redirect URL and `Enable on-behalf-of login` set to `false`. That last setting describes Power Platform's own login mode; the Function still performs the Databricks RFC 8693 exchange.
+
+![Power Platform custom connector Security details showing resource URI, scope, redirect and OBO login setting](connector-security-details.png)
+
+The **Definition** tab contains all four operations and their APIM-relative request definitions.
+
+![Power Platform custom connector Definition tab showing result, ask, message and follow-up actions](connector-definition.png)
+
+Open **Test** to validate each operation through an authenticated user connection.
 
 ![Actual Power Apps connector test showing four successful operations and a succeeded query result](connector-live-test.png)
 
@@ -384,7 +429,9 @@ Bind all four Copilot Studio actions to the same new connector and use **end-use
 
 **Live verification:** the administrator history API returned HTTP 200 with eight observed requests: six successful, one failed and one incomplete. Six exchanges succeeded and one failed. The response contained both APIM and Function events, the displayed KQL, and known correlation `d9d8436b-e6c6-421b-976e-5c56df09c8d9`. Counts are a 2026-09-12 snapshot, not fixed totals. Anonymous and forged `X-MS-CLIENT-PRINCIPAL` requests returned 401.
 
-Open the authenticated [API request history](https://caldova-databricks-showcase.azurewebsites.net/history). The page requires the administrator Microsoft sign-in configured by EasyAuth.
+**Browser URL:** <https://caldova-databricks-showcase.azurewebsites.net/history>
+
+The page requires the administrator Microsoft sign-in configured by EasyAuth.
 
 ![Authenticated API request history showing aggregate outcomes and correlated request rows](request-history.png)
 
@@ -413,7 +460,9 @@ AppTraces
 
 **Live verification:** the administrator statistics API returned HTTP 200 with five persisted visits, one distinct public IP and 30 UTC daily buckets at initial verification on 2026-09-12. The later screenshot below shows the rolling totals after additional traffic; these counts are expected to change. It records document GETs with normalized public IP, UTC timestamp, path without query parameters, and local GeoIP country/state/city. IPs are not sent to a geolocation vendor. Cosmos is serverless, private-only, key authentication disabled, `/day` partitioned with 90-day TTL. The site's MI is scoped to its database. Requests without a usable public address remain Unknown rather than being assigned an invented location.
 
-Open the authenticated [visitor statistics page](https://caldova-databricks-showcase.azurewebsites.net/stats). The page requires the administrator Microsoft sign-in configured by EasyAuth.
+**Browser URL:** <https://caldova-databricks-showcase.azurewebsites.net/stats>
+
+The page requires the administrator Microsoft sign-in configured by EasyAuth.
 
 ![Authenticated visitor statistics showing rolling visits, unique IPs, locations and daily traffic](visitor-statistics.png)
 
@@ -453,7 +502,8 @@ Use the embedded reference screenshots as examples, then capture the equivalent 
 | Function > Configuration | 64-bit, FTP disabled, HTTPS-only, TLS 1.2+ and Always On | Captured; Always On remediation pending |
 | Entra resource app > Overview / Expose an API / Manifest | Dedicated app, API URI, delegated `Genie.Access` scope and v2 tokens | Captured above |
 | Entra connector app > Overview / Authentication / API permissions / Certificates & secrets | Separate client, exact redirect, delegated permission and credential expiry; no secret value | Captured above |
-| APIM > New API > Policies / Diagnostics | JWT checks, allowlist and MI broker call; zero body/header capture | Policy captured; diagnostics view still required |
+| APIM > New API > Policies / Diagnostics | JWT checks, allowlist and MI broker call; zero body/header capture | Policy captured; diagnostics view blocked by portal extension HTTP 500 |
+| Power Apps > Custom connectors | HTTPS host/base path, OAuth resource/scope/redirect and all four action definitions | Captured above; secret masked |
 | Databricks account > Security > Authentication | Exact issuer, API GUID audience and `preferred_username` mapping | Captured above |
 | Databricks account > User management | Approved account user and current role | Captured above; current user is account admin |
 | Databricks workspace permissions | Approved Genie space, warehouse and table grants with effective inherited membership | Private-network capture still required |
