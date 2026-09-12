@@ -104,6 +104,32 @@ settings and memory, not source, command output or deployment artifacts.
 
 ## Section 7: Validation Proof
 
+2026-09-12 eight-video Showcase refresh:
+- User requested the new OBO authentication recording as episode 07, moved the
+	business-case recording to episode 08, and requested commit, publication and
+	deployment.
+- New episode 07 is Git LFS object
+	`sha256:6a5f288c8b89a3a3ff6a823f1f7224ae28f5b7a96fa5d028b2cd9b0707270d47`
+	(370,065,632 bytes). Windows media metadata reports 18:47. Chromium decoded it
+	at 1920x1080, returned a nonblank video pixel and advanced playback.
+- `npm --prefix ui run build -- --configuration production`: passed, hash
+	`d4fdd9968ba4c141`; generated Showcase chunk contains both episode filenames.
+- `npm test --prefix showcase-server`: all 12 tests passed. Deployment PowerShell
+	parser and editor diagnostics passed; `git diff --check` passed.
+- Azure CLI authentication matches subscription
+	`cf824570-a8ba-497a-a184-0a52f1830aa9` and tenant
+	`12a4b86b-e64c-43f9-af05-d9130a72dfd2`; the target Showcase app is Running.
+- This is a content-only package deployment. No infrastructure, RBAC, identity,
+	application-setting, policy, quota, Docker or schema changes are required, so
+	ARM validation/what-if and static role changes are not applicable. Existing
+	validated infrastructure and rollback controls remain unchanged.
+- Publish the LFS object and source commit before deployment because the Showcase
+	streams recordings from the repository's `main` branch. Deploy with
+	`deploy-showcase-analytics.ps1 -SkipInfrastructure -SkipBuild` after push.
+	Post-deploy gates: health and Showcase HTTP 200, anonymous admin APIs 401,
+	eight playlist rows, both new media URLs HTTP 200, and browser playback for
+	episodes 07 and 08 across desktop and mobile viewports.
+
 2026-09-12 architecture PNG content-only refresh:
 - User requested Showcase Architecture tab addition, README diagram replacement,
 	sequence diagram removal, commit, publication and deployment.
