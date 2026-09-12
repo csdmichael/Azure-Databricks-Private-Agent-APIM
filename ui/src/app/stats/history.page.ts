@@ -46,6 +46,9 @@ export class HistoryPage implements OnDestroy {
       const query = new URLSearchParams({ start: this.start, end: this.end, outcome: this.outcome, user: this.user });
       const response = await fetch(`/api/exchanges/history?${query}`, { credentials: 'same-origin', cache: 'no-store', signal: pending.signal });
       if ([401, 403].includes(response.status)) { this.authStatus.set(response.status); return; }
+      if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+        throw new Error('Request history is temporarily unavailable. Please try again shortly.');
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to load request history.');
       if (!Array.isArray(data.requests) || !data.stats || typeof data.kql !== 'string') throw new Error('Invalid history response.');

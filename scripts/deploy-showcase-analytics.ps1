@@ -95,10 +95,62 @@ try {
         }
     }
 } finally { $archive.Dispose() }
-Set-AppSettings @{ WEBSITE_RUN_FROM_PACKAGE = '1' }
-az webapp deploy -g $ResourceGroup -n $AppName --subscription $SubscriptionId --src-path $zipPath --type zip --async false --timeout 600000 -o none --only-show-errors
-if ($LASTEXITCODE -ne 0) { throw 'Showcase deployment failed; inspect Kudu deployment status before retrying.' }
-az webapp restart -g $ResourceGroup -n $AppName --subscription $SubscriptionId -o none --only-show-errors
-if ($LASTEXITCODE -ne 0) { throw 'Showcase restart failed.' }
+$archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+try {
+    $entries = @($archive.Entries.FullName)
+    if (@($entries | Group-Object { $_.ToLowerInvariant() } | Where-Object Count -gt 1).Count -or
+        @($entries | Where-Object { $_.Contains('\') }).Count -or
+        'iisnode.js' -notin $entries -or 'public/index.html' -notin $entries) {
+        throw 'Invalid deployment archive paths or missing runtime files.'
+    }
+} finally { $archive.Dispose() }
+$armToken = az account get-access-token --resource https://management.azure.com --subscription $SubscriptionId --query accessToken -o tsv
+if ($LASTEXITCODE -ne 0) { throw 'ARM authentication failed.' }
+$scm = "https://$AppName.scm.azurewebsites.net"
+$headers = @{ Authorization = "Bearer $armToken" }
+try {
+    $previousPackage = ([string](Invoke-WebRequest -UseBasicParsing -Uri "$scm/api/vfs/data/SitePackages/packagename.txt" -Headers $headers -TimeoutSec 60).Content).Trim()
+    if ($previousPackage -notmatch '^\d+\.zip$') { throw 'A valid mounted package is required for automatic rollback.' }
+    Invoke-WebRequest -UseBasicParsing -Method HEAD -Uri "$scm/api/vfs/data/SitePackages/$previousPackage" -Headers $headers -TimeoutSec 60 | Out-Null
+    $rollbackPath = Join-Path $artifactDir "rollback-$previousPackage"
+    Invoke-WebRequest -UseBasicParsing -Uri "$scm/api/vfs/data/SitePackages/$previousPackage" -Headers $headers -OutFile $rollbackPath -TimeoutSec 120 | Out-Null
+    $rollbackArchive = [System.IO.Compression.ZipFile]::OpenRead($rollbackPath)
+    try {
+        if (-not $rollbackArchive.GetEntry('web.config') -or
+            (-not $rollbackArchive.GetEntry('index.html') -and -not $rollbackArchive.GetEntry('public/index.html'))) {
+            throw 'Rollback archive is missing the site configuration or SPA.'
+        }
+    } finally { $rollbackArchive.Dispose() }
+    $settings = Invoke-RestMethod -Method POST -Headers $headers -Uri "https://management.azure.com$siteId/config/appsettings/list?api-version=2023-12-01" -TimeoutSec 60
+    try {
+        if ($settings.properties.WEBSITE_RUN_FROM_PACKAGE -ne '1') { throw 'Rollback-protected deployment requires WEBSITE_RUN_FROM_PACKAGE=1.' }
+    } finally { $settings = $null }
+    try {
+        & curl.exe --silent --show-error --fail --http1.1 -H "Authorization: Bearer $armToken" -H 'Content-Type: application/zip' -H 'Expect:' --data-binary "@$zipPath" --connect-timeout 30 --max-time 600 --output NUL "$scm/api/zipdeploy?isAsync=false&clean=true"
+        if ($LASTEXITCODE -ne 0) { throw 'Kudu package upload failed.' }
+        $latest = Invoke-RestMethod -Uri "$scm/api/deployments/latest" -Headers $headers -TimeoutSec 60
+        if ($latest.status -ne 4) { throw 'Kudu deployment did not succeed.' }
+        az webapp restart -g $ResourceGroup -n $AppName --subscription $SubscriptionId -o none --only-show-errors
+        if ($LASTEXITCODE -ne 0) { throw 'Showcase restart failed.' }
+        $health = & curl.exe --silent --show-error --fail --retry 24 --retry-all-errors --retry-delay 5 --retry-max-time 180 --max-time 15 "https://$AppName.azurewebsites.net/api/health?verify=$([guid]::NewGuid())"
+        if ($LASTEXITCODE -ne 0 -or ($health | ConvertFrom-Json).status -ne 'ok') { throw 'Showcase runtime health check failed.' }
+        $showcase = Invoke-WebRequest -UseBasicParsing -Uri "https://$AppName.azurewebsites.net/showcase?verify=$([guid]::NewGuid())" -TimeoutSec 30
+        if ($showcase.Content -notmatch '<app-root') { throw 'Showcase SPA check failed.' }
+        foreach ($route in @('api/visits/stats', 'api/exchanges/history')) {
+            $status = & curl.exe --silent --show-error --output NUL --write-out '%{http_code}' --max-time 30 "https://$AppName.azurewebsites.net/$route"
+            if ($LASTEXITCODE -ne 0 -or $status -ne '401') { throw 'Anonymous administrator API check failed.' }
+        }
+        Write-Host "Deployment verified: $($latest.id); rollback package: $previousPackage"
+    } catch {
+        $failure = $_
+        $rollbackHeaders = @{ Authorization = "Bearer $armToken"; 'If-Match' = '*' }
+        Invoke-WebRequest -UseBasicParsing -Method PUT -Uri "$scm/api/vfs/data/SitePackages/packagename.txt" -Headers $rollbackHeaders -ContentType 'text/plain; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($previousPackage)) -TimeoutSec 60 | Out-Null
+        az webapp restart -g $ResourceGroup -n $AppName --subscription $SubscriptionId -o none --only-show-errors
+        if ($LASTEXITCODE -ne 0) { throw 'Rollback package selected but restart failed; inspect the site immediately.' }
+        & curl.exe --silent --show-error --fail --retry 24 --retry-all-errors --retry-delay 5 --retry-max-time 180 --max-time 15 --output NUL "https://$AppName.azurewebsites.net/showcase?rollback=$([guid]::NewGuid())"
+        if ($LASTEXITCODE -ne 0) { throw 'Rollback package selected but public health is unverified; inspect the site immediately.' }
+        throw "Deployment failed; previous package restored. $($failure.Exception.Message)"
+    }
+} finally { $armToken = $null; $headers = $null; $rollbackHeaders = $null }
 Write-Host "Showcase: https://$AppName.azurewebsites.net/showcase"
 Write-Host "Traffic: https://$AppName.azurewebsites.net/stats"

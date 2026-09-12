@@ -54,6 +54,9 @@ export class StatsPage implements OnDestroy {
       const response = await fetch(`/api/visits/stats?${query}`, { signal: pending.signal, credentials: 'same-origin', cache: 'no-store' });
       if (response.status === 401) { this.authRequired.set(true); return; }
       if (response.status === 403) { this.forbidden.set(true); return; }
+      if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
+        throw new Error('Visitor statistics are temporarily unavailable. Please try again shortly.');
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to load visitor statistics.');
       if (!Array.isArray(data.periods) || !Array.isArray(data.locations)) throw new Error('The analytics endpoint is unavailable.');
