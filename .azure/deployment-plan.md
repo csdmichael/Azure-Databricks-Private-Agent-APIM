@@ -137,6 +137,14 @@ settings and memory, not source, command output or deployment artifacts.
 	`clean=true`, `restart=false`, HTTP/1.1 and a disabled `Expect` handshake. The
 	script retains its explicit restart, deployment-status check and automatic
 	rollback. All 12 server tests and PowerShell parsing passed after the change.
+- OneDeploy deployment `385cc8de30bd48bc9e5b1aeb6410d069` completed with status
+	4 and mounted package `20260912230035.zip`; rollback package
+	`20260912044416.zip` remains available. Health and Showcase returned 200, while
+	the anonymous statistics and history APIs returned 401.
+- The live page renders eight playlist rows. Published episodes 07 and 08 return
+	HTTP 200 and both decoded at 1920x1080 with advancing playback and no media
+	error; observed durations were 1127.77 and 198.31 seconds. An isolated 390x844
+	browser check showed no horizontal overflow and rendered episode 07 correctly.
 
 2026-09-12 architecture PNG content-only refresh:
 - User requested Showcase Architecture tab addition, README diagram replacement,
