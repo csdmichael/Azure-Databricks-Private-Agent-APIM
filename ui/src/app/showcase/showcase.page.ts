@@ -336,7 +336,7 @@ export class ShowcasePage implements AfterViewInit {
     this.selectedVideoIndex.set(index);
     this.videoError.set(false);
     this.autoplayBlocked.set(false);
-    queueMicrotask(() => this.playSelectedVideo());
+    this.playSelectedVideo();
   }
 
   playNext(): void {
@@ -358,11 +358,22 @@ export class ShowcasePage implements AfterViewInit {
     if (!element) {
       return;
     }
+    const source = this.selectedVideoSrc();
+    if (element.src !== source || element.error) {
+      element.src = source;
+      element.load();
+    }
     element.muted = false;
     element
       .play()
-      .then(() => this.autoplayBlocked.set(false))
-      .catch(() => this.autoplayBlocked.set(true));
+      .then(() => {
+        if (element.src === source) this.autoplayBlocked.set(false);
+      })
+      .catch((error: DOMException) => {
+        if (element.src === source && error.name === 'NotAllowedError') {
+          this.autoplayBlocked.set(true);
+        }
+      });
   }
 
   onVideoCanPlay(): void {

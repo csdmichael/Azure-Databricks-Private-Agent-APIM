@@ -56,7 +56,6 @@
             controls
             playsinline
             preload="metadata"
-            [src]="selectedVideoSrc()"
             [attr.aria-label]="'Video ' + selectedVideo().sequence + ': ' + selectedVideo().title"
             (canplay)="onVideoCanPlay()"
             (ended)="playNext()"
@@ -99,10 +98,8 @@
         @if (videoError()) {
           <div class="video-message video-message--pending" role="status">
             <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
-            <span>
-              This video has not been published yet. Add <code>{{ selectedVideo().file }}</code> under
-              <code>docs/Videos</code> in the repository and it will play here.
-            </span>
+            <span>This video could not be loaded. Check your connection and try again.</span>
+            <button type="button" (click)="selectVideo(selectedVideoIndex())">Retry video</button>
           </div>
         }
       </div>
