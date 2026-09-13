@@ -131,6 +131,14 @@ settings and memory, not source, command output or deployment artifacts.
 - Post-deploy gates: OneDeploy status 4, health and Showcase HTTP 200, anonymous
 	admin APIs 401, nine playlist rows, episodes 08 and 09 HTTP 200 and playable,
 	and no horizontal overflow at a 390x844 viewport.
+- OneDeploy deployment `f7d112a6fadd4947813c651b2a2dd87a` completed with status
+	4 and mounted package `20260913001152.zip`; rollback package
+	`20260912230035.zip` remains available. Health and Showcase returned 200, while
+	the anonymous statistics and history APIs returned 401.
+- The live page renders nine playlist rows. Published episodes 08 and 09 return
+	HTTP 200 and both decoded at 1920x1080 with advancing playback and no media
+	error; observed durations were 614.95 and 198.31 seconds. An isolated 390x844
+	browser check selected episode 08 and showed no horizontal overflow.
 
 2026-09-12 eight-video Showcase refresh:
 - User requested the new OBO authentication recording as episode 07, moved the
