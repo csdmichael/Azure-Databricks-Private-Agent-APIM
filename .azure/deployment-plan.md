@@ -17,7 +17,7 @@ The user explicitly authorized admin@Caldova37587778.onmicrosoft.com and request
 denied access for myaacoub@Caldova37587778.onmicrosoft.com. The target subscription,
 resource group and West US 2 were reconfirmed through the approval prompt.
 
-- Subscription: cf824570-a8ba-497a-a184-0a52f1830aa9
+- Subscription: {Subscription Id}
 - Resource group: m365-myaacoub
 - Region: westus2 (existing APIM remains westus)
 - Recipe: Bicep and Azure CLI, preserving existing deployment conventions, no azd.
@@ -88,8 +88,8 @@ are 401, disallowed users 403, broker infrastructure failures 502. Body/header
 capture remains disabled; traces contain correlation and verified user identity.
 
 Approved through the Private Broker Plan prompt. The API registration is
-`bdd127ff-fd4c-45f5-b553-ff77a7755161`; connector client is
-`8127fb92-0641-4f6e-9d6e-f508e18e9606`. Delegated consent is Principal-scoped
+`{Resource App Client Id}`; connector client is
+`{Connector App Client Id}`. Delegated consent is Principal-scoped
 to the approved admin, not AllPrincipals. No connector secret was created.
 Private Function template compilation: successful, no diagnostics. Broker tests:
 6 passed, including v2 GUID audience validation.
@@ -121,8 +121,8 @@ settings and memory, not source, command output or deployment artifacts.
 	catalog entries exactly match the nine MP4 filenames; editor diagnostics,
 	PowerShell parsing and `git diff --check` passed.
 - Azure CLI authentication matches subscription
-	`cf824570-a8ba-497a-a184-0a52f1830aa9` and tenant
-	`12a4b86b-e64c-43f9-af05-d9130a72dfd2`; the target Showcase app is
+	`{Subscription Id}` and tenant
+	`{Tenant Id}`; the target Showcase app is
 	Running with Normal availability.
 - This is a content-only package deployment. No infrastructure, RBAC, identity,
 	application-setting, policy, quota, Docker or schema changes are required.
@@ -153,8 +153,8 @@ settings and memory, not source, command output or deployment artifacts.
 - `npm test --prefix showcase-server`: all 12 tests passed. Deployment PowerShell
 	parser and editor diagnostics passed; `git diff --check` passed.
 - Azure CLI authentication matches subscription
-	`cf824570-a8ba-497a-a184-0a52f1830aa9` and tenant
-	`12a4b86b-e64c-43f9-af05-d9130a72dfd2`; the target Showcase app is Running.
+	`{Subscription Id}` and tenant
+	`{Tenant Id}`; the target Showcase app is Running.
 - This is a content-only package deployment. No infrastructure, RBAC, identity,
 	application-setting, policy, quota, Docker or schema changes are required, so
 	ARM validation/what-if and static role changes are not applicable. Existing
@@ -249,7 +249,7 @@ for each item and responsive desktop/mobile checks. Analytics stays inactive.
 2026-09-12 private broker: azure-validate validate-deployment.ps1 -Scope group
 -ResourceGroup m365-myaacoub -Template bicep/genie-obo/main.bicep
 -Parameters bicep/genie-obo/reference.bicepparam -Subscription
-cf824570-a8ba-497a-a184-0a52f1830aa9: OVERALL PASS. CLI/auth/build/ARM validation
+{Subscription Id}: OVERALL PASS. CLI/auth/build/ARM validation
 passed. What-if: Create 17, Modify 0, Delete 0. Existing Showcase and APIM unchanged.
 Azure MCP and ARM atScope policy queries confirmed inherited assignments. Deny
 definitions reviewed: classic resources, blocked VM/service SKUs and West Europe
@@ -264,7 +264,7 @@ Inherited policy review above remains applicable; no new RBAC grant introduced.
 APIM policy expressions still require server-side compilation during deployment.
 
 Private infrastructure deployment `genie-obo-private`: Succeeded. Function
-principal `551aeb1a-3359-4daa-ae02-ba4e5e3eadf0` verified with storage-scoped Blob
+principal `{Storage Client Principal Id}` verified with storage-scoped Blob
 Data Owner. Private SCM ZIP deployment `5c1229bc2f4941628d5e37a43374f830` succeeded.
 After restart/cold start, host reports Running and private anonymous POST returns
 401. Public Function and SCM return 403; Showcase /showcase returns 200.

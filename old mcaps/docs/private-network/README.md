@@ -584,9 +584,9 @@ no keys or tokens.
 
 | Item | Live value |
 |---|---|
-| Tenant | `b158173c-91f6-4f99-b5e9-aa9bcb463863` |
-| Subscription | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c` |
-| Resource group | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub` |
+| Tenant | `{Tenant Id}` |
+| Subscription | `/subscriptions/{Subscription Id}` |
+| Resource group | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub` |
 | West US 2 Databricks | `https://adb-7405613361932932.12.azuredatabricks.net` |
 | West US APIM gateway | `https://ai-gateway-apim-poc-my2.azure-api.net` |
 | SQL REST API | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks` |
@@ -595,62 +595,62 @@ no keys or tokens.
 | Genie REST API | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-genie` |
 | SQL MCP | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-mcp/mcp` |
 | Genie MCP | `https://ai-gateway-apim-poc-my2.azure-api.net/databricks-genie-mcp/mcp` |
-| Power Platform enterprise policy | [Open `power-platform-network-injection-us` in Azure portal](https://portal.azure.com/#@b158173c-91f6-4f99-b5e9-aa9bcb463863/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview) |
+| Power Platform enterprise policy | [Open `power-platform-network-injection-us` in Azure portal](https://portal.azure.com/#@{Tenant Id}/resource/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview) |
 
 ### Databricks resources
 
 | Resource | Region | Full ARM resource ID |
 |---|---|---|
-| Workspace `databricks-ws-ai-poc2` | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Databricks/workspaces/databricks-ws-ai-poc2` |
-| VNet `databricks-vnet-ai-poc2` (`10.180.0.0/16`) | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2` |
-| Host subnet (`10.180.1.0/24`) | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/databricks-host` |
-| Container subnet (`10.180.2.0/24`) | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/databricks-container` |
-| Private-endpoint subnet (`10.180.3.0/24`) | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/private-endpoints` |
-| Workspace NSG | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/databricks-ws-ai-poc2-nsg` |
-| UI/API private endpoint (`10.180.3.4`, approved) | West US 2 | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateEndpoints/databricks-ws-ai-poc2-pe-uiapi` |
-| Databricks to APIM peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/virtualNetworkPeerings/databricks-poc2-to-apim` |
-| Databricks private DNS zone | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net` |
-| APIM VNet Databricks DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net/virtualNetworkLinks/ai-gateway-apim-poc-my2-databricks-dns-link` |
+| Workspace `databricks-ws-ai-poc2` | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Databricks/workspaces/databricks-ws-ai-poc2` |
+| VNet `databricks-vnet-ai-poc2` (`10.180.0.0/16`) | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2` |
+| Host subnet (`10.180.1.0/24`) | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/databricks-host` |
+| Container subnet (`10.180.2.0/24`) | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/databricks-container` |
+| Private-endpoint subnet (`10.180.3.0/24`) | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/subnets/private-endpoints` |
+| Workspace NSG | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/databricks-ws-ai-poc2-nsg` |
+| UI/API private endpoint (`10.180.3.4`, approved) | West US 2 | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateEndpoints/databricks-ws-ai-poc2-pe-uiapi` |
+| Databricks to APIM peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/databricks-vnet-ai-poc2/virtualNetworkPeerings/databricks-poc2-to-apim` |
+| Databricks private DNS zone | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net` |
+| APIM VNet Databricks DNS link | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net/virtualNetworkLinks/ai-gateway-apim-poc-my2-databricks-dns-link` |
 
 ### APIM resources
 
 | Resource | Region | Full ARM resource ID |
 |---|---|---|
-| APIM `ai-gateway-apim-poc-my2` | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my2` |
-| APIM VNet (`10.181.0.0/16`) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet` |
-| Outbound subnet (`10.181.0.0/24`) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/subnets/apim-outbound-integration` |
-| Private-endpoint subnet (`10.181.1.0/24`) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/subnets/private-endpoints` |
-| Outbound NSG | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/ai-gateway-apim-poc-my2-integration-nsg` |
-| Private-endpoint NSG | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/ai-gateway-apim-poc-my2-private-endpoints-nsg` |
-| Gateway private endpoint (`10.181.1.4`, approved) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateEndpoints/ai-gateway-apim-poc-my2-gateway-pe` |
-| APIM to Databricks peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-databricks-poc2` |
-| APIM private DNS zone | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net` |
-| Gateway VNet APIM DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/ai-gateway-apim-poc-my2-gateway-dns-link` |
-| Databricks VNet APIM DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/databricks-vnet-ai-poc2-apim-dns-link` |
+| APIM `ai-gateway-apim-poc-my2` | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my2` |
+| APIM VNet (`10.181.0.0/16`) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet` |
+| Outbound subnet (`10.181.0.0/24`) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/subnets/apim-outbound-integration` |
+| Private-endpoint subnet (`10.181.1.0/24`) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/subnets/private-endpoints` |
+| Outbound NSG | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/ai-gateway-apim-poc-my2-integration-nsg` |
+| Private-endpoint NSG | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/networkSecurityGroups/ai-gateway-apim-poc-my2-private-endpoints-nsg` |
+| Gateway private endpoint (`10.181.1.4`, approved) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateEndpoints/ai-gateway-apim-poc-my2-gateway-pe` |
+| APIM to Databricks peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-databricks-poc2` |
+| APIM private DNS zone | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net` |
+| Gateway VNet APIM DNS link | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/ai-gateway-apim-poc-my2-gateway-dns-link` |
+| Databricks VNet APIM DNS link | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/databricks-vnet-ai-poc2-apim-dns-link` |
 
 The APIM managed identity has principal ID
-`9d8fb6ac-b6d5-404d-a0db-b10a869df0dc` and application ID
-`e9d66747-e35e-4e57-a7f8-92814c080825`. The APIM public network access state is
+`{APIM Managed Identity Principal Id}` and application ID
+`{APIM Managed Identity App Id}`. The APIM public network access state is
 `Disabled` in the live deployment.
 
 ### Power Platform resources
 
 | Resource | Region | Full ARM resource ID |
 |---|---|---|
-| East VNet (`10.182.0.0/16`) | East US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus` |
-| East delegated subnet (`10.182.0.0/24`) | East US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus/subnets/power-platform-subnet` |
-| East to APIM peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus/virtualNetworkPeerings/power-platform-eastus-to-apim` |
-| APIM to East peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-power-platform-eastus` |
-| East APIM DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/power-platform-eastus-apim-dns-link` |
-| West VNet (`10.183.0.0/16`) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus` |
-| West delegated subnet (`10.183.0.0/24`) | West US | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus/subnets/power-platform-subnet` |
-| West to APIM peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus/virtualNetworkPeerings/power-platform-westus-to-apim` |
-| APIM to West peering | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-power-platform-westus` |
-| West APIM DNS link | Global | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/power-platform-westus-apim-dns-link` |
-| Network-injection policy | United States | `/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us` |
+| East VNet (`10.182.0.0/16`) | East US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus` |
+| East delegated subnet (`10.182.0.0/24`) | East US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus/subnets/power-platform-subnet` |
+| East to APIM peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-eastus/virtualNetworkPeerings/power-platform-eastus-to-apim` |
+| APIM to East peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-power-platform-eastus` |
+| East APIM DNS link | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/power-platform-eastus-apim-dns-link` |
+| West VNet (`10.183.0.0/16`) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus` |
+| West delegated subnet (`10.183.0.0/24`) | West US | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus/subnets/power-platform-subnet` |
+| West to APIM peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/power-platform-vnet-westus/virtualNetworkPeerings/power-platform-westus-to-apim` |
+| APIM to West peering | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/virtualNetworks/ai-gateway-apim-poc-my2-vnet/virtualNetworkPeerings/apim-to-power-platform-westus` |
+| West APIM DNS link | Global | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net/virtualNetworkLinks/power-platform-westus-apim-dns-link` |
+| Network-injection policy | United States | `/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us` |
 
 The enterprise policy is an ARM control-plane resource and has no public
-runtime endpoint. Use its [Azure portal URL](https://portal.azure.com/#@b158173c-91f6-4f99-b5e9-aa9bcb463863/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview)
+runtime endpoint. Use its [Azure portal URL](https://portal.azure.com/#@{Tenant Id}/resource/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.PowerPlatform/enterprisePolicies/power-platform-network-injection-us/overview)
 to inspect it. Pass the full ARM resource ID from the table to
 `Enable-SubnetInjection -PolicyArmId`.
 

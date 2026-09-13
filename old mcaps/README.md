@@ -227,7 +227,7 @@ Azure-Databricks-Private-Agent-APIM/
 
 ## 6. Prerequisites
 
-- **Azure CLI** logged in to subscription `86b37969-9445-49cf-b03f-d8866235171c`
+- **Azure CLI** logged in to subscription `{Subscription Id}`
   (`az login`), with Contributor on RG `ai-myaacoub`.
 - **Terraform ≥ 1.5**.
 - **PowerShell 7+** (scripts) — Windows PowerShell 5.1 also works.
@@ -288,7 +288,7 @@ workflow (see [§19](#19-cicd--github-actions)).
 
 ## 8. Live URLs & endpoints
 
-> **Live** — deployed to subscription `86b37969-9445-49cf-b03f-d8866235171c`,
+> **Live** — deployed to subscription `{Subscription Id}`,
 > resource group `ai-myaacoub`. Databricks and APIM are in `westus`; the UI and
 > API are in `westus2`. Endpoints marked ✅ were tested end-to-end.
 
@@ -310,7 +310,7 @@ workflow (see [§19](#19-cicd--github-actions)).
 | What | URL |
 |------|-----|
 | **Databricks workspace** | `https://adb-7405608662655754.14.azuredatabricks.net` |
-| Databricks workspace (portal) | [Azure Portal → workspace](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Databricks/workspaces/databricks-ws-ai-poc/overview) |
+| Databricks workspace (portal) | [Azure Portal → workspace](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.Databricks/workspaces/databricks-ws-ai-poc/overview) |
 | SQL warehouse (`poc-serverless-2xs`, id `64777231f8249fdb`) | `https://adb-7405608662655754.14.azuredatabricks.net/sql/warehouses/64777231f8249fdb` |
 | **Genie space** `Arrow Semiconductor Analytics` (id `01f19b3c346c1698910416cf7a4c830c`) | `https://adb-7405608662655754.14.azuredatabricks.net/genie/rooms/01f19b3c346c1698910416cf7a4c830c` ✅ |
 | **APIM — Databricks SQL API** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks` |
@@ -322,7 +322,7 @@ workflow (see [§19](#19-cicd--github-actions)).
 | APIM — `GET /genie/conversations/{c}/messages/{m}/result` | Genie SQL result rows ✅ |
 | **APIM — Databricks MCP server** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-mcp/mcp` ✅ |
 | **APIM — Genie MCP server** | `https://ai-gateway-apim-poc-my.azure-api.net/databricks-genie-mcp/mcp` ✅ |
-| APIM instance (portal) | [Azure Portal → APIM](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my/apim-apis) |
+| APIM instance (portal) | [Azure Portal → APIM](https://portal.azure.com/#@MngEnvMCAP829495.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/ai-myaacoub/providers/Microsoft.ApiManagement/service/ai-gateway-apim-poc-my/apim-apis) |
 
 ### Agents
 
@@ -334,7 +334,7 @@ workflow (see [§19](#19-cicd--github-actions)).
 Foundry project: [`002-ai-poc-private/proj-default`](https://ai.azure.com) —
 endpoint `https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default`.
 
-**APIM managed identity** granted access in Databricks: appId `49ff6000-cfb2-4b1c-94cc-4de99251d5d6`
+**APIM managed identity** granted access in Databricks: appId `{APIM Managed Identity App Id}`
 (workspace service principal, `CAN_USE` on the warehouse, `SELECT` on the schema,
 `CAN_RUN` on the Genie space).
 
@@ -649,8 +649,8 @@ Stable Teams app ids (derived from the agent id, so they never drift):
 
 | Agent | Teams app id | Package |
 |-------|--------------|---------|
-| Databricks SQL Agent | `6e3a79b1-7a09-5838-8538-9184758ccb25` | `databricks-sql-m365-agent.zip` |
-| Databricks Genie Agent | `05b2cf4a-7129-51cd-a581-876ccda974a5` | `databricks-genie-m365-agent.zip` |
+| Databricks SQL Agent | `{SQL Agent Id}` | `databricks-sql-m365-agent.zip` |
+| Databricks Genie Agent | `{Genie Agent Id}` | `databricks-genie-m365-agent.zip` |
 
 ### 15.1 Authentication
 

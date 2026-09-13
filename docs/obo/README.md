@@ -37,11 +37,11 @@ Verified on 2026-09-12:
 | Component | Configuration or evidence |
 | --- | --- |
 | Private Function | `caldova-genie-obo-fn`, Functions v4 / Node 22, existing Windows B1 Showcase plan; managed-identity host storage; public site and SCM disabled |
-| API resource app | `bdd127ff-fd4c-45f5-b553-ff77a7755161`, v2 access tokens, delegated `Genie.Access` scope |
-| OAuth connector app | `8127fb92-0641-4f6e-9d6e-f508e18e9606`, confidential client; consent granted only for the approved administrator |
-| Federation policy | `54c34637-fef5-4fbf-8136-8c2aa6b529ea`, tenant v2 issuer, exact API GUID audience, `preferred_username` subject |
-| Power Platform connector | `Databricks Genie OBO Private`, environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5`; generated per-connector redirect registered in Entra |
-| Trace ingestion | APIM anonymous request recorded `request_started` and `request_completed` with correlation `83cc15f7-5d18-43ae-ab3b-c8371ef502fa`, final status 401; a separate Function anonymous call recorded `genie_token_exchange`, status 401 |
+| API resource app | `{Resource App Client Id}`, v2 access tokens, delegated `Genie.Access` scope |
+| OAuth connector app | `{Connector App Client Id}`, confidential client; consent granted only for the approved administrator |
+| Federation policy | `{Federation Policy Id}`, tenant v2 issuer, exact API GUID audience, `preferred_username` subject |
+| Power Platform connector | `Databricks Genie OBO Private`, environment `{Environment Id}`; generated per-connector redirect registered in Entra |
+| Trace ingestion | APIM anonymous request recorded `request_started` and `request_completed` with correlation `{Correlation Id}`, final status 401; a separate Function anonymous call recorded `genie_token_exchange`, status 401 |
 | Existing Showcase | IISNode/Express runtime deployed as `d973109ccf0e4a8b8494a6dd892f8e96`; statistics and history returned HTTP 200 for the signed-in administrator |
 
 ### Live delegated-user test
@@ -55,9 +55,9 @@ The `DBX-OBO-Private` connection (`8a725c2c16be49ecbb14a325aadafe11`) authentica
 | Query result (`result`) | HTTP 200; statement `SUCCEEDED`; underlying result row was `admin@caldova37587778.onmicrosoft.com` |
 | Follow-up (`follow-up`) | HTTP 200; read-only `SELECT current_user() AS verified_user, COUNT(*) AS row_count FROM caldova_dbx_westus2.arrow_semiconductor.wafer_yield` |
 | Follow-up query result | Statement `SUCCEEDED`; underlying row contained administrator username and row count `120` |
-| Cross-service correlation | Start request `d9d8436b-e6c6-421b-976e-5c56df09c8d9` has APIM start/identity/exchange/completion events and Function exchange status 200; final APIM status 200 |
+| Cross-service correlation | Start request `{Correlation Id}` has APIM start/identity/exchange/completion events and Function exchange status 200; final APIM status 200 |
 
-The identity query statement was `01f1ae5a-f0bb-10e6-b9eb-77e44bdb2d95`; the table aggregate statement was `01f1ae5b-109a-12b7-9a2d-43dd83214566`. No data or permissions were modified by these tests. Successful responses included `Cache-Control: no-store`. The Power Platform header `x-ms-apihub-obo: false` concerns its own Entra OBO login mode; this connector uses authorization-code login followed by the separate Databricks RFC 8693 exchange in the Function.
+The identity query statement was `{Identity Query Statement Id}`; the table aggregate statement was `{Table Aggregate Statement Id}`. No data or permissions were modified by these tests. Successful responses included `Cache-Control: no-store`. The Power Platform header `x-ms-apihub-obo: false` concerns its own Entra OBO login mode; this connector uses authorization-code login followed by the separate Databricks RFC 8693 exchange in the Function.
 
 Use [provision-genie-obo-identity.ps1](../../scripts/provision-genie-obo-identity.ps1), [provision-genie-federation.ps1](../../scripts/provision-genie-federation.ps1), [deploy-genie-obo-code.ps1](../../scripts/deploy-genie-obo-code.ps1) and [create-genie-obo-connector.ps1](../../scripts/create-genie-obo-connector.ps1) for the corresponding setup steps. The connector script keeps its six-month secret in memory and registers the service-generated redirect; it does not create an authenticated user connection. Track credential expiry and arrange rotation before expiration. The deployment script submits a managed VM run command; verify its final instance-view execution status before treating deployment as complete.
 
@@ -103,16 +103,16 @@ Power Platform must use a Managed Environment with Dataverse and a linked enterp
 
 | Parameter | Reference / source |
 | --- | --- |
-| Tenant UUID | `12a4b86b-e64c-43f9-af05-d9130a72dfd2` |
+| Tenant UUID | `{Tenant Id}` |
 | Resource group | `m365-myaacoub` |
 | API client GUID | Dedicated resource app's application ID, not object ID |
 | Connector client GUID | Separate confidential OAuth client |
 | APIM principal object ID | APIM > Managed identities > System assigned |
-| Allowed user object ID | `715bb744-31d0-4f76-ac85-7193bcf5a4eb` |
-| Databricks account UUID | `b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0`, from account console URL |
-| Workspace URL | `https://adb-7405616934814750.10.azuredatabricks.net` |
-| Genie space | `01f1abe9e51e19ddbb15297aee9a5850` |
-| SQL warehouse | `a3c7c9526aa58992` |
+| Allowed user object ID | `{Allowed User Object Id}` |
+| Databricks account UUID | `{Databricks Account Id}`, from account console URL |
+| Workspace URL | `https://adb-{Workspace Id}.10.azuredatabricks.net` |
+| Genie space | `{Genie Space Id}` |
+| SQL warehouse | `{SQL Warehouse Id}` |
 | Approved data scope | `caldova_dbx_westus2.arrow_semiconductor`, only required tables |
 | Workspace / Insights | `caldova-apim-logs-westus` / `caldova-genie-obo-insights` |
 
@@ -133,13 +133,13 @@ Reference-tenant browser URLs:
 
 | View | Browser URL |
 | --- | --- |
-| Resource app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
-| Resource app > Expose an API | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/ProtectAnAPI/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
-| Resource app > Manifest | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Manifest/appId/bdd127ff-fd4c-45f5-b553-ff77a7755161/isMSAApp~/false> |
-| Connector app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
-| Connector app > Authentication | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
-| Connector app > API permissions | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
-| Connector app > Certificates & secrets | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Credentials/appId/8127fb92-0641-4f6e-9d6e-f508e18e9606/isMSAApp~/false> |
+| Resource app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/{Resource App Client Id}/isMSAApp~/false> |
+| Resource app > Expose an API | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/ProtectAnAPI/appId/{Resource App Client Id}/isMSAApp~/false> |
+| Resource app > Manifest | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Manifest/appId/{Resource App Client Id}/isMSAApp~/false> |
+| Connector app overview | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/{Connector App Client Id}/isMSAApp~/false> |
+| Connector app > Authentication | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Authentication/appId/{Connector App Client Id}/isMSAApp~/false> |
+| Connector app > API permissions | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/{Connector App Client Id}/isMSAApp~/false> |
+| Connector app > Certificates & secrets | <https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Credentials/appId/{Connector App Client Id}/isMSAApp~/false> |
 
 Customer deployments must replace the application IDs and tenant context in these URLs.
 
@@ -184,7 +184,7 @@ The credential capture intentionally masks both the value and secret ID while re
 
 ## 2. Databricks account policy and permissions
 
-**Browser URL:** <https://accounts.azuredatabricks.net/security/authentication?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0>
+**Browser URL:** <https://accounts.azuredatabricks.net/security/authentication?account_id={Databricks Account Id}>
 
 For another customer, replace the `account_id` query value with the UUID from that customer's Databricks account-console URL.
 
@@ -207,7 +207,7 @@ This is an account-wide federation policy, **not** a service principal's Credent
 
 Provision the allowed user in the account/workspace, grant required SQL entitlements, **CAN USE** on the warehouse and minimum Genie-space access. Grant only `USE CATALOG`, `USE SCHEMA`, and `SELECT` on approved tables. Audit inherited groups, ownership and administrator rights before claiming a second user is denied. Do not revoke unrelated grants blindly.
 
-**Browser URL:** <https://accounts.azuredatabricks.net/user-management/users?account_id=b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0>
+**Browser URL:** <https://accounts.azuredatabricks.net/user-management/users?account_id={Databricks Account Id}>
 
 ![Databricks account user list showing the approved administrator and current account-admin role](databricks-account-user.png)
 
@@ -221,7 +221,7 @@ GRANT SELECT ON TABLE `<catalog>`.`<schema>`.`<table>` TO `<approved-principal>`
 
 No row filters or column masks are created by the broker. Configure and test them in Unity Catalog where required. OAuth `all-apis` does not grant table privileges. Reference acceptance users: allow `admin@Caldova37587778.onmicrosoft.com`, deny `myaacoub@Caldova37587778.onmicrosoft.com`.
 
-**Browser URL:** <https://adb-7405616934814750.10.azuredatabricks.net/?o=7405616934814750>
+**Browser URL:** <https://adb-{Workspace Id}.10.azuredatabricks.net/?o={Workspace Id}>
 
 Open the reference workspace from an approved private network. The same URL from the public capture session is rejected, which is useful network evidence but does not prove workspace or data authorization.
 
@@ -235,10 +235,10 @@ Reference-tenant browser URLs:
 
 | View | Browser URL |
 | --- | --- |
-| App Service plan | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/appserviceplan> |
-| Configuration | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/configuration> |
-| Identity | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/msi> |
-| Networking | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/networkingHub> |
+| App Service plan | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/appserviceplan> |
+| Configuration | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/configuration> |
+| Identity | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/msi> |
+| Networking | <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/m365-myaacoub/providers/Microsoft.Web/sites/caldova-genie-obo-fn/networkingHub> |
 
 Replace tenant, subscription, resource-group and app names for a customer deployment.
 
@@ -345,7 +345,7 @@ Source: [API template](../../apim/obo.bicep), [API policy](../../apim/policies/g
 
 ### Policy excerpt and walkthrough
 
-**Browser URL:** <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.ApiManagement/service/caldova-apim-westus/apis>
+**Browser URL:** <https://portal.azure.com/#@caldova37587778.onmicrosoft.com/resource/subscriptions/{Subscription Id}/resourceGroups/m365-myaacoub/providers/Microsoft.ApiManagement/service/caldova-apim-westus/apis>
 
 Select **Databricks Genie - delegated user > All operations > Policies**. During this documentation pass, the APIM portal extension returned HTTP 500 before its diagnostics blade rendered, so diagnostics remain verified from the deployed template and live telemetry but not newly captured.
 
@@ -401,7 +401,7 @@ After the broker succeeds, APIM replaces Authorization with the returned Databri
 
 Create a Swagger 2.0 custom connector in the linked Managed Environment, using the new APIM base path and OAuth instead of a subscription key. Configure tenant-specific Entra authorization/token endpoints, connector client ID/secret and delegated API scope. Register its generated redirect URI in Entra. Provide real body schemas with required `content`, not examples alone.
 
-**Browser URL:** <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors>
+**Browser URL:** <https://make.powerapps.com/environments/{Environment Id}/customconnectors>
 
 Select **Databricks Genie OBO Private > Edit**. The **General** tab confirms HTTPS, the APIM gateway host and the dedicated OBO base path.
 
@@ -427,7 +427,7 @@ Bind all four Copilot Studio actions to the same new connector and use **end-use
 
 ## 6. Correlated request history
 
-**Live verification:** the administrator history API returned HTTP 200 with eight observed requests: six successful, one failed and one incomplete. Six exchanges succeeded and one failed. The response contained both APIM and Function events, the displayed KQL, and known correlation `d9d8436b-e6c6-421b-976e-5c56df09c8d9`. Counts are a 2026-09-12 snapshot, not fixed totals. Anonymous and forged `X-MS-CLIENT-PRINCIPAL` requests returned 401.
+**Live verification:** the administrator history API returned HTTP 200 with eight observed requests: six successful, one failed and one incomplete. Six exchanges succeeded and one failed. The response contained both APIM and Function events, the displayed KQL, and known correlation `{Correlation Id}`. Counts are a 2026-09-12 snapshot, not fixed totals. Anonymous and forged `X-MS-CLIENT-PRINCIPAL` requests returned 401.
 
 **Browser URL:** <https://caldova-databricks-showcase.azurewebsites.net/history>
 
