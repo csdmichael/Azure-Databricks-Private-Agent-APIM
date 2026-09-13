@@ -104,6 +104,34 @@ settings and memory, not source, command output or deployment artifacts.
 
 ## Section 7: Validation Proof
 
+2026-09-12 nine-video Showcase refresh:
+- User added `08. Updating Agent with OBO Flow.mp4`, renamed the prior business
+	case recording to episode 09, and requested commit, publication and deployment.
+- Episode 08 is Git LFS object
+	`sha256:9bfdeeb30f0bfada145177d6a8e4183077454adba7312f776e9d21f1e3522975`
+	(60,548,904 bytes). Episode 09 retains LFS object
+	`sha256:7fdef50c48522ad555dd6a532cd010c111adcf6ad51559466a6790a10c422d05`
+	(13,022,994 bytes), allowing Git to preserve the business-video rename.
+- Windows media metadata reports 10:14 for episode 08. Chromium decoded it at
+	1920x1080 with ready state 4, no media error and advancing playback; observed
+	duration was 614.95 seconds.
+- `npm --prefix ui run build -- --configuration production`: passed, hash
+	`565a7e9246bb4297`; the generated Showcase chunk contains episode 08 and 09.
+	`npm test --prefix showcase-server`: all 12 tests passed. The nine sequential
+	catalog entries exactly match the nine MP4 filenames; editor diagnostics,
+	PowerShell parsing and `git diff --check` passed.
+- Azure CLI authentication matches subscription
+	`cf824570-a8ba-497a-a184-0a52f1830aa9` and tenant
+	`12a4b86b-e64c-43f9-af05-d9130a72dfd2`; the target Showcase app is
+	Running with Normal availability.
+- This is a content-only package deployment. No infrastructure, RBAC, identity,
+	application-setting, policy, quota, Docker or schema changes are required.
+	Publish both LFS objects and source metadata before deploying with
+	`deploy-showcase-analytics.ps1 -SkipInfrastructure -SkipBuild`.
+- Post-deploy gates: OneDeploy status 4, health and Showcase HTTP 200, anonymous
+	admin APIs 401, nine playlist rows, episodes 08 and 09 HTTP 200 and playable,
+	and no horizontal overflow at a 390x844 viewport.
+
 2026-09-12 eight-video Showcase refresh:
 - User requested the new OBO authentication recording as episode 07, moved the
 	business-case recording to episode 08, and requested commit, publication and
