@@ -180,11 +180,19 @@ export class ShowcasePage implements AfterViewInit {
     },
     {
       sequence: '08',
+      title: 'Updating the agent with OBO',
+      description:
+        'Updating the Copilot Studio agent to use the delegated-user connector, end-user credentials, and the new on-behalf-of authentication flow.',
+      duration: '10:14',
+      file: '08. Updating Agent with OBO Flow.mp4',
+    },
+    {
+      sequence: '09',
       title: 'Business case and value proposition',
       description:
         'The expected productivity gains, implementation costs, return on investment, and broader business value of the solution.',
       duration: '3:18',
-      file: '08. Business Case and Value Proposition.mp4',
+      file: '09. Business Case and Value Proposition.mp4',
     },
   ];
 
