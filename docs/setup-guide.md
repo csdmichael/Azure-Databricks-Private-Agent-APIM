@@ -639,7 +639,7 @@ Databricks VNet. APIM is the only proxy.
 | Zone | Record | Resolves to | Linked virtual networks |
 |---|---|---|---|
 | `privatelink.azure-api.net` | `caldova-apim-westus` | `10.191.1.4` | APIM, Databricks, both Power Platform VNets |
-| `privatelink.azuredatabricks.net` | `adb-7405616934814750.10` | `10.190.3.6` | APIM, Databricks |
+| `privatelink.azuredatabricks.net` | `adb-{Workspace Id}.10` | `10.190.3.6` | APIM, Databricks |
 | `privatelink.azuredatabricks.net` | `westus2.pl-auth` | `10.190.3.4` | APIM, Databricks |
 | `privatelink.azuredatabricks.net` | `westus2-c3.pl-auth` | `10.190.3.5` | APIM, Databricks |
 
@@ -656,7 +656,7 @@ privately.
 | Kind | `NetworkInjection` |
 | Location (geo) | `canada` |
 | Subnets | `caldova-pp-vnet-canadacentral/power-platform-subnet`, `caldova-pp-vnet-canadaeast/power-platform-subnet` |
-| Linked environment | `Caldova Private` (`52456fcd-1d20-ecdb-aa2e-8979e3f794f5`) |
+| Linked environment | `Caldova Private` (`{Environment Id}`) |
 | Link status | `Linked`, both subnets `Succeeded` |
 
 ### Public access state

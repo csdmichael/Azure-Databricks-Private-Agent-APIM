@@ -145,12 +145,12 @@ Replace the identifiers with your own where they differ.
 | **Showcase site** | <https://caldova-databricks-showcase.azurewebsites.net> |
 | Azure portal | <https://portal.azure.com/> |
 | Power Platform admin center | <https://admin.powerplatform.microsoft.com/> |
-| This environment in the admin center | <https://admin.powerplatform.microsoft.com/manage/environments/environment/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/hub> |
+| This environment in the admin center | <https://admin.powerplatform.microsoft.com/manage/environments/environment/{Environment Id}/hub> |
 | Power Apps maker portal | <https://make.powerapps.com/> |
-| Power Apps custom connectors | <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors> |
-| Power Apps connections | <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/connections> |
+| Power Apps custom connectors | <https://make.powerapps.com/environments/{Environment Id}/customconnectors> |
+| Power Apps connections | <https://make.powerapps.com/environments/{Environment Id}/connections> |
 | Copilot Studio | <https://copilotstudio.microsoft.com/> |
-| Databricks workspace | <https://adb-7405616934814750.10.azuredatabricks.net> |
+| Databricks workspace | <https://adb-{Workspace Id}.10.azuredatabricks.net> |
 | APIM gateway (private only) | `https://caldova-apim-westus.azure-api.net` |
 
 ---
@@ -159,17 +159,17 @@ Replace the identifiers with your own where they differ.
 
 | Setting | Value |
 |---|---|
-| Subscription | `cf824570-a8ba-497a-a184-0a52f1830aa9` |
+| Subscription | `{Subscription Id}` |
 | Resource group | `m365-myaacoub` |
-| Tenant | `12a4b86b-e64c-43f9-af05-d9130a72dfd2` |
+| Tenant | `{Tenant Id}` |
 | Databricks | `caldova-dbx-westus2` (West US 2), public access **disabled** |
 | API Management | `caldova-apim-westus` (West US), StandardV2, public access **disabled** |
-| Power Platform | `Caldova Private` (`52456fcd-1d20-ecdb-aa2e-8979e3f794f5`), canada geo |
+| Power Platform | `Caldova Private` (`{Environment Id}`), canada geo |
 | Catalog | `caldova_dbx_westus2.arrow_semiconductor` |
-| SQL warehouse | `a3c7c9526aa58992` (serverless 2X-Small, auto-stop 5 min) |
-| Genie space | `01f1abe9e51e19ddbb15297aee9a5850` |
+| SQL warehouse | `{SQL Warehouse Id}` (serverless 2X-Small, auto-stop 5 min) |
+| Genie space | `{Genie Space Id}` |
 | Log Analytics | `caldova-apim-logs-westus` |
-| Copilot Studio agent | `Genie Deck Builder Pro` (`0b4034e0-53b9-4ae8-a506-11e3269fa451`) |
+| Copilot Studio agent | `Genie Deck Builder Pro` (`{Agent Id}`) |
 
 ---
 
@@ -184,7 +184,7 @@ Replace the identifiers with your own where they differ.
 
 Both Power Platform subnets are `/24` because the enterprise policy requires each regional
 subnet to expose the same usable address count. The region pair must match the environment
-geo: environment `52456fcd-1d20-ecdb-aa2e-8979e3f794f5` is `canada`, so the VNets are
+geo: environment `{Environment Id}` is `canada`, so the VNets are
 `canadacentral` and `canadaeast`.
 
 ---
@@ -354,7 +354,7 @@ Foundry path in [old mcaps/foundry/README.md](old%20mcaps/foundry/README.md) —
 Create the connector in the linked environment from the Swagger 2.0 definition in
 [connector](connector).
 
-Portal: <https://make.powerapps.com/environments/52456fcd-1d20-ecdb-aa2e-8979e3f794f5/customconnectors>
+Portal: <https://make.powerapps.com/environments/{Environment Id}/customconnectors>
 
 ![Power Apps Custom connectors list showing Databricks-Genie-Private-APIM](docs/images/10-powerapps-custom-connector.png)
 
