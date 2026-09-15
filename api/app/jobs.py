@@ -17,13 +17,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Callable, Literal
 
+from .config import get_settings
+
 logger = logging.getLogger(__name__)
 
 JobStatus = Literal["running", "completed", "failed"]
-
-JOB_TTL_SECONDS = 3600
-MAX_JOBS = 200
-
 
 @dataclass
 class ChatJob:
@@ -37,17 +35,19 @@ class ChatJob:
 
 
 class JobStore:
-    def __init__(self, max_workers: int = 4) -> None:
+    def __init__(self, max_workers: int, job_ttl_seconds: int, max_jobs: int) -> None:
         self._jobs: dict[str, ChatJob] = {}
         self._lock = threading.Lock()
+        self._job_ttl_seconds = job_ttl_seconds
+        self._max_jobs = max_jobs
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="chat")
 
     def _evict(self) -> None:
-        cutoff = time.time() - JOB_TTL_SECONDS
+        cutoff = time.time() - self._job_ttl_seconds
         stale = [job_id for job_id, job in self._jobs.items() if job.created_at < cutoff]
         for job_id in stale:
             self._jobs.pop(job_id, None)
-        while len(self._jobs) > MAX_JOBS:
+        while len(self._jobs) > self._max_jobs:
             oldest = min(self._jobs.values(), key=lambda job: job.created_at)
             self._jobs.pop(oldest.id, None)
 
@@ -80,4 +80,9 @@ class JobStore:
             return self._jobs.get(job_id)
 
 
-job_store = JobStore()
+_settings = get_settings()
+job_store = JobStore(
+    max_workers=_settings.chat_job_workers,
+    job_ttl_seconds=_settings.job_ttl_seconds,
+    max_jobs=_settings.max_jobs,
+)

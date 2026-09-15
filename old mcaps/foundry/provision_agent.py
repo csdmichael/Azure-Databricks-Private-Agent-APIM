@@ -19,13 +19,15 @@ from azure.identity import DefaultAzureCredential
 
 from common import put_mcp_connection, required_env, run_pptx_smoke_test
 
-INSTRUCTIONS = """You are a semiconductor business analytics agent.
+def agent_instructions() -> str:
+    namespace = f"{required_env('DATABRICKS_CATALOG')}.{required_env('DATABRICKS_SCHEMA')}"
+    return f"""You are a semiconductor business analytics agent.
 Use the Databricks MCP tools for every numeric or factual claim about company data.
 Use only read-only SELECT or SHOW statements and only the connected sample schema
-caldova_dbx_westus2.arrow_semiconductor.
+{namespace}.
 
 The MCP `query` tool takes a single string argument named `body`. Always set `body`
-to a compact JSON object string of the exact form {"statement": "<SQL>"} where <SQL>
+to a compact JSON object string of the exact form {{"statement": "<SQL>"}} where <SQL>
 is one read-only statement. Never put bare SQL in `body`; it must be JSON.
 
 Use Code Interpreter to create charts and PowerPoint presentations when requested.
@@ -67,7 +69,7 @@ def main() -> int:
         agent_name=agent_name,
         definition=PromptAgentDefinition(
             model=required_env("FOUNDRY_MODEL_DEPLOYMENT_NAME"),
-            instructions=INSTRUCTIONS,
+            instructions=agent_instructions(),
             tools=[
                 MCPTool(
                     server_label="databricks",

@@ -140,6 +140,12 @@ $settings = @(
     "TEAMS_APP_ID_NAMESPACE=$(Get-ConfigValue -Config $config -Path 'api.teamsAppIdNamespace')",
     "DATABRICKS_CATALOG=$(Get-ConfigValue -Config $config -Path 'databricks.catalog')",
     "DATABRICKS_SCHEMA=$(Get-ConfigValue -Config $config -Path 'databricks.schema')",
+    "DATABRICKS_SQL_FOUNDRY_AGENT_NAME=$(Get-ConfigValue -Config $config -Path 'api.agents.sqlFoundryName')",
+    "DATABRICKS_GENIE_FOUNDRY_AGENT_NAME=$(Get-ConfigValue -Config $config -Path 'api.agents.genieFoundryName')",
+    "API_TITLE=$(Get-ConfigValue -Config $config -Path 'api.title')",
+    "API_VERSION=$(Get-ConfigValue -Config $config -Path 'api.version')",
+    "API_CONTACT_NAME=$(Get-ConfigValue -Config $config -Path 'api.contactName')",
+    "API_LICENSE_NAME=$(Get-ConfigValue -Config $config -Path 'api.licenseName')",
     "REQUEST_TIMEOUT_SECONDS=$(Get-ConfigValue -Config $config -Path 'api.requestTimeoutSeconds')",
     "JOB_TTL_SECONDS=$(Get-ConfigValue -Config $config -Path 'api.jobTtlSeconds')",
     "MAX_JOBS=$(Get-ConfigValue -Config $config -Path 'api.maxJobs')",
@@ -147,7 +153,10 @@ $settings = @(
     "MAX_MCP_APPROVAL_ROUNDS=$(Get-ConfigValue -Config $config -Path 'foundry.maxMcpApprovalRounds')",
     "TEAMS_MANIFEST_VERSION=$(Get-ConfigValue -Config $config -Path 'api.teamsManifestVersion')",
     "DECLARATIVE_AGENT_VERSION=$(Get-ConfigValue -Config $config -Path 'api.declarativeAgentVersion')",
-    "PLUGIN_SCHEMA_VERSION=$(Get-ConfigValue -Config $config -Path 'api.pluginSchemaVersion')"
+    "PLUGIN_SCHEMA_VERSION=$(Get-ConfigValue -Config $config -Path 'api.pluginSchemaVersion')",
+    "M365_DEVELOPER_NAME=$(Get-ConfigValue -Config $config -Path 'api.m365DeveloperName')",
+    "M365_APP_VERSION=$(Get-ConfigValue -Config $config -Path 'api.m365AppVersion')",
+    "M365_NAME_SUFFIX=$(Get-ConfigValue -Config $config -Path 'api.m365NameSuffix')"
 )
 Invoke-Az (@("webapp", "config", "appsettings", "set", "-g", $ResourceGroup, "-n", $ApiAppName, "-o", "none", "--settings") + $settings) | Out-Null
 

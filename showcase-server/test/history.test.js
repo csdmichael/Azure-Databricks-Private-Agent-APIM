@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { historyFilter, buildQuery, groupHistory, historyStore } = require('../history');
 const filter = { start: '2026-09-01', end: '2026-09-12', outcome: 'all', user: '' };
 const resource = '/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/test/providers/Microsoft.Insights/components/obo';
+const queryMaxResults = 10001;
 
 test('groups by request id, not user/time, and separates API from exchange outcomes', () => {
   const event = (correlationId, stage, timestamp, extra = {}) => ({ correlationId, stage, timestamp, source: 'apim', userId: 'same-user', user: 'admin@example.com', ...extra });
@@ -28,13 +29,14 @@ test('defaults to last 30 UTC dates and prevents query injection', () => {
   assert.equal(range.start, '2026-08-14');
   assert.throws(() => historyFilter({ start: "2026-09-01');union *" }));
   assert.throws(() => historyFilter({ outcome: 'arbitrary' }));
-  assert.throws(() => buildQuery(filter, "resource';union *"));
-  const query = buildQuery(filter, resource);
+  assert.throws(() => buildQuery(filter, "resource';union *", queryMaxResults));
+  const query = buildQuery(filter, resource, queryMaxResults);
   assert.match(query, /order by timestamp desc/);
   assert.match(query, /take 10001/);
 });
 test('partial logs are not presented as complete history', async () => {
-  const store = historyStore({ LOG_ANALYTICS_WORKSPACE_ID: '11111111-1111-1111-1111-111111111111', LOG_ANALYTICS_RESOURCE_ID: resource },
+  const store = historyStore({ LOG_ANALYTICS_WORKSPACE_ID: '11111111-1111-1111-1111-111111111111', LOG_ANALYTICS_RESOURCE_ID: resource,
+    LOG_ANALYTICS_QUERY_TIMEOUT_MS: '20000', LOG_ANALYTICS_QUERY_MAX_RESULTS: String(queryMaxResults) },
     { getToken: async () => ({ token: 'test' }) }, async () => Response.json({ error: { code: 'PartialError' }, tables: [] }));
   await assert.rejects(store.read(filter), /Incomplete log query/);
 });

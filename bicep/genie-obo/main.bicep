@@ -36,6 +36,17 @@ param connectorClientId string
 @description('Private Databricks workspace URL.')
 param workspaceUrl string
 
+@description('Delegated OAuth scope required from callers.')
+param oboScope string
+
+@description('Timeout in milliseconds for downloading Microsoft Entra signing keys.')
+@minValue(1)
+param jwkFetchTimeoutMs int
+
+@description('Timeout in milliseconds for the Databricks token exchange request.')
+@minValue(1)
+param tokenExchangeTimeoutMs int
+
 @description('Function app virtual network integration subnet name.')
 param integrationSubnetName string
 
@@ -154,6 +165,9 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'APIM_PRINCIPAL_ID', value: apim.identity.principalId }
         { name: 'ALLOWED_CLIENT_IDS', value: connectorClientId }
         { name: 'DATABRICKS_WORKSPACE_URL', value: workspaceUrl }
+        { name: 'OBO_SCOPE', value: oboScope }
+        { name: 'JWK_FETCH_TIMEOUT_MS', value: string(jwkFetchTimeoutMs) }
+        { name: 'TOKEN_EXCHANGE_TIMEOUT_MS', value: string(tokenExchangeTimeoutMs) }
         { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
       ]
     }

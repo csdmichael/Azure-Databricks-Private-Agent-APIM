@@ -5,15 +5,16 @@ import { BrokerError, createBroker, loadConfig, type BrokerConfig } from '../src
 
 const config: BrokerConfig = {
   tenantId: '11111111-1111-1111-1111-111111111111', audience: '22222222-2222-2222-2222-222222222222',
-  brokerAudience: '22222222-2222-2222-2222-222222222222', apimPrincipalId: 'apim-object', clientIds: ['connector-client'],
-  scope: 'Genie.Access', workspaceUrl: 'https://adb-123.10.azuredatabricks.net',
+  brokerAudience: '22222222-2222-2222-2222-222222222222', apimPrincipalId: '33333333-3333-3333-3333-333333333333',
+  clientIds: ['44444444-4444-4444-4444-444444444444'], scope: 'Genie.Access',
+  workspaceUrl: 'https://adb-123.10.azuredatabricks.net', jwkFetchTimeoutMs: 5000, tokenExchangeTimeoutMs: 10000,
 };
 const keys = await generateKeyPair('RS256');
 const issuer = `https://login.microsoftonline.com/${config.tenantId}/v2.0`;
 const sign = (claims: JWTPayload, audience = config.audience, expiry: string | number = '5m') =>
   new SignJWT({ tid: config.tenantId, ...claims }).setProtectedHeader({ alg: 'RS256' })
     .setIssuer(issuer).setAudience(audience).setIssuedAt().setNotBefore('0s').setExpirationTime(expiry).sign(keys.privateKey);
-const userClaims = { oid: 'user-object', azp: 'connector-client', scp: 'Genie.Access', preferred_username: 'user@example.com' };
+const userClaims = { oid: 'user-object', azp: config.clientIds[0], scp: config.scope, preferred_username: 'user@example.com' };
 const caller = await sign({ oid: config.apimPrincipalId }, config.brokerAudience);
 const user = await sign(userClaims);
 const rejected = (status: number) => (error: unknown) => error instanceof BrokerError && error.status === status;
@@ -74,9 +75,12 @@ test('fails closed and hides upstream errors', async () => {
 test('configuration cannot redirect the exchange to an arbitrary host', () => {
   const env = { ENTRA_TENANT_ID: config.tenantId, ENTRA_API_CLIENT_ID: config.audience,
     BROKER_AUDIENCE: config.brokerAudience, APIM_PRINCIPAL_ID: config.apimPrincipalId,
-    ALLOWED_CLIENT_IDS: 'connector-client' };
+    ALLOWED_CLIENT_IDS: config.clientIds.join(','), OBO_SCOPE: config.scope,
+    JWK_FETCH_TIMEOUT_MS: String(config.jwkFetchTimeoutMs),
+    TOKEN_EXCHANGE_TIMEOUT_MS: String(config.tokenExchangeTimeoutMs) };
   for (const url of ['http://adb-123.10.azuredatabricks.net', 'https://evil.example', `${config.workspaceUrl}/other`, `${config.workspaceUrl}?redirect=evil`]) {
     assert.throws(() => loadConfig({ ...env, DATABRICKS_WORKSPACE_URL: url }));
   }
   assert.equal(loadConfig({ ...env, DATABRICKS_WORKSPACE_URL: config.workspaceUrl }).workspaceUrl, config.workspaceUrl);
+  assert.throws(() => loadConfig({ ...env, DATABRICKS_WORKSPACE_URL: config.workspaceUrl, JWK_FETCH_TIMEOUT_MS: '0' }));
 });

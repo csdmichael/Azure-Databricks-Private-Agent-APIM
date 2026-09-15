@@ -21,17 +21,7 @@ concurrency:
 
 env:
   AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  AZURE_RESOURCE_GROUP: m365-myaacoub
-  FOUNDRY_ACCOUNT_NAME: 002-ai-poc-private
-  FOUNDRY_PROJECT_NAME: proj-default
-  FOUNDRY_PROJECT_ENDPOINT: https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default
-  FOUNDRY_AGENT_NAME: databricks-agent-mcp
-  FOUNDRY_GENIE_AGENT_NAME: databricks-genie-agent
-  FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-4.1
-  MCP_CONNECTION_NAME: databricks-apim-mcp
-  MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-mcp/mcp
-  GENIE_MCP_CONNECTION_NAME: databricks-apim-genie-mcp
-  GENIE_MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-genie-mcp/mcp
+  DEPLOYMENT_CONFIG_PATH: config/deployment.json
   APIM_SUBSCRIPTION_KEY: ${{ secrets.APIM_SUBSCRIPTION_KEY }}
 
 jobs:
@@ -40,6 +30,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Load deployment configuration
+        shell: bash
+        run: |
+          foundry_account=$(jq -r '.foundry.application.accountName' "$DEPLOYMENT_CONFIG_PATH")
+          foundry_project=$(jq -r '.foundry.application.projectName' "$DEPLOYMENT_CONFIG_PATH")
+          gateway=$(jq -r '.apim.gatewayUrl' "$DEPLOYMENT_CONFIG_PATH")
+          {
+            echo "DEPLOYMENT_CONFIG_PATH=$GITHUB_WORKSPACE/$DEPLOYMENT_CONFIG_PATH"
+            echo "AZURE_RESOURCE_GROUP=$(jq -r '.azure.resourceGroup' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "FOUNDRY_ACCOUNT_NAME=$foundry_account"
+            echo "FOUNDRY_PROJECT_NAME=$foundry_project"
+            echo "FOUNDRY_PROJECT_ENDPOINT=https://${foundry_account}.services.ai.azure.com/api/projects/${foundry_project}"
+            echo "FOUNDRY_AGENT_NAME=$(jq -r '.api.agents.sqlFoundryName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "FOUNDRY_GENIE_AGENT_NAME=$(jq -r '.api.agents.genieFoundryName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "FOUNDRY_MODEL_DEPLOYMENT_NAME=$(jq -r '.foundry.application.modelDeploymentName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "MCP_CONNECTION_NAME=$(jq -r '.foundry.application.sqlConnectionName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "MCP_SERVER_URL=${gateway}/$(jq -r '.apim.mcpPath' "$DEPLOYMENT_CONFIG_PATH")/mcp"
+            echo "GENIE_MCP_CONNECTION_NAME=$(jq -r '.foundry.application.genieConnectionName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "GENIE_MCP_SERVER_URL=${gateway}/$(jq -r '.apim.genieMcpPath' "$DEPLOYMENT_CONFIG_PATH")/mcp"
+            echo "DATABRICKS_CATALOG=$(jq -r '.databricks.catalog' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_SCHEMA=$(jq -r '.databricks.schema' "$DEPLOYMENT_CONFIG_PATH")"
+          } >> "$GITHUB_ENV"
 
       - name: Azure login (OIDC)
         uses: azure/login@v2

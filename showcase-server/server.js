@@ -8,25 +8,48 @@ const geoip = require('geoip-lite');
 const { clientIp, createVisit, parseRange, summarize, isStatsAdmin } = require('./analytics');
 const { historyFilter, historyStore } = require('./history');
 
+function requiredSetting(env, name) {
+  const value = env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function integerSetting(env, name, minimum = 1) {
+  const value = Number(requiredSetting(env, name));
+  if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`${name} must be an integer greater than or equal to ${minimum}`);
+  return value;
+}
+
 function cosmosStore(env) {
-  if (!env.COSMOS_ENDPOINT) throw new Error('COSMOS_ENDPOINT is required');
+  const endpoint = requiredSetting(env, 'COSMOS_ENDPOINT');
+  const parsedEndpoint = new URL(endpoint);
+  if (parsedEndpoint.protocol !== 'https:' || parsedEndpoint.username || parsedEndpoint.password) {
+    throw new Error('COSMOS_ENDPOINT must be an HTTPS URL without credentials');
+  }
+  const database = requiredSetting(env, 'COSMOS_DATABASE');
+  const containerName = requiredSetting(env, 'COSMOS_CONTAINER');
+  const requestTimeout = integerSetting(env, 'COSMOS_REQUEST_TIMEOUT_MS');
+  const maxRetryAttemptCount = integerSetting(env, 'COSMOS_MAX_RETRY_ATTEMPTS', 0);
+  const maxWaitTimeInSeconds = integerSetting(env, 'COSMOS_MAX_RETRY_WAIT_SECONDS', 0);
+  const maxItemCount = integerSetting(env, 'COSMOS_QUERY_PAGE_SIZE');
+  const maxRows = integerSetting(env, 'COSMOS_MAX_ROWS');
   const client = new CosmosClient({
-    endpoint: env.COSMOS_ENDPOINT, aadCredentials: new ManagedIdentityCredential(),
-    connectionPolicy: { requestTimeout: 4000, retryOptions: { maxRetryAttemptCount: 1, maxWaitTimeInSeconds: 2 } },
+    endpoint: parsedEndpoint.origin, aadCredentials: new ManagedIdentityCredential(),
+    connectionPolicy: { requestTimeout, retryOptions: { maxRetryAttemptCount, maxWaitTimeInSeconds } },
   });
-  const container = client.database('showcase-analytics').container('visits');
+  const container = client.database(database).container(containerName);
   return {
     record: visit => container.items.create(visit),
     async read(range) {
       const iterator = container.items.query({
         query: 'SELECT c.timestamp, c.day, c.ip, c.country, c.state, c.city, c.path FROM c WHERE c.day >= @start AND c.day <= @end',
         parameters: [{ name: '@start', value: range.start }, { name: '@end', value: range.end }],
-      }, { maxItemCount: 1000 });
+      }, { maxItemCount });
       const visits = [];
       while (iterator.hasMoreResults()) {
         const page = await iterator.fetchNext();
         visits.push(...page.resources);
-        if (visits.length > 100000) {
+        if (visits.length > maxRows) {
           const error = new Error('The selected range is too large. Choose fewer days.');
           error.status = 422;
           throw error;
@@ -38,6 +61,7 @@ function cosmosStore(env) {
 }
 
 function createApp({ store, env = process.env, lookup = geoip.lookup, staticRoot = path.join(__dirname, 'public'), logs = historyStore(env) }) {
+  const analyticsTtlSeconds = integerSetting(env, 'ANALYTICS_TTL_SECONDS');
   const server = express();
   server.disable('x-powered-by');
   server.use((_request, response, next) => {
@@ -84,7 +108,7 @@ function createApp({ store, env = process.env, lookup = geoip.lookup, staticRoot
     response.set('Cache-Control', 'no-store');
     if (request.method === 'GET') {
       try {
-        await store.record(createVisit(clientIp(request, Boolean(env.WEBSITE_INSTANCE_ID)), request.path, lookup));
+        await store.record(createVisit(clientIp(request, Boolean(env.WEBSITE_INSTANCE_ID)), request.path, lookup, analyticsTtlSeconds));
       } catch { console.error('Visit persistence failed'); }
     }
     response.sendFile(path.join(staticRoot, 'index.html'), error => { if (error) next(error); });
@@ -102,4 +126,4 @@ if (require.main === module) {
   server.listen(process.env.PORT || 8080);
 }
 
-module.exports = { createApp, cosmosStore };
+module.exports = { createApp, cosmosStore, integerSetting };

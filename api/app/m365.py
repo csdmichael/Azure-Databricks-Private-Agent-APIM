@@ -17,16 +17,13 @@ from .config import get_settings
 
 ASSETS_DIR = Path(__file__).parent / "m365_assets"
 
-TEAMS_MANIFEST_SCHEMA = (
-    "https://developer.microsoft.com/en-us/json-schemas/teams/v1.29/MicrosoftTeams.schema.json"
-)
-TEAMS_MANIFEST_VERSION = "1.29"
-DECLARATIVE_AGENT_SCHEMA = (
-    "https://developer.microsoft.com/json-schemas/copilot/declarative-agent/v1.8/schema.json"
-)
-DECLARATIVE_AGENT_VERSION = "v1.8"
-PLUGIN_SCHEMA = "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.4/schema.json"
-PLUGIN_SCHEMA_VERSION = "v2.4"
+_settings = get_settings()
+TEAMS_MANIFEST_VERSION = _settings.teams_manifest_version
+TEAMS_MANIFEST_SCHEMA = f"https://developer.microsoft.com/en-us/json-schemas/teams/v{TEAMS_MANIFEST_VERSION}/MicrosoftTeams.schema.json"
+DECLARATIVE_AGENT_VERSION = _settings.declarative_agent_version
+DECLARATIVE_AGENT_SCHEMA = f"https://developer.microsoft.com/json-schemas/copilot/declarative-agent/{DECLARATIVE_AGENT_VERSION}/schema.json"
+PLUGIN_SCHEMA_VERSION = _settings.plugin_schema_version
+PLUGIN_SCHEMA = f"https://developer.microsoft.com/json-schemas/copilot/plugin/{PLUGIN_SCHEMA_VERSION}/schema.json"
 
 _SECURITY_SCHEMES = {
     "apiKeyHeader": {
@@ -81,15 +78,16 @@ _STATEMENT_RESPONSE_SCHEMA = {
 
 
 def _databricks_openapi(base_url: str) -> dict:
+    namespace = _settings.databricks_namespace
     return {
         "openapi": "3.0.3",
         "info": {
             "title": "Databricks SQL",
             "description": (
                 "Read-only access to the private Azure Databricks warehouse "
-                "(caldova_dbx_westus2.arrow_semiconductor) through Azure API Management."
+                f"({namespace}) through Azure API Management."
             ),
-            "version": "1.0.0",
+            "version": _settings.api_version,
         },
         "servers": [{"url": f"{base_url}/databricks", "description": "APIM gateway"}],
         "security": [{"apiKeyHeader": []}],
@@ -120,7 +118,7 @@ def _databricks_openapi(base_url: str) -> dict:
                                 "example": {
                                     "statement": (
                                         "SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd "
-                                        "FROM caldova_dbx_westus2.arrow_semiconductor.product_sales "
+                                        f"FROM {namespace}.product_sales "
                                         "GROUP BY region ORDER BY revenue_musd DESC"
                                     )
                                 },
@@ -142,8 +140,7 @@ def _databricks_openapi(base_url: str) -> dict:
                     "operationId": "listTables",
                     "summary": "List the sample tables",
                     "description": (
-                        "Lists the tables available in "
-                        "caldova_dbx_westus2.arrow_semiconductor."
+                        f"Lists the tables available in {namespace}."
                     ),
                     "responses": {
                         "200": {
@@ -236,7 +233,7 @@ def _genie_openapi(base_url: str) -> dict:
                 "Genie is asynchronous: call askGenie, poll getGenieMessage until status "
                 "is COMPLETED, then call getGenieResult for the rows."
             ),
-            "version": "1.0.0",
+            "version": _settings.api_version,
         },
         "servers": [{"url": f"{base_url}/databricks-genie", "description": "APIM gateway"}],
         "security": [{"apiKeyHeader": []}],
@@ -332,7 +329,7 @@ _OPENAPI_BUILDERS = {
 
 _FUNCTION_DESCRIPTIONS = {
     "runQuery": "Run one read-only SQL statement against the semiconductor sample schema.",
-    "listTables": "List the tables available in databricks_ws_ai_poc.arrow_semiconductor.",
+    "listTables": f"List the tables available in {_settings.databricks_namespace}.",
     "askGenie": "Ask Databricks Genie a business question and get conversation and message ids.",
     "getGenieMessage": "Poll a Genie message until it is COMPLETED and read the answer and SQL.",
     "getGenieResult": "Fetch the result rows for a completed Genie message.",
@@ -341,7 +338,7 @@ _FUNCTION_DESCRIPTIONS = {
 
 
 def build_openapi(agent: AgentDefinition) -> dict:
-    return _OPENAPI_BUILDERS[agent.id](get_settings().apim_base_url)
+    return _OPENAPI_BUILDERS[agent.id](_settings.apim_base_url)
 
 
 def _plugin_manifest(agent: AgentDefinition, api_key_reference_id: str | None) -> dict:
@@ -393,21 +390,23 @@ def _declarative_agent(agent: AgentDefinition) -> dict:
 
 
 def _teams_manifest(agent: AgentDefinition) -> dict:
-    settings = get_settings()
-    apim_host = settings.apim_base_url.replace("https://", "").replace("http://", "")
+    apim_host = _settings.apim_base_url.replace("https://", "").replace("http://", "")
     return {
         "$schema": TEAMS_MANIFEST_SCHEMA,
         "manifestVersion": TEAMS_MANIFEST_VERSION,
-        "version": "1.0.0",
+        "version": _settings.m365_app_version,
         "id": agent.teams_app_id,
         "developer": {
-            "name": "Michael Yaacoub",
-            "websiteUrl": settings.github_repo_url,
-            "privacyUrl": f"{settings.github_repo_url}/blob/main/README.md",
-            "termsOfUseUrl": f"{settings.github_repo_url}/blob/main/LICENSE",
+            "name": _settings.m365_developer_name,
+            "websiteUrl": _settings.github_repo_url,
+            "privacyUrl": f"{_settings.github_repo_url}/blob/main/README.md",
+            "termsOfUseUrl": f"{_settings.github_repo_url}/blob/main/LICENSE",
         },
         "icons": {"color": "color.png", "outline": "outline.png"},
-        "name": {"short": agent.display_name[:30], "full": f"{agent.display_name} (POC)"[:100]},
+        "name": {
+            "short": agent.display_name[:30],
+            "full": f"{agent.display_name} {_settings.m365_name_suffix}".strip()[:100],
+        },
         "description": {"short": agent.tagline[:80], "full": agent.description[:4000]},
         "accentColor": agent.accent_color,
         "copilotAgents": {

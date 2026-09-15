@@ -20,14 +20,16 @@ from azure.identity import DefaultAzureCredential
 
 from common import put_mcp_connection, required_env, run_pptx_smoke_test
 
-INSTRUCTIONS = """You are a semiconductor business analytics agent for an Arrow-style
+def agent_instructions() -> str:
+    namespace = f"{required_env('DATABRICKS_CATALOG')}.{required_env('DATABRICKS_SCHEMA')}"
+    return f"""You are a semiconductor business analytics agent for an Arrow-style
 chip manufacturer. You answer questions using Databricks AI/BI Genie, which is
-curated over the schema caldova_dbx_westus2.arrow_semiconductor.
+curated over the schema {namespace}.
 
 Genie is asynchronous. Follow this loop exactly for every business question:
 
 1. Call the `ask` tool. Its only argument is `body`, a string. Set `body` to a
-   compact JSON object string of the exact form {"content": "<question>"}.
+    compact JSON object string of the exact form {{"content": "<question>"}}.
    Never put a bare question in `body`; it must be JSON. The response contains
    `conversation_id` and `message_id`.
 2. Call the `message` tool with `conversationId` and `messageId`. Repeat until
@@ -41,7 +43,7 @@ Genie is asynchronous. Follow this loop exactly for every business question:
    `statement_response.manifest.schema.columns[].name` and rows at
    `statement_response.result.data_array` (arrays of strings, in column order).
 5. For a follow-up question in the same thread, call `follow-up` with
-   `conversationId` and `body` set to {"content": "<question>"}.
+    `conversationId` and `body` set to {{"content": "<question>"}}.
 
 Grounding rules:
 - Use Genie for every numeric or factual claim about company data. Never invent,
@@ -89,7 +91,7 @@ def main() -> int:
         agent_name=agent_name,
         definition=PromptAgentDefinition(
             model=required_env("FOUNDRY_MODEL_DEPLOYMENT_NAME"),
-            instructions=INSTRUCTIONS,
+            instructions=agent_instructions(),
             tools=[
                 MCPTool(
                     server_label="databricks_genie",

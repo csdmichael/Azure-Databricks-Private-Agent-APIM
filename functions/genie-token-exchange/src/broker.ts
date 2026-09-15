@@ -8,6 +8,8 @@ export interface BrokerConfig {
   clientIds: string[];
   scope: string;
   workspaceUrl: string;
+  jwkFetchTimeoutMs: number;
+  tokenExchangeTimeoutMs: number;
 }
 
 export class BrokerError extends Error {
@@ -22,20 +24,30 @@ export function loadConfig(env: NodeJS.ProcessEnv): BrokerConfig {
     if (!value) throw new Error(`Missing ${name}`);
     return value;
   };
+  const positiveInteger = (name: string): number => {
+    const value = Number(required(name));
+    if (!Number.isSafeInteger(value) || value < 1) throw new Error(`Invalid ${name}`);
+    return value;
+  };
   const config: BrokerConfig = {
     tenantId: required('ENTRA_TENANT_ID'),
     audience: required('ENTRA_API_CLIENT_ID'),
     brokerAudience: required('BROKER_AUDIENCE'),
     apimPrincipalId: required('APIM_PRINCIPAL_ID'),
     clientIds: required('ALLOWED_CLIENT_IDS').split(',').map(value => value.trim()).filter(Boolean),
-    scope: 'Genie.Access',
+    scope: required('OBO_SCOPE'),
     workspaceUrl: required('DATABRICKS_WORKSPACE_URL'),
+    jwkFetchTimeoutMs: positiveInteger('JWK_FETCH_TIMEOUT_MS'),
+    tokenExchangeTimeoutMs: positiveInteger('TOKEN_EXCHANGE_TIMEOUT_MS'),
   };
   const workspace = new URL(config.workspaceUrl);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (workspace.protocol !== 'https:' || !/^adb-[0-9]+\.[0-9]+\.azuredatabricks\.net$/.test(workspace.hostname)
       || workspace.port || workspace.username || workspace.password || workspace.search || workspace.hash
       || workspace.pathname !== '/' || !config.clientIds.length
-      || !/^[0-9a-f-]{36}$/i.test(config.tenantId)) {
+      || !uuid.test(config.tenantId) || !uuid.test(config.audience)
+      || !uuid.test(config.brokerAudience) || !uuid.test(config.apimPrincipalId)
+      || config.clientIds.some(clientId => !uuid.test(clientId))) {
     throw new Error('Invalid broker configuration');
   }
   config.workspaceUrl = workspace.origin;
@@ -45,7 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): BrokerConfig {
 export function createBroker(config: BrokerConfig, keys?: JWTVerifyGetKey, request: typeof fetch = fetch) {
   const signingKeys = keys ?? createRemoteJWKSet(
     new URL(`https://login.microsoftonline.com/${config.tenantId}/discovery/v2.0/keys`),
-    { timeoutDuration: 5000 },
+    { timeoutDuration: config.jwkFetchTimeoutMs },
   );
   return async (callerToken: string, userToken: string) => {
     if (!callerToken || !userToken || callerToken.length > 32768 || userToken.length > 32768) {
@@ -84,7 +96,7 @@ export function createBroker(config: BrokerConfig, keys?: JWTVerifyGetKey, reque
       response = await request(`${config.workspaceUrl}/oidc/v1/token`, {
         method: 'POST',
         redirect: 'error',
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(config.tokenExchangeTimeoutMs),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',

@@ -7,11 +7,8 @@ import sys
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
-endpoint = os.getenv(
-    "FOUNDRY_PROJECT_ENDPOINT",
-    "https://002-ai-poc-private.services.ai.azure.com/api/projects/proj-default",
-)
-agent_name = sys.argv[1] if len(sys.argv) > 1 else "databricks-agent-mcp"
+endpoint = os.environ["FOUNDRY_PROJECT_ENDPOINT"]
+agent_name = sys.argv[1] if len(sys.argv) > 1 else os.environ["FOUNDRY_AGENT_NAME"]
 prompt = (
     sys.argv[2]
     if len(sys.argv) > 2

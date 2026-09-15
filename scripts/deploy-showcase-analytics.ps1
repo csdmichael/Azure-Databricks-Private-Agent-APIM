@@ -16,6 +16,8 @@ param(
     [Nullable[int]] $CosmosRequestTimeoutMs,
     [Nullable[int]] $CosmosMaxRetryAttempts,
     [Nullable[int]] $CosmosMaxRetryWaitSeconds,
+    [Nullable[int]] $CosmosQueryPageSize,
+    [Nullable[int]] $CosmosMaxRows,
     [string] $LogAnalyticsWorkspaceId,
     [string] $LogAnalyticsResourceId,
     [Nullable[int]] $LogAnalyticsQueryTimeoutMs,
@@ -52,6 +54,8 @@ $CosmosContainer = Get-ConfigValue -Config $config -Path 'showcase.cosmosContain
 $CosmosRequestTimeoutMs = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosRequestTimeoutMs' -Override $CosmosRequestTimeoutMs)
 $CosmosMaxRetryAttempts = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosMaxRetryAttempts' -Override $CosmosMaxRetryAttempts)
 $CosmosMaxRetryWaitSeconds = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosMaxRetryWaitSeconds' -Override $CosmosMaxRetryWaitSeconds)
+$CosmosQueryPageSize = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosQueryPageSize' -Override $CosmosQueryPageSize)
+$CosmosMaxRows = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosMaxRows' -Override $CosmosMaxRows)
 $LogAnalyticsWorkspaceId = Get-ConfigValue -Config $config -Path 'showcase.logAnalyticsWorkspaceId' -Override $LogAnalyticsWorkspaceId
 $LogAnalyticsResourceId = Get-ConfigValue -Config $config -Path 'showcase.logAnalyticsResourceId' -Override $LogAnalyticsResourceId
 $LogAnalyticsQueryTimeoutMs = [int](Get-ConfigValue -Config $config -Path 'showcase.logAnalyticsQueryTimeoutMs' -Override $LogAnalyticsQueryTimeoutMs)
@@ -120,6 +124,8 @@ if (-not $SkipInfrastructure -or $ResumeConfiguration) {
         COSMOS_REQUEST_TIMEOUT_MS = [string]$CosmosRequestTimeoutMs
         COSMOS_MAX_RETRY_ATTEMPTS = [string]$CosmosMaxRetryAttempts
         COSMOS_MAX_RETRY_WAIT_SECONDS = [string]$CosmosMaxRetryWaitSeconds
+        COSMOS_QUERY_PAGE_SIZE = [string]$CosmosQueryPageSize
+        COSMOS_MAX_ROWS = [string]$CosmosMaxRows
         LOG_ANALYTICS_WORKSPACE_ID = $LogAnalyticsWorkspaceId
         LOG_ANALYTICS_RESOURCE_ID = $LogAnalyticsResourceId
         LOG_ANALYTICS_QUERY_TIMEOUT_MS = [string]$LogAnalyticsQueryTimeoutMs

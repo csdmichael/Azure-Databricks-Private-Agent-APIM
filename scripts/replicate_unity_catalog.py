@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -16,8 +18,26 @@ TERMINAL_STATES = {"CANCELED", "CLOSED", "FAILED", "SUCCEEDED"}
 
 
 class DatabricksClient:
-    def __init__(self, host: str, token: str):
+    def __init__(
+        self,
+        host: str,
+        token: str,
+        api_timeout_seconds: int,
+        api_retry_attempts: int,
+        api_retry_max_delay_seconds: int,
+        sql_wait_timeout_seconds: int,
+        sql_poll_interval_seconds: int,
+        sql_row_limit: int,
+        sql_byte_limit: int,
+    ):
         self.host = host.rstrip("/")
+        self.api_timeout_seconds = api_timeout_seconds
+        self.api_retry_attempts = api_retry_attempts
+        self.api_retry_max_delay_seconds = api_retry_max_delay_seconds
+        self.sql_wait_timeout_seconds = sql_wait_timeout_seconds
+        self.sql_poll_interval_seconds = sql_poll_interval_seconds
+        self.sql_row_limit = sql_row_limit
+        self.sql_byte_limit = sql_byte_limit
         self.session = requests.Session()
         self.session.headers.update(
             {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -26,12 +46,18 @@ class DatabricksClient:
     def request(
         self, method: str, path: str, body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        for attempt in range(7):
+        for attempt in range(self.api_retry_attempts):
             response = self.session.request(
-                method, f"{self.host}{path}", json=body, timeout=120
+                method,
+                f"{self.host}{path}",
+                json=body,
+                timeout=self.api_timeout_seconds,
             )
-            if response.status_code in {429, 500, 502, 503, 504} and attempt < 6:
-                time.sleep(min(2**attempt, 20))
+            if (
+                response.status_code in {429, 500, 502, 503, 504}
+                and attempt < self.api_retry_attempts - 1
+            ):
+                time.sleep(min(2**attempt, self.api_retry_max_delay_seconds))
                 continue
             if not response.ok:
                 raise RuntimeError(
@@ -107,17 +133,17 @@ def execute_sql(
         {
             "warehouse_id": warehouse_id,
             "statement": statement,
-            "wait_timeout": "50s",
+            "wait_timeout": f"{client.sql_wait_timeout_seconds}s",
             "on_wait_timeout": "CONTINUE",
             "format": "JSON_ARRAY",
             "disposition": "INLINE",
-            "row_limit": 100000,
-            "byte_limit": 25000000,
+            "row_limit": client.sql_row_limit,
+            "byte_limit": client.sql_byte_limit,
         },
     )
     statement_id = response["statement_id"]
     while response.get("status", {}).get("state") not in TERMINAL_STATES:
-        time.sleep(3)
+        time.sleep(client.sql_poll_interval_seconds)
         response = client.request("GET", f"/api/2.0/sql/statements/{statement_id}")
     status = response.get("status", {})
     if status.get("state") != "SUCCEEDED":
@@ -274,25 +300,104 @@ def stop_if_previously_stopped(
         client.request("POST", f"/api/2.0/sql/warehouses/{warehouse_id}/stop")
 
 
+def _load_config(path: str | None) -> dict[str, Any]:
+    config_path = (
+        Path(path).expanduser()
+        if path
+        else Path(__file__).resolve().parents[1] / "config" / "deployment.json"
+    )
+    try:
+        value = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Cannot read deployment configuration {config_path}: {error}") from error
+    if not isinstance(value, dict):
+        raise ValueError(f"Deployment configuration root must be an object: {config_path}")
+    return value
+
+
+def _config_value(config: dict[str, Any], path: str) -> Any:
+    value: Any = config
+    for segment in path.split("."):
+        if not isinstance(value, dict) or segment not in value:
+            return None
+        value = value[segment]
+    return value
+
+
+def _positive_setting(
+    command_value: int | None,
+    env_name: str,
+    config: dict[str, Any],
+    config_path: str,
+) -> int:
+    value: Any = command_value
+    if value is None:
+        value = os.getenv(env_name)
+    if value is None:
+        value = _config_value(config, config_path)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            f"Set --{env_name.lower().replace('_', '-')} or configure '{config_path}' as a positive integer."
+        ) from error
+    if parsed < 1:
+        raise ValueError(f"{env_name} must be greater than zero.")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config-path", default=os.getenv("DEPLOYMENT_CONFIG_PATH"))
     parser.add_argument("--source-host", required=True)
     parser.add_argument("--target-host", required=True)
     parser.add_argument("--source-catalog", required=True)
     parser.add_argument("--target-catalog", required=True)
     parser.add_argument("--source-warehouse-id", required=True)
     parser.add_argument("--target-warehouse-id", required=True)
-    parser.add_argument("--batch-size", type=int, default=500)
-    return parser.parse_args()
+    parser.add_argument("--batch-size", type=int)
+    parser.add_argument("--api-timeout-seconds", type=int)
+    parser.add_argument("--api-retry-attempts", type=int)
+    parser.add_argument("--api-retry-max-delay-seconds", type=int)
+    parser.add_argument("--sql-wait-timeout-seconds", type=int)
+    parser.add_argument("--sql-poll-interval-seconds", type=int)
+    parser.add_argument("--sql-row-limit", type=int)
+    parser.add_argument("--sql-byte-limit", type=int)
+    args = parser.parse_args()
+    config = _load_config(args.config_path)
+    settings = {
+        "batch_size": ("DATABRICKS_REPLICATION_BATCH_SIZE", "databricks.replicationBatchSize"),
+        "api_timeout_seconds": ("DATABRICKS_API_TIMEOUT_SECONDS", "databricks.apiTimeoutSeconds"),
+        "api_retry_attempts": ("DATABRICKS_API_RETRY_ATTEMPTS", "databricks.apiRetryAttempts"),
+        "api_retry_max_delay_seconds": ("DATABRICKS_API_RETRY_MAX_DELAY_SECONDS", "databricks.apiRetryMaxDelaySeconds"),
+        "sql_wait_timeout_seconds": ("DATABRICKS_SQL_WAIT_TIMEOUT_SECONDS", "databricks.sqlWaitTimeoutSeconds"),
+        "sql_poll_interval_seconds": ("DATABRICKS_SQL_POLL_INTERVAL_SECONDS", "databricks.sqlPollIntervalSeconds"),
+        "sql_row_limit": ("DATABRICKS_SQL_ROW_LIMIT", "databricks.sqlRowLimit"),
+        "sql_byte_limit": ("DATABRICKS_SQL_BYTE_LIMIT", "databricks.sqlByteLimit"),
+    }
+    for attribute, (env_name, config_path) in settings.items():
+        setattr(
+            args,
+            attribute,
+            _positive_setting(getattr(args, attribute), env_name, config, config_path),
+        )
+    return args
 
 
 def main() -> None:
     args = parse_args()
-    if args.batch_size < 1:
-        raise ValueError("--batch-size must be greater than zero.")
     token = azure_cli_token()
-    source = DatabricksClient(args.source_host, token)
-    target = DatabricksClient(args.target_host, token)
+    client_options = {
+        "api_timeout_seconds": args.api_timeout_seconds,
+        "api_retry_attempts": args.api_retry_attempts,
+        "api_retry_max_delay_seconds": args.api_retry_max_delay_seconds,
+        "sql_wait_timeout_seconds": args.sql_wait_timeout_seconds,
+        "sql_poll_interval_seconds": args.sql_poll_interval_seconds,
+        "sql_row_limit": args.sql_row_limit,
+        "sql_byte_limit": args.sql_byte_limit,
+    }
+    source = DatabricksClient(args.source_host, token, **client_options)
+    target = DatabricksClient(args.target_host, token, **client_options)
     source_state = source.request(
         "GET", f"/api/2.0/sql/warehouses/{args.source_warehouse_id}"
     )["state"]

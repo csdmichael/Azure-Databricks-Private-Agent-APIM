@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "api/**"
+      - "config/deployment.json"
       - "scripts/build_m365_packages.py"
       - "scripts/requirements-dev.txt"
       - ".github/workflows/deploy-api.yml"
@@ -19,8 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AZURE_RESOURCE_GROUP: m365-myaacoub
-  API_APP_NAME: databricks-agents-api-my
+  DEPLOYMENT_CONFIG_PATH: config/deployment.json
 
 jobs:
   build-and-deploy:
@@ -28,6 +28,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Load deployment configuration
+        shell: bash
+        run: |
+          api_app_name=$(jq -r '.appService.apiAppName' "$DEPLOYMENT_CONFIG_PATH")
+          foundry_account=$(jq -r '.foundry.application.accountName' "$DEPLOYMENT_CONFIG_PATH")
+          foundry_project=$(jq -r '.foundry.application.projectName' "$DEPLOYMENT_CONFIG_PATH")
+          {
+            echo "DEPLOYMENT_CONFIG_PATH=$GITHUB_WORKSPACE/$DEPLOYMENT_CONFIG_PATH"
+            echo "AZURE_RESOURCE_GROUP=$(jq -r '.azure.resourceGroup' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "API_APP_NAME=$api_app_name"
+            echo "UI_APP_NAME=$(jq -r '.appService.uiAppName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "PUBLIC_API_URL=https://${api_app_name}.azurewebsites.net"
+            echo "FOUNDRY_PROJECT_ENDPOINT=https://${foundry_account}.services.ai.azure.com/api/projects/${foundry_project}"
+            echo "APIM_BASE_URL=$(jq -r '.apim.gatewayUrl' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_WORKSPACE_URL=$(jq -r '.databricks.workspaceUrl' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "GITHUB_REPO_URL=$(jq -r '.api.githubRepoUrl' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "TEAMS_APP_ID_NAMESPACE=$(jq -r '.api.teamsAppIdNamespace' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_CATALOG=$(jq -r '.databricks.catalog' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_SCHEMA=$(jq -r '.databricks.schema' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_SQL_FOUNDRY_AGENT_NAME=$(jq -r '.api.agents.sqlFoundryName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DATABRICKS_GENIE_FOUNDRY_AGENT_NAME=$(jq -r '.api.agents.genieFoundryName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "API_TITLE=$(jq -r '.api.title' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "API_VERSION=$(jq -r '.api.version' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "API_CONTACT_NAME=$(jq -r '.api.contactName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "API_LICENSE_NAME=$(jq -r '.api.licenseName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "REQUEST_TIMEOUT_SECONDS=$(jq -r '.api.requestTimeoutSeconds' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "JOB_TTL_SECONDS=$(jq -r '.api.jobTtlSeconds' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "MAX_JOBS=$(jq -r '.api.maxJobs' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "CHAT_JOB_WORKERS=$(jq -r '.api.chatJobWorkers' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "MAX_MCP_APPROVAL_ROUNDS=$(jq -r '.foundry.maxMcpApprovalRounds' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "TEAMS_MANIFEST_VERSION=$(jq -r '.api.teamsManifestVersion' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "DECLARATIVE_AGENT_VERSION=$(jq -r '.api.declarativeAgentVersion' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "PLUGIN_SCHEMA_VERSION=$(jq -r '.api.pluginSchemaVersion' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "M365_DEVELOPER_NAME=$(jq -r '.api.m365DeveloperName' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "M365_APP_VERSION=$(jq -r '.api.m365AppVersion' "$DEPLOYMENT_CONFIG_PATH")"
+            echo "M365_NAME_SUFFIX=$(jq -r '.api.m365NameSuffix' "$DEPLOYMENT_CONFIG_PATH")"
+          } >> "$GITHUB_ENV"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -71,6 +109,47 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Apply API application settings
+        run: |
+          ui_host=$(az staticwebapp show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$UI_APP_NAME" \
+            --query defaultHostname \
+            --output tsv)
+          configured_origins=$(jq -r '.api.corsAllowOrigins | join(",")' "$DEPLOYMENT_CONFIG_PATH")
+          cors_origins="https://${ui_host},${configured_origins}"
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$API_APP_NAME" \
+            --settings \
+              "PUBLIC_API_URL=$PUBLIC_API_URL" \
+              "FOUNDRY_PROJECT_ENDPOINT=$FOUNDRY_PROJECT_ENDPOINT" \
+              "APIM_BASE_URL=$APIM_BASE_URL" \
+              "DATABRICKS_WORKSPACE_URL=$DATABRICKS_WORKSPACE_URL" \
+              "GITHUB_REPO_URL=$GITHUB_REPO_URL" \
+              "TEAMS_APP_ID_NAMESPACE=$TEAMS_APP_ID_NAMESPACE" \
+              "DATABRICKS_CATALOG=$DATABRICKS_CATALOG" \
+              "DATABRICKS_SCHEMA=$DATABRICKS_SCHEMA" \
+              "DATABRICKS_SQL_FOUNDRY_AGENT_NAME=$DATABRICKS_SQL_FOUNDRY_AGENT_NAME" \
+              "DATABRICKS_GENIE_FOUNDRY_AGENT_NAME=$DATABRICKS_GENIE_FOUNDRY_AGENT_NAME" \
+              "API_TITLE=$API_TITLE" \
+              "API_VERSION=$API_VERSION" \
+              "API_CONTACT_NAME=$API_CONTACT_NAME" \
+              "API_LICENSE_NAME=$API_LICENSE_NAME" \
+              "CORS_ALLOW_ORIGINS=$cors_origins" \
+              "REQUEST_TIMEOUT_SECONDS=$REQUEST_TIMEOUT_SECONDS" \
+              "JOB_TTL_SECONDS=$JOB_TTL_SECONDS" \
+              "MAX_JOBS=$MAX_JOBS" \
+              "CHAT_JOB_WORKERS=$CHAT_JOB_WORKERS" \
+              "MAX_MCP_APPROVAL_ROUNDS=$MAX_MCP_APPROVAL_ROUNDS" \
+              "TEAMS_MANIFEST_VERSION=$TEAMS_MANIFEST_VERSION" \
+              "DECLARATIVE_AGENT_VERSION=$DECLARATIVE_AGENT_VERSION" \
+              "PLUGIN_SCHEMA_VERSION=$PLUGIN_SCHEMA_VERSION" \
+              "M365_DEVELOPER_NAME=$M365_DEVELOPER_NAME" \
+              "M365_APP_VERSION=$M365_APP_VERSION" \
+              "M365_NAME_SUFFIX=$M365_NAME_SUFFIX" \
+            --output none
 
       - name: Deploy to App Service
         run: |

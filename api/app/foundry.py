@@ -14,9 +14,6 @@ from .observability import configure_observability
 
 logger = logging.getLogger(__name__)
 
-# A turn can pause several times waiting for MCP tool approval.
-MAX_APPROVAL_ROUNDS = 8
-
 
 @dataclass
 class GeneratedFile:
@@ -36,7 +33,7 @@ class AgentReply:
 class FoundryChat:
     """Creates agent-scoped OpenAI clients lazily and caches them per agent."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_approval_rounds: int | None = None) -> None:
         # Reentrant: _agent_client holds the lock while calling _ensure_project.
         self._lock = threading.RLock()
         self._credential: DefaultAzureCredential | None = None
@@ -44,6 +41,13 @@ class FoundryChat:
         self._agent_clients: dict[str, object] = {}
         self._agent_references: dict[str, dict[str, str]] = {}
         self._files_client = None
+        self._max_approval_rounds = (
+            max_approval_rounds
+            if max_approval_rounds is not None
+            else get_settings().max_mcp_approval_rounds
+        )
+        if self._max_approval_rounds < 1:
+            raise ValueError("max_approval_rounds must be a positive integer")
 
     def _ensure_project(self) -> AIProjectClient:
         if self._project is None:
@@ -118,7 +122,7 @@ class FoundryChat:
         texts: list[str] = []
         payload: object = message
 
-        for _ in range(MAX_APPROVAL_ROUNDS):
+        for _ in range(self._max_approval_rounds):
             response = client.responses.create(
                 conversation=conversation_id,
                 input=payload,
@@ -145,7 +149,7 @@ class FoundryChat:
                 for item in approvals
             ]
         else:
-            logger.warning("Stopped after %d approval rounds", MAX_APPROVAL_ROUNDS)
+            logger.warning("Stopped after %d approval rounds", self._max_approval_rounds)
 
         # The same file is cited once per reference; keep the first of each id.
         unique_files = list({file.file_id: file for file in files}.values())

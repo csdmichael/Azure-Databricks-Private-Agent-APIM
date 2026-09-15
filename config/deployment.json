@@ -16,7 +16,13 @@
     "sourceSchemaToken": "arrow_semiconductor",
     "genieSpaceTitle": "Arrow Semiconductor Analytics",
     "apiTimeoutSeconds": 120,
-    "sqlWaitTimeoutSeconds": 50
+    "apiRetryAttempts": 7,
+    "apiRetryMaxDelaySeconds": 20,
+    "sqlWaitTimeoutSeconds": 50,
+    "sqlPollIntervalSeconds": 3,
+    "sqlRowLimit": 100000,
+    "sqlByteLimit": 25000000,
+    "replicationBatchSize": 500
   },
   "apim": {
     "serviceName": "caldova-apim-westus",
@@ -26,6 +32,7 @@
     "sourceApiId": "databricks",
     "mcpDisplayName": "Databricks MCP",
     "mcpPath": "databricks-mcp",
+    "genieMcpPath": "databricks-genie-mcp",
     "productId": "databricks-agents",
     "databricksResourceId": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d",
     "rateLimits": {
@@ -42,7 +49,10 @@
   "foundry": {
     "application": {
       "accountName": "002-ai-poc-private",
-      "projectName": "proj-default"
+      "projectName": "proj-default",
+      "modelDeploymentName": "gpt-4.1",
+      "sqlConnectionName": "databricks-apim-mcp",
+      "genieConnectionName": "databricks-apim-genie-mcp"
     },
     "original": {
       "accountName": "foundry-myaacoub",
@@ -79,8 +89,19 @@
     "healthTimeoutSeconds": 900
   },
   "api": {
+    "title": "Databricks Agents API",
+    "version": "1.0.0",
+    "contactName": "Michael Yaacoub - Sr Solution Engineer, Microsoft",
+    "licenseName": "MIT",
     "githubRepoUrl": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM",
     "teamsAppIdNamespace": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM/m365/",
+    "m365DeveloperName": "Michael Yaacoub",
+    "m365AppVersion": "1.0.0",
+    "m365NameSuffix": "(POC)",
+    "agents": {
+      "sqlFoundryName": "databricks-agent-mcp",
+      "genieFoundryName": "databricks-genie-agent"
+    },
     "corsAllowOrigins": [
       "http://localhost:4200",
       "http://localhost:8100"
@@ -138,6 +159,8 @@
     "cosmosRequestTimeoutMs": 4000,
     "cosmosMaxRetryAttempts": 1,
     "cosmosMaxRetryWaitSeconds": 2,
+    "cosmosQueryPageSize": 1000,
+    "cosmosMaxRows": 100000,
     "logAnalyticsWorkspaceId": "b41e5454-7d6c-4764-ba87-fa8174e71e1c",
     "logAnalyticsResourceId": "/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Insights/components/caldova-genie-obo-insights",
     "logAnalyticsQueryTimeoutMs": 20000,

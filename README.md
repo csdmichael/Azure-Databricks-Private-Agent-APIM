@@ -26,6 +26,7 @@ the data path traverses the public internet.
 - [Current environment](#current-environment)
 - [Address plan](#address-plan)
 - [Repository layout](#repository-layout)
+- [Configuration](#configuration)
 - [Deploy](#deploy)
 - [Setup walkthrough](#setup-walkthrough)
   - [1. Power Platform managed environment](#1-power-platform-managed-environment)
@@ -193,6 +194,7 @@ geo: environment `{Environment Id}` is `canada`, so the VNets are
 
 | Path | Purpose |
 |---|---|
+| [config/deployment.json](config/deployment.json) | Non-secret deployment names, IDs, URLs, regions, network ranges, runtime limits, and display metadata |
 | [terraform](terraform) | VNet-injected Databricks workspace, NSGs, private DNS zone, private endpoints |
 | [bicep/apim-private](bicep/apim-private) | APIM StandardV2, VNet, gateway private endpoint, peering to Databricks |
 | [bicep/foundry-private](bicep/foundry-private) | Foundry with public portal ingress, private Agent Service egress, private endpoint, DNS, and validation runbook |
@@ -218,10 +220,43 @@ to the target catalog at run time.
 
 ---
 
+## Configuration
+
+[config/deployment.json](config/deployment.json) is the source of truth for non-secret,
+environment-specific values used by PowerShell, local Python tooling, runtime app
+settings, and GitHub Actions. Create a separate copy for another environment and pass it
+to PowerShell with `-ConfigPath`; explicit command parameters override the selected file.
+
+```powershell
+./scripts/deploy-infra.ps1 -ConfigPath ./config/deployment.production.json -Step all
+```
+
+Bicep templates contain required parameters instead of live resource defaults. Their
+companion `.bicepparam` files are environment configuration and can contain non-secret
+resource names, IDs, regions, CIDRs, SKUs, limits, and metadata. Values known only at run
+time, such as the Genie space ID, use `readEnvironmentVariable(...)` or an explicit
+deployment argument. APIM policies read environment values through named values created
+by Bicep; policies retain only protocol constants such as HTTP status codes, fixed
+Microsoft audiences, and API paths.
+
+Deployed Python, Node.js, and Azure Functions code reads environment variables. The
+deployment scripts translate `deployment.json` into App Service or Function settings;
+the Python API also reads the JSON directly for local source-checkout development.
+Credentials, subscription keys, tokens, certificates, and client secrets never belong in
+the JSON or `.bicepparam` files. Keep them in GitHub Secrets, Key Vault, managed identity,
+or short-lived process memory.
+
+Generated files are not configuration authorities. Regenerate compiled ARM JSON from
+its Bicep source, connector definitions through their creation scripts, and TypeScript
+`dist` output through `npm run build`. Terraform state records deployed values and must
+not be edited as source configuration.
+
+---
+
 ## Deploy
 
 ```powershell
-az login --tenant Caldova37587778.onmicrosoft.com
+az login --tenant <tenant-id>
 ./scripts/deploy-infra.ps1 -Step all
 ```
 

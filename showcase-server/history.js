@@ -11,10 +11,17 @@ function historyFilter(query, now = new Date()) {
   return { ...range, outcome, user: user.trim().toLowerCase() };
 }
 
-function buildQuery(range, resourceId) {
+function positiveInteger(env, name) {
+  const value = Number(env[name]);
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer`);
+  return value;
+}
+
+function buildQuery(range, resourceId, queryMaxResults) {
   if (!/^\/subscriptions\/[a-f0-9-]+\/resourceGroups\/[\w.-]+\/providers\/Microsoft.Insights\/components\/[\w.-]+$/i.test(resourceId ?? '')) {
     throw new Error('LOG_ANALYTICS_RESOURCE_ID must identify the OBO Application Insights resource');
   }
+  if (!Number.isSafeInteger(queryMaxResults) || queryMaxResults < 1) throw new Error('Invalid Log Analytics result limit');
   return `AppTraces
 | where TimeGenerated >= datetime(${range.start}) and TimeGenerated < datetime(${range.end}) + 1d
 | where _ResourceId =~ '${resourceId}'
@@ -23,7 +30,7 @@ function buildQuery(range, resourceId) {
 | where tostring(audit.event) in ('genie_request', 'genie_token_exchange')
 | project timestamp=TimeGenerated, event=tostring(audit.event), source=tostring(audit.source), correlationId=tostring(audit.correlationId), stage=tostring(audit.stage), outcome=tostring(audit.outcome), status=toint(audit.status), userId=tostring(audit.userId), user=tostring(audit.user), operation=tostring(audit.operation), method=tostring(audit.method), durationMs=todouble(audit.durationMs), code=tostring(audit.code), invocationId=tostring(audit.invocationId)
 | order by timestamp desc
-| take 10001`;
+| take ${queryMaxResults}`;
 }
 
 function groupHistory(events, filter) {
@@ -58,21 +65,23 @@ function groupHistory(events, filter) {
 }
 
 function historyStore(env, credential = new ManagedIdentityCredential(), request = fetch) {
+  const queryTimeoutMs = positiveInteger(env, 'LOG_ANALYTICS_QUERY_TIMEOUT_MS');
+  const queryMaxResults = positiveInteger(env, 'LOG_ANALYTICS_QUERY_MAX_RESULTS');
   return {
     async read(filter) {
       if (!/^[a-f0-9-]{36}$/i.test(env.LOG_ANALYTICS_WORKSPACE_ID ?? '')) throw new Error('Log workspace is not configured');
-      const kql = buildQuery(filter, env.LOG_ANALYTICS_RESOURCE_ID);
+      const kql = buildQuery(filter, env.LOG_ANALYTICS_RESOURCE_ID, queryMaxResults);
       const token = await credential.getToken('https://api.loganalytics.io/.default');
       const response = await request(`https://api.loganalytics.io/v1/workspaces/${env.LOG_ANALYTICS_WORKSPACE_ID}/query`, {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000),
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(queryTimeoutMs),
         headers: { Authorization: `Bearer ${token.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: kql }),
       });
       if (!response.ok) throw new Error('Log query unavailable');
       const data = await response.json();
       if (data.error || !Array.isArray(data.tables) || !data.tables[0]) throw new Error('Incomplete log query');
       const table = data.tables[0];
-      if (table.rows.length > 10000) {
-        const error = new Error('More than 10,000 events. Select a shorter date range.');
+      if (table.rows.length >= queryMaxResults) {
+        const error = new Error(`At least ${queryMaxResults.toLocaleString()} events matched. Select a shorter date range.`);
         error.status = 422;
         throw error;
       }

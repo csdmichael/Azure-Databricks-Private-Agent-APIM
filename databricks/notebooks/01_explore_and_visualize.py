@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # Arrow-style Semiconductor POC — Data & Visualizations
 # MAGIC
-# MAGIC This notebook explores the `caldova_dbx_westus2.arrow_semiconductor` sample dataset and
+# MAGIC This notebook explores the configured Unity Catalog sample dataset and
 # MAGIC renders the charts that Copilot Studio / Foundry agents reproduce in PowerPoint.
 # MAGIC
 # MAGIC **Prerequisite:** run `databricks/sql/01_create_and_load.sql` first
@@ -12,10 +12,18 @@
 
 # COMMAND ----------
 
-CATALOG = "caldova_dbx_westus2"
-SCHEMA = "arrow_semiconductor"
-spark.sql(f"USE CATALOG {CATALOG}")
-spark.sql(f"USE SCHEMA {SCHEMA}")
+dbutils.widgets.text("catalog", "", "Unity Catalog")
+dbutils.widgets.text("schema", "", "Schema")
+CATALOG = dbutils.widgets.get("catalog").strip()
+SCHEMA = dbutils.widgets.get("schema").strip()
+if not CATALOG or not SCHEMA:
+  raise ValueError("Set the catalog and schema notebook parameters before running.")
+
+def quote_identifier(value):
+  return f"`{value.replace('`', '``')}`"
+
+spark.sql(f"USE CATALOG {quote_identifier(CATALOG)}")
+spark.sql(f"USE SCHEMA {quote_identifier(SCHEMA)}")
 print(f"Using {CATALOG}.{SCHEMA}")
 display(spark.sql("SHOW TABLES"))
 

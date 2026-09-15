@@ -24,12 +24,13 @@ function clientIp(request, behindAzure) {
   return normalizeIp(chain.split(',').at(-1));
 }
 
-function createVisit(ip, path, lookup, now = new Date()) {
+function createVisit(ip, path, lookup, ttlSeconds, now = new Date()) {
+  if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1) throw new Error('Visit TTL must be a positive integer.');
   const location = ip ? lookup(ip) : null;
   return {
     id: randomUUID(), day: now.toISOString().slice(0, 10), timestamp: now.toISOString(),
     ip, country: location?.country || 'Unknown', state: location?.region || 'Unknown',
-    city: location?.city || 'Unknown', path, ttl: 90 * 24 * 60 * 60,
+    city: location?.city || 'Unknown', path, ttl: ttlSeconds,
   };
 }
 

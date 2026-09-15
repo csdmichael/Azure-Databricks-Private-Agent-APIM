@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { normalizeIp, clientIp, createVisit, parseRange, summarize, isStatsAdmin } = require('../analytics');
+const visitTtlSeconds = 7776000;
 
 test('bundled GeoIP database resolves locally without a network service', () => {
   const geoip = require('geoip-lite');
@@ -22,10 +23,10 @@ test('canonicalizes public addresses and ignores forged leading proxy headers', 
 
 test('counts distinct IPs across the range, not sums of daily or location uniques', () => {
   const visits = [
-    createVisit('8.8.8.8', '/', () => ({ country: 'US', region: 'CA', city: 'Mountain View' }), new Date('2026-08-31T23:00:00Z')),
-    createVisit('8.8.8.8', '/showcase', () => ({ country: 'CA', region: 'ON', city: 'Toronto' }), new Date('2026-09-01T01:00:00Z')),
-    createVisit('1.1.1.1', '/', () => null, new Date('2026-09-01T02:00:00Z')),
-    createVisit(null, '/', () => null, new Date('2026-09-01T03:00:00Z')),
+    createVisit('8.8.8.8', '/', () => ({ country: 'US', region: 'CA', city: 'Mountain View' }), visitTtlSeconds, new Date('2026-08-31T23:00:00Z')),
+    createVisit('8.8.8.8', '/showcase', () => ({ country: 'CA', region: 'ON', city: 'Toronto' }), visitTtlSeconds, new Date('2026-09-01T01:00:00Z')),
+    createVisit('1.1.1.1', '/', () => null, visitTtlSeconds, new Date('2026-09-01T02:00:00Z')),
+    createVisit(null, '/', () => null, visitTtlSeconds, new Date('2026-09-01T03:00:00Z')),
   ];
   const range = parseRange({ start: '2026-08-31', end: '2026-09-02', period: 'day' }, new Date('2026-09-11'));
   const result = summarize(visits, range);

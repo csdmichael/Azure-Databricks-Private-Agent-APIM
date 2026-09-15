@@ -50,14 +50,17 @@ request limit. Chat is therefore asynchronous:
 """
 
 app = FastAPI(
-    title="Databricks Agents API",
+    title=settings.api_title,
     description=DESCRIPTION,
-    version="1.0.0",
+    version=settings.api_version,
     contact={
-        "name": "Michael Yaacoub — Sr Solution Engineer, Microsoft",
+        "name": settings.api_contact_name,
         "url": settings.github_repo_url,
     },
-    license_info={"name": "MIT", "url": f"{settings.github_repo_url}/blob/main/LICENSE"},
+    license_info={
+        "name": settings.api_license_name,
+        "url": f"{settings.github_repo_url}/blob/main/LICENSE",
+    },
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

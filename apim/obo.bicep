@@ -133,5 +133,6 @@ resource operationPolicy 'Microsoft.ApiManagement/service/apis/operations/polici
   parent: operation[index]
   name: 'policy'
   properties: { format: 'rawxml', value: item.policy }
+  dependsOn: [namedValues]
 }]
 output apiUrl string = 'https://${apimServiceName}.azure-api.net/databricks-genie-obo'

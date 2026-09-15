@@ -7,8 +7,9 @@ agent package that can be uploaded to the Microsoft 365 developer portal.
 from dataclasses import dataclass, field
 from uuid import NAMESPACE_URL, uuid5
 
-# Stable per-agent Teams app ids, derived so they never change between builds.
-_APP_ID_NAMESPACE = "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM/m365/"
+from .config import get_settings
+
+_settings = get_settings()
 
 
 @dataclass(frozen=True)
@@ -31,12 +32,12 @@ class AgentDefinition:
 
     @property
     def teams_app_id(self) -> str:
-        return str(uuid5(NAMESPACE_URL, _APP_ID_NAMESPACE + self.id))
+        return str(uuid5(NAMESPACE_URL, _settings.teams_app_id_namespace + self.id))
 
 
 DATABRICKS_SQL_AGENT = AgentDefinition(
     id="databricks-sql",
-    foundry_agent_name="databricks-agent-mcp",
+    foundry_agent_name=_settings.sql_foundry_agent_name,
     display_name="Databricks SQL Agent",
     short_name="Databricks SQL",
     tagline="Deterministic SQL over the private warehouse",
@@ -69,7 +70,7 @@ DATABRICKS_SQL_AGENT = AgentDefinition(
         "You are a semiconductor business analytics agent for an Arrow-style chip "
         "manufacturer. Use the Databricks actions for every numeric or factual claim "
         "about company data, and only issue read-only SELECT or SHOW statements against "
-        "the schema caldova_dbx_westus2.arrow_semiconductor.\n\n"
+        f"the schema {_settings.databricks_namespace}.\n\n"
         "Tables available: product_sales (revenue, units, gross margin by region, fiscal "
         "quarter, product family), fab_production (wafer starts, good dies, yield by fab "
         "and process node), wafer_yield (actual versus target yield by month and node), "
@@ -84,14 +85,14 @@ DATABRICKS_SQL_AGENT = AgentDefinition(
     plugin_description_human="Query the private Azure Databricks semiconductor dataset.",
     plugin_description_model=(
         "Runs read-only SQL statements against the Azure Databricks warehouse and lists "
-        "the available tables in caldova_dbx_westus2.arrow_semiconductor."
+        f"the available tables in {_settings.databricks_namespace}."
     ),
     openapi_operations=["runQuery", "listTables"],
 )
 
 DATABRICKS_GENIE_AGENT = AgentDefinition(
     id="databricks-genie",
-    foundry_agent_name="databricks-genie-agent",
+    foundry_agent_name=_settings.genie_foundry_agent_name,
     display_name="Databricks Genie Agent",
     short_name="Genie",
     tagline="Natural-language analytics with AI/BI Genie",
@@ -124,7 +125,7 @@ DATABRICKS_GENIE_AGENT = AgentDefinition(
     m365_instructions=(
         "You are a semiconductor business analytics agent that answers questions using "
         "Databricks AI/BI Genie, curated over the schema "
-        "caldova_dbx_westus2.arrow_semiconductor.\n\n"
+        f"{_settings.databricks_namespace}.\n\n"
         "Genie is asynchronous, so always follow this loop: call the ask action with the "
         "user's question, then poll the message action with the returned conversationId and "
         "messageId until status is COMPLETED. Read the answer from attachments[].text.content "
