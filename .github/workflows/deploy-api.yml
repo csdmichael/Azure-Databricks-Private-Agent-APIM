@@ -45,6 +45,10 @@ jobs:
         working-directory: api
         run: python -c "from app.main import app; print(len(app.routes), 'routes')"
 
+      - name: Run API tests
+        working-directory: api
+        run: python -m unittest discover -s tests -v
+
       - name: Build and validate Microsoft 365 agent packages
         run: python scripts/build_m365_packages.py
 

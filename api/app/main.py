@@ -22,9 +22,11 @@ from .config import get_settings
 from .foundry import foundry_chat
 from .jobs import job_store
 from .m365 import build_openapi, build_package, package_files
+from .observability import configure_observability
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+configure_observability()
 
 settings = get_settings()
 

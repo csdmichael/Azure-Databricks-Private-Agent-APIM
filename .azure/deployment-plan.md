@@ -2,11 +2,13 @@
 
 Status: Validated
 
-Current scope: activate the existing Showcase Node analytics/history runtime using
-the dedicated IISNode entry point and automatic package rollback. User requested
-continuation of pending tasks after approving rollback-protected activation.
-Use -SkipInfrastructure -SkipBuild after current tests/build pass. No new
-infrastructure, identity grants or network changes. Prior OBO evidence retained.
+Current scope: enable logging and agent tracing for `foundry-myaacoub/proj-default`
+and `foundry-myaacoub-private/sales-poc`. Reuse the existing workspace-based
+`caldova-genie-obo-insights` component and `caldova-apim-logs-westus` workspace.
+Add shared account-level Application Insights connections, project diagnostics,
+and the trace-reading roles approved by the user. Instrument the Python caller with
+OpenTelemetry while keeping prompt/output content recording disabled. Validate
+with one agent invocation per project and Application Insights trace queries.
 
 ## Approval and Context
 
@@ -103,6 +105,54 @@ Stats record limits bound query work. Entra client secrets remain in App Service
 settings and memory, not source, command output or deployment artifacts.
 
 ## Section 7: Validation Proof
+
+2026-09-14 Foundry observability preflight:
+- Confirmed target: subscription `ME-Caldova37587778-myaacoub-1`
+	(`cf824570-a8ba-497a-a184-0a52f1830aa9`), resource group
+	`m365-myaacoub`; both Foundry accounts are in West US. The user approved the
+	target and the four trace-reading role assignments.
+- `validate-deployment.ps1 -Scope group -ResourceGroup m365-myaacoub
+	-Template bicep/foundry-observability/main.bicep -Subscription
+	cf824570-a8ba-497a-a184-0a52f1830aa9`: OVERALL PASS. Azure CLI,
+	authentication, Bicep compilation and ARM validation passed. What-if reports
+	Create 11, Modify 0, Delete 0.
+- `.venv/Scripts/python.exe -m unittest discover -s tests -v`: 2 tests passed.
+	`from app.main import app` imported successfully with 14 routes. The tests
+	verify content recording and baggage are disabled and every Responses API call
+	carries the Foundry agent name/ID reference needed for trace attribution.
+- `az bicep lint --file bicep/foundry-observability/main.bicep`: passed. Bicep,
+	Python and test editor diagnostics report no errors.
+- Static RBAC review: `proj-default` and `sales-poc` system identities receive
+	Log Analytics Reader and Privileged Monitoring Data Reader only at the existing
+	`caldova-genie-obo-insights` component scope. IDs are deterministic; no broad
+	scope, write permission, or new identity is introduced. This matches the
+	Microsoft Foundry Application Insights connection sample.
+- Azure Policy review: Azure CLI confirmed the approved tenant/subscription and
+	returned zero policy assignments at or inherited by the target resource-group
+	scope (`az policy assignment list --disable-scope-strict-match true`). No Deny,
+	DenyAction, Modify or DeployIfNotExists rule applies to the four connection,
+	diagnostic-setting or role-assignment resource types. Azure Policy MCP could
+	not query this tenant because its server credential was issued by a different
+	tenant; the authenticated local CLI was used instead and made no changes.
+- Deployment `foundry-observability` succeeded at
+	`2026-09-15T03:40:30Z`. The first attempt exposed a duplicate project-level
+	connection conflict because account-level shared connections are inherited by
+	projects. Both SDK telemetry lookups succeeded through the inherited links, so
+	the redundant declarations were removed; the corrected deployment completed
+	without deleting or replacing any resource.
+- Live verification: both projects expose one `AppInsights` connection targeting
+	`caldova-genie-obo-insights`. Both project diagnostic settings enable `allLogs`
+	and `AllMetrics` to `caldova-apim-logs-westus`. Each project identity has both
+	approved trace-reader roles at the Application Insights component scope.
+- Runtime trace test: `test-agent:1` in `foundry-myaacoub/proj-default` and
+	`semiconductor-sales:5` in `foundry-myaacoub-private/sales-poc` each returned
+	`TRACE_OK`. Application Insights returned eight successful `create_conversation`,
+	`invoke_agent` and `chat` spans across the two conversation IDs, including model
+	metadata for `gpt-6-astra-2026-09-03` and `gpt-5.6-sol-2026-07-09`.
+- Runtime logging test: `AzureDiagnostics` reported 217 recent records for
+	`foundry-myaacoub` and 11 for `foundry-myaacoub-private`, with current
+	`RequestResponse`, `Audit` and `AzureOpenAIRequestUsage` categories as applicable.
+	Queries projected only operational metadata; trace content recording remained off.
 
 2026-09-12 nine-video Showcase refresh:
 - User added `08. Updating Agent with OBO Flow.mp4`, renamed the prior business
@@ -245,6 +295,22 @@ for each item and responsive desktop/mobile checks. Analytics stays inactive.
 	- [x] Core Validation (CLI, auth, build, validate, what-if)
 	- [x] Local compilation, tests and Bicep linting
 	- [x] Azure Policy Validation
+
+- [x] All validation checks pass (Foundry observability scope)
+	- [x] Core Validation (CLI, auth, Bicep build, ARM validation and what-if)
+	- [x] Python import/tests and Bicep linting
+	- [x] Azure Policy Validation
+
+2026-09-14 Foundry observability scope: user approved subscription
+`ME-Caldova37587778-myaacoub-1` (`cf824570-a8ba-497a-a184-0a52f1830aa9`), resource
+group `m365-myaacoub`, and both trace-reading role assignments. Reuse existing
+resources only; no new billable component, network exposure or account replacement.
+Expected ARM changes are two shared Application Insights connections, two project
+diagnostic settings and four scoped role assignments. Runtime acceptance requires
+both projects to expose an AppInsights connection, SDK telemetry lookup to succeed,
+account/project diagnostics to target the shared workspace, and fresh agent traces
+to appear after a real invocation. Trace content and binary-data recording remain
+disabled to avoid storing prompts, responses, tool arguments or generated files.
 
 2026-09-12 private broker: azure-validate validate-deployment.ps1 -Scope group
 -ResourceGroup m365-myaacoub -Template bicep/genie-obo/main.bicep

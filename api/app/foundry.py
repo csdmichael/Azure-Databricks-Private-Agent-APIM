@@ -10,6 +10,7 @@ from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
 from .config import get_settings
+from .observability import configure_observability
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class FoundryChat:
         self._credential: DefaultAzureCredential | None = None
         self._project: AIProjectClient | None = None
         self._agent_clients: dict[str, object] = {}
+        self._agent_references: dict[str, dict[str, str]] = {}
         self._files_client = None
 
     def _ensure_project(self) -> AIProjectClient:
@@ -52,6 +54,7 @@ class FoundryChat:
                         endpoint=get_settings().foundry_project_endpoint,
                         credential=self._credential,
                     )
+                    configure_observability(self._project)
         return self._project
 
     def _agent_client(self, agent_name: str):
@@ -60,7 +63,14 @@ class FoundryChat:
             with self._lock:
                 client = self._agent_clients.get(agent_name)
                 if client is None:
-                    client = self._ensure_project().get_openai_client(agent_name=agent_name)
+                    project = self._ensure_project()
+                    agent = project.agents.get(agent_name)
+                    self._agent_references[agent_name] = {
+                        "name": agent.name,
+                        "id": agent.versions.latest.id,
+                        "type": "agent_reference",
+                    }
+                    client = project.get_openai_client(agent_name=agent_name)
                     self._agent_clients[agent_name] = client
         return client
 
@@ -109,7 +119,11 @@ class FoundryChat:
         payload: object = message
 
         for _ in range(MAX_APPROVAL_ROUNDS):
-            response = client.responses.create(conversation=conversation_id, input=payload)
+            response = client.responses.create(
+                conversation=conversation_id,
+                input=payload,
+                extra_body={"agent_reference": self._agent_references[agent_name]},
+            )
             self._collect(response, tool_calls, files, texts)
 
             # The agents are configured with require_approval="never", but the

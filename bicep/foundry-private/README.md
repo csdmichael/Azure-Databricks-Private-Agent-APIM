@@ -92,6 +92,14 @@ az vm deallocate -g m365-myaacoub -n caldova-jump
 The test fails unless Foundry and APIM resolve to private IP addresses and the
 agent response contains a completed, error-free MCP call.
 
+## Logging and tracing
+
+The shared observability deployment connects this project and the original
+`foundry-myaacoub/proj-default` project to the existing Application Insights and
+Log Analytics resources. It also enables project diagnostics and trace-reading
+RBAC. See [../foundry-observability/README.md](../foundry-observability/README.md)
+for deployment and verification commands.
+
 ## Verified state
 
 On 2026-09-14:

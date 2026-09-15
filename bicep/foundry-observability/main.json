@@ -1,0 +1,189 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.47.16.16243",
+      "templateHash": "17440403853277626168"
+    }
+  },
+  "parameters": {
+    "originalFoundryAccountName": {
+      "type": "string",
+      "defaultValue": "foundry-myaacoub",
+      "metadata": {
+        "description": "Name of the original Microsoft Foundry account."
+      }
+    },
+    "originalProjectName": {
+      "type": "string",
+      "defaultValue": "proj-default",
+      "metadata": {
+        "description": "Name of the project in the original Microsoft Foundry account."
+      }
+    },
+    "privateFoundryAccountName": {
+      "type": "string",
+      "defaultValue": "foundry-myaacoub-private",
+      "metadata": {
+        "description": "Name of the private-egress Microsoft Foundry account."
+      }
+    },
+    "privateProjectName": {
+      "type": "string",
+      "defaultValue": "sales-poc",
+      "metadata": {
+        "description": "Name of the project in the private-egress Microsoft Foundry account."
+      }
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string",
+      "defaultValue": "caldova-apim-logs-westus",
+      "metadata": {
+        "description": "Name of the existing Log Analytics workspace that receives Foundry diagnostics."
+      }
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "defaultValue": "caldova-genie-obo-insights",
+      "metadata": {
+        "description": "Name of the existing workspace-based Application Insights component used for agent traces."
+      }
+    }
+  },
+  "variables": {
+    "traceReaderRoleDefinitionIds": [
+      "73c42c96-874c-492b-b04d-ab87d138a893",
+      "dbc9c667-e97f-4491-aee6-90b9cf960190"
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CognitiveServices/accounts/connections",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('originalFoundryAccountName'), parameters('applicationInsightsName'))]",
+      "properties": {
+        "category": "AppInsights",
+        "target": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "authType": "ApiKey",
+        "isSharedToAll": true,
+        "credentials": {
+          "key": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+        },
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/connections",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('privateFoundryAccountName'), parameters('applicationInsightsName'))]",
+      "properties": {
+        "category": "AppInsights",
+        "target": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "authType": "ApiKey",
+        "isSharedToAll": true,
+        "credentials": {
+          "key": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+        },
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+        }
+      }
+    },
+    {
+      "copy": {
+        "name": "originalProjectTraceReaders",
+        "count": "[length(variables('traceReaderRoleDefinitionIds'))]"
+      },
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+      "name": "[guid(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('originalFoundryAccountName'), parameters('originalProjectName')), variables('traceReaderRoleDefinitionIds')[copyIndex()])]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('originalFoundryAccountName'), parameters('originalProjectName')), '2025-06-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('traceReaderRoleDefinitionIds')[copyIndex()])]"
+      }
+    },
+    {
+      "copy": {
+        "name": "privateProjectTraceReaders",
+        "count": "[length(variables('traceReaderRoleDefinitionIds'))]"
+      },
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+      "name": "[guid(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('privateFoundryAccountName'), parameters('privateProjectName')), variables('traceReaderRoleDefinitionIds')[copyIndex()])]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('privateFoundryAccountName'), parameters('privateProjectName')), '2025-06-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('traceReaderRoleDefinitionIds')[copyIndex()])]"
+      }
+    },
+    {
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('originalFoundryAccountName'), parameters('originalProjectName'))]",
+      "name": "[format('{0}-{1}-logs', parameters('originalFoundryAccountName'), parameters('originalProjectName'))]",
+      "properties": {
+        "workspaceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true
+          }
+        ],
+        "metrics": [
+          {
+            "category": "AllMetrics",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('privateFoundryAccountName'), parameters('privateProjectName'))]",
+      "name": "[format('{0}-{1}-logs', parameters('privateFoundryAccountName'), parameters('privateProjectName'))]",
+      "properties": {
+        "workspaceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true
+          }
+        ],
+        "metrics": [
+          {
+            "category": "AllMetrics",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+    },
+    "applicationInsightsId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+    },
+    "originalProjectId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('originalFoundryAccountName'), parameters('originalProjectName'))]"
+    },
+    "privateProjectId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('privateFoundryAccountName'), parameters('privateProjectName'))]"
+    }
+  }
+}
