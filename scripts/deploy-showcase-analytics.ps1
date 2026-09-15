@@ -7,7 +7,7 @@ param(
     [string] $TenantId,
     [string[]] $AdminObjectIds,
     [string] $ApplicationDisplayName,
-    [string] $DeploymentName = 'showcase-analytics',
+    [string] $DeploymentName,
     [string] $ArtifactDirectory,
     [string] $NodeVersion = '~24',
     [int] $CredentialLifetimeMonths = 6,
@@ -23,8 +23,17 @@ param(
     [Nullable[int]] $LogAnalyticsQueryTimeoutMs,
     [Nullable[int]] $LogAnalyticsQueryMaxResults,
     [Nullable[int]] $AnalyticsTtlSeconds,
+    [string] $Location,
+    [string] $CosmosNamePrefix,
+    [string] $PrivateEndpointSubnetName,
     [string] $DatabricksVnetName,
     [string] $IntegrationSubnetName,
+    [string] $IntegrationSubnetCidr,
+    [string] $CosmosConsistencyLevel,
+    [Nullable[bool]] $CosmosZoneRedundant,
+    [Nullable[int]] $BackupIntervalInMinutes,
+    [Nullable[int]] $BackupRetentionInHours,
+    [string] $BackupStorageRedundancy,
     [Nullable[int]] $HealthTimeoutSeconds,
     [int] $ManagementRequestTimeoutSeconds = 60,
     [int] $RollbackDownloadTimeoutSeconds = 120,
@@ -49,6 +58,7 @@ $AppName = Get-ConfigValue -Config $config -Path 'showcase.appName' -Override $A
 $TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
 $AdminObjectIds = @(Get-ConfigValue -Config $config -Path 'showcase.adminObjectIds' -Override $AdminObjectIds)
 $ApplicationDisplayName = Get-ConfigValue -Config $config -Path 'showcase.applicationDisplayName' -Override $ApplicationDisplayName
+$DeploymentName = Get-ConfigValue -Config $config -Path 'deployments.showcaseAnalyticsName' -Override $DeploymentName
 $CosmosDatabase = Get-ConfigValue -Config $config -Path 'showcase.cosmosDatabase' -Override $CosmosDatabase
 $CosmosContainer = Get-ConfigValue -Config $config -Path 'showcase.cosmosContainer' -Override $CosmosContainer
 $CosmosRequestTimeoutMs = [int](Get-ConfigValue -Config $config -Path 'showcase.cosmosRequestTimeoutMs' -Override $CosmosRequestTimeoutMs)
@@ -61,8 +71,17 @@ $LogAnalyticsResourceId = Get-ConfigValue -Config $config -Path 'showcase.logAna
 $LogAnalyticsQueryTimeoutMs = [int](Get-ConfigValue -Config $config -Path 'showcase.logAnalyticsQueryTimeoutMs' -Override $LogAnalyticsQueryTimeoutMs)
 $LogAnalyticsQueryMaxResults = [int](Get-ConfigValue -Config $config -Path 'showcase.logAnalyticsQueryMaxResults' -Override $LogAnalyticsQueryMaxResults)
 $AnalyticsTtlSeconds = [int](Get-ConfigValue -Config $config -Path 'showcase.analyticsTtlSeconds' -Override $AnalyticsTtlSeconds)
+$Location = Get-ConfigValue -Config $config -Path 'network.databricksLocation' -Override $Location
+$CosmosNamePrefix = Get-ConfigValue -Config $config -Path 'showcase.cosmosNamePrefix' -Override $CosmosNamePrefix
+$PrivateEndpointSubnetName = Get-ConfigValue -Config $config -Path 'network.privateEndpointSubnetName' -Override $PrivateEndpointSubnetName
 $DatabricksVnetName = Get-ConfigValue -Config $config -Path 'network.databricksVnetName' -Override $DatabricksVnetName
 $IntegrationSubnetName = Get-ConfigValue -Config $config -Path 'network.genieOboIntegrationSubnetName' -Override $IntegrationSubnetName
+$IntegrationSubnetCidr = Get-ConfigValue -Config $config -Path 'network.showcaseIntegrationSubnetCidr' -Override $IntegrationSubnetCidr
+$CosmosConsistencyLevel = Get-ConfigValue -Config $config -Path 'showcase.cosmosConsistencyLevel' -Override $CosmosConsistencyLevel
+$CosmosZoneRedundant = [bool](Get-ConfigValue -Config $config -Path 'showcase.cosmosZoneRedundant' -Override $CosmosZoneRedundant)
+$BackupIntervalInMinutes = [int](Get-ConfigValue -Config $config -Path 'showcase.backupIntervalInMinutes' -Override $BackupIntervalInMinutes)
+$BackupRetentionInHours = [int](Get-ConfigValue -Config $config -Path 'showcase.backupRetentionInHours' -Override $BackupRetentionInHours)
+$BackupStorageRedundancy = Get-ConfigValue -Config $config -Path 'showcase.backupStorageRedundancy' -Override $BackupStorageRedundancy
 $HealthTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'appService.healthTimeoutSeconds' -Override $HealthTimeoutSeconds)
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -112,7 +131,19 @@ if (-not $SkipInfrastructure) {
         $password = Invoke-RestMethod -Method POST -Headers @{ Authorization = "Bearer $graphToken" } -ContentType 'application/json' -Uri "https://graph.microsoft.com/v1.0/applications/$($registration.id)/addPassword" -Body (@{ passwordCredential = @{ displayName = "$ApplicationDisplayName EasyAuth"; endDateTime = [DateTime]::UtcNow.AddMonths($CredentialLifetimeMonths).ToString('o') } } | ConvertTo-Json)
         Set-AppSettings @{ SHOWCASE_AUTH_CLIENT_SECRET = $password.secretText; ENTRA_TENANT_ID = $TenantId; STATS_ADMIN_OBJECT_IDS = ($AdminObjectIds -join ','); WEBSITE_NODE_DEFAULT_VERSION = $NodeVersion }
     } finally { $graphToken = $null; $password = $null }
-    $deployment = Invoke-AzJson @('deployment', 'group', 'create', '-g', $ResourceGroup, '-n', $DeploymentName, '-f', "$root/bicep/showcase-analytics/main.bicep", '-p', "webPrincipalId=$($identity.principalId)", "authClientId=$($registration.appId)", "webAppName=$AppName", "tenantId=$TenantId")
+    $deployment = Invoke-AzJson @(
+        'deployment', 'group', 'create', '-g', $ResourceGroup, '-n', $DeploymentName,
+        '-f', "$root/bicep/showcase-analytics/main.bicep", '-p',
+        "location=$Location", "webAppName=$AppName", "webPrincipalId=$($identity.principalId)",
+        "authClientId=$($registration.appId)", "tenantId=$TenantId", "cosmosNamePrefix=$CosmosNamePrefix",
+        "vnetName=$DatabricksVnetName", "privateEndpointSubnetName=$PrivateEndpointSubnetName",
+        "integrationSubnetName=$IntegrationSubnetName", "integrationSubnetCidr=$IntegrationSubnetCidr",
+        "cosmosDatabaseName=$CosmosDatabase", "cosmosContainerName=$CosmosContainer",
+        "analyticsTtlSeconds=$AnalyticsTtlSeconds", "cosmosConsistencyLevel=$CosmosConsistencyLevel",
+        "cosmosZoneRedundant=$($CosmosZoneRedundant.ToString().ToLowerInvariant())",
+        "backupIntervalInMinutes=$BackupIntervalInMinutes", "backupRetentionInHours=$BackupRetentionInHours",
+        "backupStorageRedundancy=$BackupStorageRedundancy"
+    )
 }
 if (-not $SkipInfrastructure -or $ResumeConfiguration) {
     $deployment = Invoke-AzJson @('deployment', 'group', 'show', '-g', $ResourceGroup, '-n', $DeploymentName)

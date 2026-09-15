@@ -4,45 +4,135 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.41.2.15936",
-      "templateHash": "6753510996890023305"
+      "version": "0.47.16.16243",
+      "templateHash": "13841933219061983643"
     }
   },
   "parameters": {
     "location": {
       "type": "string",
-      "defaultValue": "westus2"
+      "metadata": {
+        "description": "Azure region for the analytics data resources."
+      }
     },
     "webAppName": {
       "type": "string",
-      "defaultValue": "caldova-databricks-showcase"
+      "metadata": {
+        "description": "Existing showcase web app name."
+      }
     },
     "webPrincipalId": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "Managed identity principal ID of the showcase web app."
+      }
     },
     "authClientId": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "Microsoft Entra application client ID used by App Service authentication."
+      }
     },
     "tenantId": {
       "type": "string",
-      "defaultValue": "[tenant().tenantId]"
+      "metadata": {
+        "description": "Microsoft Entra tenant ID used by App Service authentication."
+      }
     },
-    "cosmosName": {
+    "cosmosNamePrefix": {
       "type": "string",
-      "defaultValue": "[format('caldova-showcase-{0}', uniqueString(resourceGroup().id))]"
+      "minLength": 3,
+      "maxLength": 30,
+      "metadata": {
+        "description": "Prefix for the generated Cosmos DB account name. The resource group hash is appended."
+      }
     },
     "vnetName": {
       "type": "string",
-      "defaultValue": "caldova-dbx-vnet-westus2"
+      "metadata": {
+        "description": "Existing virtual network used by the showcase web app."
+      }
+    },
+    "privateEndpointSubnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing private endpoint subnet name."
+      }
+    },
+    "integrationSubnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Web app virtual network integration subnet name."
+      }
+    },
+    "integrationSubnetCidr": {
+      "type": "string",
+      "metadata": {
+        "description": "Address prefix for the web app integration subnet."
+      }
+    },
+    "cosmosDatabaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "Cosmos DB SQL database name."
+      }
+    },
+    "cosmosContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Cosmos DB SQL container name."
+      }
+    },
+    "analyticsTtlSeconds": {
+      "type": "int",
+      "minValue": -1,
+      "metadata": {
+        "description": "Default item time-to-live in seconds for analytics records."
+      }
+    },
+    "cosmosConsistencyLevel": {
+      "type": "string",
+      "metadata": {
+        "description": "Cosmos DB default consistency level."
+      }
+    },
+    "cosmosZoneRedundant": {
+      "type": "bool",
+      "metadata": {
+        "description": "Whether the Cosmos DB write region is zone redundant."
+      }
+    },
+    "backupIntervalInMinutes": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Periodic backup interval in minutes."
+      }
+    },
+    "backupRetentionInHours": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Periodic backup retention in hours."
+      }
+    },
+    "backupStorageRedundancy": {
+      "type": "string",
+      "metadata": {
+        "description": "Backup storage redundancy mode."
+      }
     }
+  },
+  "variables": {
+    "cosmosName": "[format('{0}-{1}', parameters('cosmosNamePrefix'), uniqueString(resourceGroup().id))]"
   },
   "resources": [
     {
       "type": "Microsoft.Network/virtualNetworks/subnets",
       "apiVersion": "2024-05-01",
-      "name": "[format('{0}/{1}', parameters('vnetName'), 'genie-obo-integration')]",
+      "name": "[format('{0}/{1}', parameters('vnetName'), parameters('integrationSubnetName'))]",
       "properties": {
-        "addressPrefix": "10.190.5.0/24",
+        "addressPrefix": "[parameters('integrationSubnetCidr')]",
         "delegations": [
           {
             "name": "web",
@@ -56,7 +146,7 @@
     {
       "type": "Microsoft.DocumentDB/databaseAccounts",
       "apiVersion": "2024-05-15",
-      "name": "[parameters('cosmosName')]",
+      "name": "[variables('cosmosName')]",
       "location": "[parameters('location')]",
       "kind": "GlobalDocumentDB",
       "properties": {
@@ -70,11 +160,11 @@
           {
             "locationName": "[parameters('location')]",
             "failoverPriority": 0,
-            "isZoneRedundant": false
+            "isZoneRedundant": "[parameters('cosmosZoneRedundant')]"
           }
         ],
         "consistencyPolicy": {
-          "defaultConsistencyLevel": "Session"
+          "defaultConsistencyLevel": "[parameters('cosmosConsistencyLevel')]"
         },
         "publicNetworkAccess": "Disabled",
         "disableLocalAuth": true,
@@ -82,9 +172,9 @@
         "backupPolicy": {
           "type": "Periodic",
           "periodicModeProperties": {
-            "backupIntervalInMinutes": 480,
-            "backupRetentionIntervalInHours": 24,
-            "backupStorageRedundancy": "Local"
+            "backupIntervalInMinutes": "[parameters('backupIntervalInMinutes')]",
+            "backupRetentionIntervalInHours": "[parameters('backupRetentionInHours')]",
+            "backupStorageRedundancy": "[parameters('backupStorageRedundancy')]"
           }
         }
       }
@@ -92,23 +182,23 @@
     {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', parameters('cosmosName'), 'showcase-analytics')]",
+      "name": "[format('{0}/{1}', variables('cosmosName'), parameters('cosmosDatabaseName'))]",
       "properties": {
         "resource": {
-          "id": "showcase-analytics"
+          "id": "[parameters('cosmosDatabaseName')]"
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]"
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]"
       ]
     },
     {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}/{2}', parameters('cosmosName'), 'showcase-analytics', 'visits')]",
+      "name": "[format('{0}/{1}/{2}', variables('cosmosName'), parameters('cosmosDatabaseName'), parameters('cosmosContainerName'))]",
       "properties": {
         "resource": {
-          "id": "visits",
+          "id": "[parameters('cosmosContainerName')]",
           "partitionKey": {
             "paths": [
               "/day"
@@ -116,7 +206,7 @@
             "kind": "Hash",
             "version": 2
           },
-          "defaultTtl": 7776000,
+          "defaultTtl": "[parameters('analyticsTtlSeconds')]",
           "indexingPolicy": {
             "automatic": true,
             "indexingMode": "consistent",
@@ -134,21 +224,21 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('cosmosName'), 'showcase-analytics')]"
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosName'), parameters('cosmosDatabaseName'))]"
       ]
     },
     {
       "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
       "apiVersion": "2024-05-15",
-      "name": "[format('{0}/{1}', parameters('cosmosName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')), parameters('webPrincipalId'), 'showcase-data'))]",
+      "name": "[format('{0}/{1}', variables('cosmosName'), guid(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName')), parameters('webPrincipalId'), 'showcase-data'))]",
       "properties": {
         "principalId": "[parameters('webPrincipalId')]",
-        "roleDefinitionId": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')))]",
-        "scope": "[format('{0}/dbs/showcase-analytics', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')))]"
+        "roleDefinitionId": "[format('{0}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002', resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName')))]",
+        "scope": "[format('{0}/dbs/{1}', resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName')), parameters('cosmosDatabaseName'))]"
       },
       "dependsOn": [
-        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]",
-        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', parameters('cosmosName'), 'showcase-analytics')]"
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosName'), parameters('cosmosDatabaseName'))]"
       ]
     },
     {
@@ -160,7 +250,7 @@
     {
       "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
       "apiVersion": "2024-06-01",
-      "name": "[format('{0}/{1}', 'privatelink.documents.azure.com', 'showcase-analytics')]",
+      "name": "[format('{0}/{1}', 'privatelink.documents.azure.com', parameters('cosmosDatabaseName'))]",
       "location": "global",
       "properties": {
         "registrationEnabled": false,
@@ -175,17 +265,17 @@
     {
       "type": "Microsoft.Network/privateEndpoints",
       "apiVersion": "2024-05-01",
-      "name": "showcase-analytics-cosmos-pe",
+      "name": "[format('{0}-cosmos-pe', parameters('cosmosDatabaseName'))]",
       "location": "[parameters('location')]",
       "properties": {
         "subnet": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('privateEndpointSubnetName'))]"
         },
         "privateLinkServiceConnections": [
           {
             "name": "cosmos",
             "properties": {
-              "privateLinkServiceId": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]",
+              "privateLinkServiceId": "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]",
               "groupIds": [
                 "Sql"
               ]
@@ -194,13 +284,13 @@
         ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName'))]"
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName'))]"
       ]
     },
     {
       "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
       "apiVersion": "2024-05-01",
-      "name": "[format('{0}/{1}', 'showcase-analytics-cosmos-pe', 'default')]",
+      "name": "[format('{0}/{1}', format('{0}-cosmos-pe', parameters('cosmosDatabaseName')), 'default')]",
       "properties": {
         "privateDnsZoneConfigs": [
           {
@@ -212,7 +302,7 @@
         ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Network/privateEndpoints', 'showcase-analytics-cosmos-pe')]",
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-cosmos-pe', parameters('cosmosDatabaseName')))]",
         "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.documents.azure.com')]"
       ]
     },
@@ -235,7 +325,7 @@
             "registration": {
               "clientId": "[parameters('authClientId')]",
               "clientSecretSettingName": "SHOWCASE_AUTH_CLIENT_SECRET",
-              "openIdIssuer": "[format('https://login.microsoftonline.com/{0}/v2.0', parameters('tenantId'))]"
+              "openIdIssuer": "[format('{0}{1}/v2.0', environment().authentication.loginEndpoint, parameters('tenantId'))]"
             },
             "validation": {
               "allowedAudiences": [
@@ -259,15 +349,15 @@
   "outputs": {
     "cosmosEndpoint": {
       "type": "string",
-      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosName')), '2024-05-15').documentEndpoint]"
+      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosName')), '2024-05-15').documentEndpoint]"
     },
     "cosmosAccountName": {
       "type": "string",
-      "value": "[parameters('cosmosName')]"
+      "value": "[variables('cosmosName')]"
     },
     "subnetId": {
       "type": "string",
-      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'genie-obo-integration')]"
+      "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('integrationSubnetName'))]"
     }
   }
 }

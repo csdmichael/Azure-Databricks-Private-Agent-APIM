@@ -35,6 +35,13 @@
     "genieMcpPath": "databricks-genie-mcp",
     "productId": "databricks-agents",
     "databricksResourceId": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d",
+    "databricksApiDisplayName": "Databricks SQL",
+    "databricksApiDescription": "Query the private Databricks warehouse through managed identity authentication.",
+    "genieApiDisplayName": "Databricks Genie",
+    "genieApiDescription": "Ask natural-language questions of Databricks data through AI/BI Genie.",
+    "productDisplayName": "Databricks Agents",
+    "productDescription": "APIs and MCP tools for agents over private Databricks.",
+    "subscriptionDisplayName": "Databricks Subscription",
     "rateLimits": {
       "databricksCalls": 60,
       "genieCalls": 30,
@@ -151,6 +158,7 @@
   "showcase": {
     "appName": "caldova-databricks-showcase",
     "applicationDisplayName": "Caldova Showcase Statistics",
+    "cosmosNamePrefix": "caldova-showcase",
     "adminObjectIds": [
       "715bb744-31d0-4f76-ac85-7193bcf5a4eb"
     ],
@@ -165,7 +173,12 @@
     "logAnalyticsResourceId": "/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Insights/components/caldova-genie-obo-insights",
     "logAnalyticsQueryTimeoutMs": 20000,
     "logAnalyticsQueryMaxResults": 10001,
-    "analyticsTtlSeconds": 7776000
+    "analyticsTtlSeconds": 7776000,
+    "cosmosConsistencyLevel": "Session",
+    "cosmosZoneRedundant": false,
+    "backupIntervalInMinutes": 480,
+    "backupRetentionInHours": 24,
+    "backupStorageRedundancy": "Local"
   },
   "github": {
     "repository": "csdmichael/Azure-Databricks-Private-Agent-APIM",
@@ -206,7 +219,8 @@
   "deployments": {
     "apimPrivateName": "caldova-apim-private",
     "apimLockdownName": "caldova-apim-private-lockdown",
-    "powerPlatformPrivateName": "caldova-power-platform-private"
+    "powerPlatformPrivateName": "caldova-power-platform-private",
+    "showcaseAnalyticsName": "showcase-analytics"
   },
   "tests": {
     "localApiBaseUrl": "http://127.0.0.1:8000",

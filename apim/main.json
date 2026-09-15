@@ -4,14 +4,13 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.41.2.15936",
-      "templateHash": "13143908969439119162"
+      "version": "0.47.16.16243",
+      "templateHash": "11270223820288897472"
     }
   },
   "parameters": {
     "apimServiceName": {
       "type": "string",
-      "defaultValue": "caldova-apim-westus",
       "metadata": {
         "description": "Existing API Management service name."
       }
@@ -30,31 +29,98 @@
     },
     "databricksCatalog": {
       "type": "string",
-      "defaultValue": "databricks_ws_ai_poc",
       "metadata": {
         "description": "Unity Catalog catalog exposed through the Databricks SQL API."
       }
     },
     "databricksSchema": {
       "type": "string",
-      "defaultValue": "arrow_semiconductor",
       "metadata": {
         "description": "Unity Catalog schema exposed through the Databricks SQL API."
       }
     },
     "genieSpaceId": {
       "type": "string",
-      "defaultValue": "",
+      "minLength": 1,
       "metadata": {
-        "description": "Databricks Genie space id (optional; set later if not ready)."
+        "description": "Databricks Genie space id."
+      }
+    },
+    "databricksRateLimitCalls": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Maximum Databricks SQL API calls allowed in each renewal period."
+      }
+    },
+    "genieRateLimitCalls": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Maximum Databricks Genie API calls allowed in each renewal period."
+      }
+    },
+    "rateLimitRenewalPeriodSeconds": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Rate-limit renewal period in seconds for the Databricks APIs."
+      }
+    },
+    "sqlWaitTimeout": {
+      "type": "string",
+      "metadata": {
+        "description": "Databricks SQL statement wait timeout, such as 50s."
+      }
+    },
+    "databricksApiDisplayName": {
+      "type": "string",
+      "metadata": {
+        "description": "Display name for the Databricks SQL API."
+      }
+    },
+    "databricksApiDescription": {
+      "type": "string",
+      "metadata": {
+        "description": "Description for the Databricks SQL API."
+      }
+    },
+    "genieApiDisplayName": {
+      "type": "string",
+      "metadata": {
+        "description": "Display name for the Databricks Genie API."
+      }
+    },
+    "genieApiDescription": {
+      "type": "string",
+      "metadata": {
+        "description": "Description for the Databricks Genie API."
+      }
+    },
+    "productDisplayName": {
+      "type": "string",
+      "metadata": {
+        "description": "Display name for the APIM product that groups the Databricks APIs."
+      }
+    },
+    "productDescription": {
+      "type": "string",
+      "metadata": {
+        "description": "Description for the APIM product that groups the Databricks APIs."
+      }
+    },
+    "subscriptionDisplayName": {
+      "type": "string",
+      "metadata": {
+        "description": "Display name for the product subscription."
       }
     }
   },
   "variables": {
-    "$fxv#0": "<!--\r\n  API-level policy for the Databricks API.\r\n  - Uses APIM's system-assigned managed identity to obtain an Entra token for the\r\n    Databricks login application, then forwards it as the backend Authorization.\r\n    (The APIM MI must be added as a user in the Databricks workspace with access\r\n    to the SQL warehouse and the databricks_ws_ai_poc.arrow_semiconductor schema.)\r\n  - Routes all operations to the private workspace control-plane URL.\r\n  - Applies a conservative rate limit for the POC.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"60\" renewal-period=\"60\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>\r\n",
-    "$fxv#1": "<!--\r\n  POST /query  ->  Databricks SQL Statement Execution API.\r\n  Consumers send only { \"statement\": \"SELECT ...\" }.\r\n  The warehouse id and execution options are injected server-side so the\r\n  warehouse stays an internal detail of the gateway.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-body>@{\r\n      var body = context.Request.Body.As<Newtonsoft.Json.Linq.JObject>(preserveContent: true);\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      if (body[\"wait_timeout\"] == null) { body[\"wait_timeout\"] = \"50s\"; }\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
-    "$fxv#2": "<!--\r\n  GET /tables  ->  lists the sample tables in the configured catalog and schema.\r\n  A fixed, safe read-only statement so agents can discover the schema.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-method>POST</set-method>\r\n    <set-body>@{\r\n      var body = new Newtonsoft.Json.Linq.JObject();\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      body[\"statement\"] = \"SHOW TABLES IN {{databricks-catalog}}.{{databricks-schema}}\";\r\n      body[\"wait_timeout\"] = \"50s\";\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n    <set-header name=\"Content-Type\" exists-action=\"override\">\r\n      <value>application/json</value>\r\n    </set-header>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
-    "$fxv#3": "<!--\r\n  API-level policy for the Databricks Genie (AI/BI) API.\r\n  Same managed-identity auth + private backend routing as the Databricks API.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"30\" renewal-period=\"60\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#0": "<!--\r\n  API-level policy for the Databricks API.\r\n  - Uses APIM's system-assigned managed identity to obtain an Entra token for the\r\n    Databricks login application, then forwards it as the backend Authorization.\r\n    (The APIM MI must be added as a user in the Databricks workspace with access\r\n    to the SQL warehouse and configured Unity Catalog schema.)\r\n  - Routes all operations to the private workspace control-plane URL.\r\n  - Applies a conservative rate limit for the POC.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"{{databricks-rate-limit-calls}}\" renewal-period=\"{{databricks-rate-limit-renewal-period}}\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend>\r\n    <base />\r\n  </backend>\r\n  <outbound>\r\n    <base />\r\n  </outbound>\r\n  <on-error>\r\n    <base />\r\n  </on-error>\r\n</policies>\r\n",
+    "$fxv#1": "<!--\r\n  POST /query  ->  Databricks SQL Statement Execution API.\r\n  Consumers send only { \"statement\": \"SELECT ...\" }.\r\n  The warehouse id and execution options are injected server-side so the\r\n  warehouse stays an internal detail of the gateway.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-body>@{\r\n      var body = context.Request.Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true);\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      if (body[\"wait_timeout\"] == null) { body[\"wait_timeout\"] = \"{{databricks-sql-wait-timeout}}\"; }\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#2": "<!--\r\n  GET /tables  ->  lists the sample tables in the configured catalog and schema.\r\n  A fixed, safe read-only statement so agents can discover the schema.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/sql/statements\" />\r\n    <set-method>POST</set-method>\r\n    <set-body>@{\r\n      var body = new Newtonsoft.Json.Linq.JObject();\r\n      body[\"warehouse_id\"] = \"{{databricks-warehouse-id}}\";\r\n      body[\"statement\"] = \"SHOW TABLES IN {{databricks-catalog}}.{{databricks-schema}}\";\r\n      body[\"wait_timeout\"] = \"{{databricks-sql-wait-timeout}}\";\r\n      body[\"on_wait_timeout\"] = \"CONTINUE\";\r\n      body[\"format\"] = \"JSON_ARRAY\";\r\n      body[\"disposition\"] = \"INLINE\";\r\n      return body.ToString();\r\n    }</set-body>\r\n    <set-header name=\"Content-Type\" exists-action=\"override\">\r\n      <value>application/json</value>\r\n    </set-header>\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
+    "$fxv#3": "<!--\r\n  API-level policy for the Databricks Genie (AI/BI) API.\r\n  Same managed-identity auth + private backend routing as the Databricks API.\r\n-->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rate-limit calls=\"{{genie-rate-limit-calls}}\" renewal-period=\"{{genie-rate-limit-renewal-period}}\" />\r\n    <authentication-managed-identity resource=\"2ff814a6-3304-4ab8-85cb-cd0e6f879c1d\"\r\n                                     output-token-variable-name=\"msi-access-token\" ignore-error=\"false\" />\r\n    <set-header name=\"Authorization\" exists-action=\"override\">\r\n      <value>@(\"Bearer \" + (string)context.Variables[\"msi-access-token\"])</value>\r\n    </set-header>\r\n    <set-backend-service base-url=\"{{databricks-workspace-url}}\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
     "$fxv#4": "<!-- POST /genie/ask : start a Genie conversation on the configured space. Body: { \"content\": \"natural-language question\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/start-conversation\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
     "$fxv#5": "<!-- POST /genie/conversations/{conversationId}/messages : ask a follow-up. Body: { \"content\": \"...\" } -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
     "$fxv#6": "<!-- GET /genie/conversations/{conversationId}/messages/{messageId}/result : fetch the SQL result Genie generated. -->\r\n<policies>\r\n  <inbound>\r\n    <base />\r\n    <rewrite-uri template=\"/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}/query-result\" />\r\n  </inbound>\r\n  <backend><base /></backend>\r\n  <outbound><base /></outbound>\r\n  <on-error><base /></on-error>\r\n</policies>\r\n",
@@ -107,7 +173,57 @@
       "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-genie-space-id')]",
       "properties": {
         "displayName": "databricks-genie-space-id",
-        "value": "[if(empty(parameters('genieSpaceId')), 'REPLACE_WITH_GENIE_SPACE_ID', parameters('genieSpaceId'))]",
+        "value": "[parameters('genieSpaceId')]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-rate-limit-calls')]",
+      "properties": {
+        "displayName": "databricks-rate-limit-calls",
+        "value": "[string(parameters('databricksRateLimitCalls'))]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-rate-limit-renewal-period')]",
+      "properties": {
+        "displayName": "databricks-rate-limit-renewal-period",
+        "value": "[string(parameters('rateLimitRenewalPeriodSeconds'))]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'genie-rate-limit-calls')]",
+      "properties": {
+        "displayName": "genie-rate-limit-calls",
+        "value": "[string(parameters('genieRateLimitCalls'))]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'genie-rate-limit-renewal-period')]",
+      "properties": {
+        "displayName": "genie-rate-limit-renewal-period",
+        "value": "[string(parameters('rateLimitRenewalPeriodSeconds'))]",
+        "secret": false
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/namedValues",
+      "apiVersion": "2023-09-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-sql-wait-timeout')]",
+      "properties": {
+        "displayName": "databricks-sql-wait-timeout",
+        "value": "[parameters('sqlWaitTimeout')]",
         "secret": false
       }
     },
@@ -116,8 +232,8 @@
       "apiVersion": "2023-09-01-preview",
       "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks')]",
       "properties": {
-        "displayName": "Databricks SQL",
-        "description": "[format('Query the private Databricks warehouse ({0}.{1} sample data).', parameters('databricksCatalog'), parameters('databricksSchema'))]",
+        "displayName": "[parameters('databricksApiDisplayName')]",
+        "description": "[parameters('databricksApiDescription')]",
         "path": "databricks",
         "protocols": [
           "https"
@@ -138,6 +254,8 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-rate-limit-calls')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-rate-limit-renewal-period')]",
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-workspace-url')]"
       ]
     },
@@ -157,7 +275,7 @@
               "examples": {
                 "default": {
                   "value": {
-                    "statement": "[format('SELECT region, ROUND(SUM(revenue_usd)/1e6,2) AS revenue_musd FROM {0}.{1}.product_sales GROUP BY region ORDER BY revenue_musd DESC', parameters('databricksCatalog'), parameters('databricksSchema'))]"
+                    "statement": "[format('SHOW TABLES IN {0}.{1}', parameters('databricksCatalog'), parameters('databricksSchema'))]"
                   }
                 }
               }
@@ -184,6 +302,7 @@
         "value": "[variables('$fxv#1')]"
       },
       "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-sql-wait-timeout')]",
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-warehouse-id')]",
         "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks', 'query')]"
       ]
@@ -193,10 +312,10 @@
       "apiVersion": "2023-09-01-preview",
       "name": "[format('{0}/{1}/{2}', parameters('apimServiceName'), 'databricks', 'tables')]",
       "properties": {
-        "displayName": "List sample tables",
+        "displayName": "List schema tables",
         "method": "GET",
         "urlTemplate": "/tables",
-        "description": "[format('Lists tables in {0}.{1}.', parameters('databricksCatalog'), parameters('databricksSchema'))]",
+        "description": "Lists tables in the configured Unity Catalog schema.",
         "responses": [
           {
             "statusCode": 200,
@@ -219,6 +338,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-catalog')]",
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-schema')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-sql-wait-timeout')]",
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-warehouse-id')]",
         "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'databricks', 'tables')]"
       ]
@@ -228,8 +348,8 @@
       "apiVersion": "2023-09-01-preview",
       "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-genie')]",
       "properties": {
-        "displayName": "Databricks Genie",
-        "description": "Ask natural-language questions of the Databricks data via AI/BI Genie.",
+        "displayName": "[parameters('genieApiDisplayName')]",
+        "description": "[parameters('genieApiDescription')]",
         "path": "databricks-genie",
         "protocols": [
           "https"
@@ -250,6 +370,8 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'databricks-genie')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'genie-rate-limit-calls')]",
+        "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'genie-rate-limit-renewal-period')]",
         "[resourceId('Microsoft.ApiManagement/service/namedValues', parameters('apimServiceName'), 'databricks-workspace-url')]"
       ]
     },
@@ -433,8 +555,8 @@
       "apiVersion": "2023-09-01-preview",
       "name": "[format('{0}/{1}', parameters('apimServiceName'), 'databricks-agents')]",
       "properties": {
-        "displayName": "Databricks Agents",
-        "description": "APIs and MCP tools for Foundry / Copilot Studio agents over private Databricks.",
+        "displayName": "[parameters('productDisplayName')]",
+        "description": "[parameters('productDescription')]",
         "subscriptionRequired": true,
         "approvalRequired": false,
         "state": "published"
@@ -470,7 +592,7 @@
       "name": "[format('{0}/{1}', parameters('apimServiceName'), 'DatabricksSubscription')]",
       "properties": {
         "allowTracing": false,
-        "displayName": "Databricks Subscription",
+        "displayName": "[parameters('subscriptionDisplayName')]",
         "scope": "[resourceId('Microsoft.ApiManagement/service/products', parameters('apimServiceName'), 'databricks-agents')]",
         "state": "active"
       },

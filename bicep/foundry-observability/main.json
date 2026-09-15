@@ -5,48 +5,42 @@
     "_generator": {
       "name": "bicep",
       "version": "0.47.16.16243",
-      "templateHash": "17440403853277626168"
+      "templateHash": "525340812203677444"
     }
   },
   "parameters": {
     "originalFoundryAccountName": {
       "type": "string",
-      "defaultValue": "foundry-myaacoub",
       "metadata": {
         "description": "Name of the original Microsoft Foundry account."
       }
     },
     "originalProjectName": {
       "type": "string",
-      "defaultValue": "proj-default",
       "metadata": {
         "description": "Name of the project in the original Microsoft Foundry account."
       }
     },
     "privateFoundryAccountName": {
       "type": "string",
-      "defaultValue": "foundry-myaacoub-private",
       "metadata": {
         "description": "Name of the private-egress Microsoft Foundry account."
       }
     },
     "privateProjectName": {
       "type": "string",
-      "defaultValue": "sales-poc",
       "metadata": {
         "description": "Name of the project in the private-egress Microsoft Foundry account."
       }
     },
     "logAnalyticsWorkspaceName": {
       "type": "string",
-      "defaultValue": "caldova-apim-logs-westus",
       "metadata": {
         "description": "Name of the existing Log Analytics workspace that receives Foundry diagnostics."
       }
     },
     "applicationInsightsName": {
       "type": "string",
-      "defaultValue": "caldova-genie-obo-insights",
       "metadata": {
         "description": "Name of the existing workspace-based Application Insights component used for agent traces."
       }

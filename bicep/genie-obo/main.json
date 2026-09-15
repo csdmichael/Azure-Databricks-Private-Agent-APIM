@@ -4,67 +4,167 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.41.2.15936",
-      "templateHash": "13429146456369756292"
+      "version": "0.47.16.16243",
+      "templateHash": "3877784071843922622"
     }
   },
   "parameters": {
     "location": {
       "type": "string",
-      "defaultValue": "westus2"
+      "metadata": {
+        "description": "Azure region for the function app and storage account."
+      }
     },
     "functionName": {
       "type": "string",
-      "defaultValue": "caldova-genie-obo-fn"
+      "metadata": {
+        "description": "Function app name for the delegated token broker."
+      }
     },
     "planName": {
       "type": "string",
-      "defaultValue": "caldova-showcase-plan"
+      "metadata": {
+        "description": "Existing App Service plan name."
+      }
     },
-    "storageName": {
+    "storageNamePrefix": {
       "type": "string",
-      "defaultValue": "[format('genieobo{0}', uniqueString(resourceGroup().id))]"
+      "minLength": 3,
+      "maxLength": 11,
+      "metadata": {
+        "description": "Prefix for the generated storage account name. The resource group hash is appended."
+      }
     },
     "vnetName": {
       "type": "string",
-      "defaultValue": "caldova-dbx-vnet-westus2"
+      "metadata": {
+        "description": "Existing virtual network used by the function app."
+      }
     },
     "apimVnetName": {
       "type": "string",
-      "defaultValue": "caldova-apim-westus-vnet"
+      "metadata": {
+        "description": "Existing API Management virtual network name."
+      }
     },
     "apimName": {
       "type": "string",
-      "defaultValue": "caldova-apim-westus"
+      "metadata": {
+        "description": "Existing API Management service name."
+      }
     },
     "insightsName": {
       "type": "string",
-      "defaultValue": "caldova-genie-obo-insights"
+      "metadata": {
+        "description": "Existing Application Insights component name."
+      }
     },
     "tenantId": {
       "type": "string",
-      "defaultValue": "[tenant().tenantId]"
+      "metadata": {
+        "description": "Microsoft Entra tenant ID used by the token broker."
+      }
     },
     "apiClientId": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "Application client ID for the token broker API."
+      }
     },
     "connectorClientId": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "Client application ID allowed to call the token broker."
+      }
     },
     "workspaceUrl": {
       "type": "string",
-      "defaultValue": "https://adb-7405616934814750.10.azuredatabricks.net"
+      "metadata": {
+        "description": "Private Databricks workspace URL."
+      }
+    },
+    "oboScope": {
+      "type": "string",
+      "metadata": {
+        "description": "Delegated OAuth scope required from callers."
+      }
+    },
+    "jwkFetchTimeoutMs": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Timeout in milliseconds for downloading Microsoft Entra signing keys."
+      }
+    },
+    "tokenExchangeTimeoutMs": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Timeout in milliseconds for the Databricks token exchange request."
+      }
+    },
+    "integrationSubnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Function app virtual network integration subnet name."
+      }
+    },
+    "privateEndpointSubnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Private endpoint subnet name."
+      }
+    },
+    "deploymentContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Blob container used for deployment packages."
+      }
+    },
+    "storageSkuName": {
+      "type": "string",
+      "metadata": {
+        "description": "Storage account SKU name."
+      }
+    },
+    "blobDeleteRetentionDays": {
+      "type": "int",
+      "minValue": 1,
+      "metadata": {
+        "description": "Blob soft-delete retention in days."
+      }
+    },
+    "functionsExtensionVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Functions extension version setting."
+      }
+    },
+    "nodeVersion": {
+      "type": "string",
+      "metadata": {
+        "description": "Node.js version setting for the function app."
+      }
+    },
+    "netFrameworkVersion": {
+      "type": "string",
+      "metadata": {
+        "description": ".NET Framework version setting used by the function host."
+      }
     }
+  },
+  "variables": {
+    "storageName": "[format('{0}{1}', parameters('storageNamePrefix'), uniqueString(resourceGroup().id))]"
   },
   "resources": [
     {
       "type": "Microsoft.Storage/storageAccounts",
       "apiVersion": "2023-05-01",
-      "name": "[parameters('storageName')]",
+      "name": "[variables('storageName')]",
       "location": "[parameters('location')]",
       "kind": "StorageV2",
       "sku": {
-        "name": "Standard_LRS"
+        "name": "[parameters('storageSkuName')]"
       },
       "properties": {
         "supportsHttpsTrafficOnly": true,
@@ -82,26 +182,26 @@
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices",
       "apiVersion": "2023-05-01",
-      "name": "[format('{0}/{1}', parameters('storageName'), 'default')]",
+      "name": "[format('{0}/{1}', variables('storageName'), 'default')]",
       "properties": {
         "deleteRetentionPolicy": {
           "enabled": true,
-          "days": 7
+          "days": "[parameters('blobDeleteRetentionDays')]"
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
       ]
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
       "apiVersion": "2023-05-01",
-      "name": "[format('{0}/{1}/{2}', parameters('storageName'), 'default', 'deployments')]",
+      "name": "[format('{0}/{1}/{2}', variables('storageName'), 'default', parameters('deploymentContainerName'))]",
       "properties": {
         "publicAccess": "None"
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageName'), 'default')]"
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageName'), 'default')]"
       ]
     },
     {
@@ -132,13 +232,13 @@
       "location": "[parameters('location')]",
       "properties": {
         "subnet": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('privateEndpointSubnetName'))]"
         },
         "privateLinkServiceConnections": [
           {
             "name": "blob",
             "properties": {
-              "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]",
+              "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]",
               "groupIds": [
                 "blob"
               ]
@@ -147,7 +247,7 @@
         ]
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
       ]
     },
     {
@@ -182,18 +282,18 @@
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]",
         "httpsOnly": true,
         "publicNetworkAccess": "Disabled",
-        "virtualNetworkSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'genie-obo-integration')]",
+        "virtualNetworkSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('integrationSubnetName'))]",
         "siteConfig": {
           "alwaysOn": true,
           "use32BitWorkerProcess": false,
           "ftpsState": "Disabled",
           "minTlsVersion": "1.2",
           "scmMinTlsVersion": "1.2",
-          "netFrameworkVersion": "v8.0",
+          "netFrameworkVersion": "[parameters('netFrameworkVersion')]",
           "appSettings": [
             {
               "name": "FUNCTIONS_EXTENSION_VERSION",
-              "value": "~4"
+              "value": "[parameters('functionsExtensionVersion')]"
             },
             {
               "name": "FUNCTIONS_WORKER_RUNTIME",
@@ -201,7 +301,7 @@
             },
             {
               "name": "WEBSITE_NODE_DEFAULT_VERSION",
-              "value": "~22"
+              "value": "[parameters('nodeVersion')]"
             },
             {
               "name": "WEBSITE_RUN_FROM_PACKAGE",
@@ -209,7 +309,7 @@
             },
             {
               "name": "AzureWebJobsStorage__accountName",
-              "value": "[parameters('storageName')]"
+              "value": "[variables('storageName')]"
             },
             {
               "name": "AzureWebJobsStorage__credential",
@@ -240,6 +340,18 @@
               "value": "[parameters('workspaceUrl')]"
             },
             {
+              "name": "OBO_SCOPE",
+              "value": "[parameters('oboScope')]"
+            },
+            {
+              "name": "JWK_FETCH_TIMEOUT_MS",
+              "value": "[string(parameters('jwkFetchTimeoutMs'))]"
+            },
+            {
+              "name": "TOKEN_EXCHANGE_TIMEOUT_MS",
+              "value": "[string(parameters('tokenExchangeTimeoutMs'))]"
+            },
+            {
               "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
               "value": "[reference(resourceId('Microsoft.Insights/components', parameters('insightsName')), '2020-02-02').ConnectionString]"
             }
@@ -247,14 +359,14 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
       ]
     },
     {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
-      "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]",
-      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageName')), resourceId('Microsoft.Web/sites', parameters('functionName')), 'host-blob-owner')]",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), resourceId('Microsoft.Web/sites', parameters('functionName')), 'host-blob-owner')]",
       "properties": {
         "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('functionName')), '2023-12-01', 'full').identity.principalId]",
         "principalType": "ServicePrincipal",
@@ -262,7 +374,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', parameters('functionName'))]",
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
       ]
     },
     {
@@ -319,7 +431,7 @@
       "location": "[parameters('location')]",
       "properties": {
         "subnet": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), 'private-endpoints')]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('privateEndpointSubnetName'))]"
         },
         "privateLinkServiceConnections": [
           {
@@ -372,11 +484,11 @@
     },
     "storageAccountName": {
       "type": "string",
-      "value": "[parameters('storageName')]"
+      "value": "[variables('storageName')]"
     },
     "deploymentContainerId": {
       "type": "string",
-      "value": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageName'), 'default', 'deployments')]"
+      "value": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('storageName'), 'default', parameters('deploymentContainerName'))]"
     }
   }
 }
