@@ -1,51 +1,51 @@
 @description('Azure region shared by the Foundry account and agent subnet.')
-param location string = 'westus'
+param location string
 
 @description('Name of the new private Microsoft Foundry account.')
-param foundryAccountName string = 'foundry-myaacoub-private'
+param foundryAccountName string
 
 @description('Inbound public network access for the Foundry portal and data-plane APIs.')
 @allowed([
   'Enabled'
   'Disabled'
 ])
-param publicNetworkAccess string = 'Enabled'
+param publicNetworkAccess string
 
 @description('Name of the Foundry project to create.')
-param projectName string = 'sales-poc'
+param projectName string
 
 @description('Name of the basic Agents capability host.')
-param projectCapabilityHostName string = 'caphostproj'
+param projectCapabilityHostName string
 
 @description('Name of the model deployment used by the migrated agent.')
-param modelDeploymentName string = 'gpt-6-astra'
+param modelDeploymentName string
 
 @description('Publisher model name used by the deployment.')
-param modelName string = 'gpt-6-astra'
+param modelName string
 
 @description('Publisher model version used by the deployment.')
-param modelVersion string = '2026-09-03'
+param modelVersion string
 
 @description('Model deployment SKU.')
-param modelSkuName string = 'GlobalStandard'
+param modelSkuName string
 
 @description('Model deployment capacity in thousands of tokens per minute.')
-param modelCapacity int = 500
+param modelCapacity int
 
 @description('Name of the existing virtual network that contains the private APIM endpoint.')
-param vnetName string = 'caldova-apim-westus-vnet'
+param vnetName string
 
 @description('Name of the peered virtual network that contains the private validation client.')
-param clientVnetName string = 'caldova-dbx-vnet-westus2'
+param clientVnetName string
 
 @description('Name of the existing subnet that hosts private endpoints.')
-param privateEndpointSubnetName string = 'private-endpoints'
+param privateEndpointSubnetName string
 
 @description('Name of the dedicated subnet used by Foundry Agent Service.')
-param agentSubnetName string = 'foundry-agent'
+param agentSubnetName string
 
 @description('Address prefix for the dedicated Foundry Agent Service subnet.')
-param agentSubnetPrefix string = '10.191.2.0/24'
+param agentSubnetPrefix string
 
 param tags object = {
   project: 'caldova-databricks-apim-private'

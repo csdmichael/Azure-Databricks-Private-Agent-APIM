@@ -1,0 +1,206 @@
+{
+  "azure": {
+    "subscriptionId": "cf824570-a8ba-497a-a184-0a52f1830aa9",
+    "tenantId": "12a4b86b-e64c-43f9-af05-d9130a72dfd2",
+    "resourceGroup": "m365-myaacoub"
+  },
+  "databricks": {
+    "workspaceUrl": "https://adb-7405616934814750.10.azuredatabricks.net",
+    "accountId": "b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0",
+    "warehouseId": "a3c7c9526aa58992",
+    "catalog": "caldova_dbx_westus2",
+    "schema": "arrow_semiconductor",
+    "warehouseName": "caldova-serverless-2xs",
+    "sampleWarehouseName": "poc-serverless-2xs",
+    "sourceCatalogToken": "databricks_ws_ai_poc",
+    "sourceSchemaToken": "arrow_semiconductor",
+    "genieSpaceTitle": "Arrow Semiconductor Analytics",
+    "apiTimeoutSeconds": 120,
+    "sqlWaitTimeoutSeconds": 50
+  },
+  "apim": {
+    "serviceName": "caldova-apim-westus",
+    "gatewayUrl": "https://caldova-apim-westus.azure-api.net",
+    "applicationId": "8f7e8889-3159-4a37-b816-1500a2e476ef",
+    "subscriptionName": "DatabricksSubscription",
+    "sourceApiId": "databricks",
+    "mcpDisplayName": "Databricks MCP",
+    "mcpPath": "databricks-mcp",
+    "productId": "databricks-agents",
+    "databricksResourceId": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d",
+    "rateLimits": {
+      "databricksCalls": 60,
+      "genieCalls": 30,
+      "oboCalls": 30,
+      "renewalPeriodSeconds": 60
+    },
+    "timeouts": {
+      "sqlWait": "50s",
+      "oboBrokerSeconds": 20
+    }
+  },
+  "foundry": {
+    "application": {
+      "accountName": "002-ai-poc-private",
+      "projectName": "proj-default"
+    },
+    "original": {
+      "accountName": "foundry-myaacoub",
+      "projectName": "proj-default"
+    },
+    "private": {
+      "accountName": "foundry-myaacoub-private",
+      "projectName": "sales-poc",
+      "agentName": "semiconductor-sales",
+      "modelDeploymentName": "gpt-6-astra",
+      "modelName": "gpt-6-astra",
+      "modelVersion": "2026-09-03",
+      "modelSkuName": "GlobalStandard",
+      "modelCapacity": 500,
+      "connectionName": "databricks-mcp",
+      "capabilityHostName": "caphostproj",
+      "publicNetworkAccess": "Enabled"
+    },
+    "maxMcpApprovalRounds": 8
+  },
+  "appService": {
+    "location": "westus2",
+    "planName": "plan-databricks-agents-poc",
+    "planSku": "F1",
+    "apiAppName": "databricks-agents-api-my",
+    "uiAppName": "databricks-agents-ui-my",
+    "staticWebAppSku": "Free",
+    "pythonRuntime": "PYTHON:3.12",
+    "containerStartTimeLimitSeconds": 600,
+    "gunicornWorkers": 1,
+    "gunicornThreads": 8,
+    "gunicornTimeoutSeconds": 600,
+    "gunicornBind": "0.0.0.0:8000",
+    "healthTimeoutSeconds": 900
+  },
+  "api": {
+    "githubRepoUrl": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM",
+    "teamsAppIdNamespace": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM/m365/",
+    "corsAllowOrigins": [
+      "http://localhost:4200",
+      "http://localhost:8100"
+    ],
+    "requestTimeoutSeconds": 300,
+    "jobTtlSeconds": 3600,
+    "maxJobs": 200,
+    "chatJobWorkers": 4,
+    "teamsManifestVersion": "1.29",
+    "declarativeAgentVersion": "v1.8",
+    "pluginSchemaVersion": "v2.4"
+  },
+  "powerPlatform": {
+    "connectorEnvironmentId": "52456fcd-1d20-ecdb-aa2e-8979e3f794f5",
+    "infrastructureEnvironmentId": "d35d1518-b911-ec93-b145-aec5290161f0",
+    "enterprisePolicyName": "caldova-pp-network-injection-canada",
+    "linkTimeoutSeconds": 900,
+    "environment": {
+      "displayName": "Caldova-US-Agents",
+      "domainName": "caldova-us-agents",
+      "sku": "Sandbox",
+      "location": "unitedstates",
+      "currencyCode": "USD",
+      "baseLanguage": 1033
+    },
+    "connectors": {
+      "genieName": "Databricks Genie (Private APIM)",
+      "directName": "Databricks Genie (Direct Private)",
+      "directApplicationId": "82bbdaca-f996-452d-89c2-49dee7456ebe",
+      "oboName": "Databricks Genie OBO Private",
+      "iconBrandColor": "#1B3139"
+    }
+  },
+  "obo": {
+    "apiClientId": "bdd127ff-fd4c-45f5-b553-ff77a7755161",
+    "connectorClientId": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
+    "allowedUserId": "715bb744-31d0-4f76-ac85-7193bcf5a4eb",
+    "apiDisplayName": "Caldova Genie OBO API",
+    "connectorDisplayName": "Caldova Genie OBO Connector",
+    "functionName": "caldova-genie-obo-fn",
+    "planName": "caldova-showcase-plan",
+    "jumpVmName": "caldova-jump",
+    "scope": "Genie.Access",
+    "jwkFetchTimeoutMs": 5000,
+    "tokenExchangeTimeoutMs": 10000
+  },
+  "showcase": {
+    "appName": "caldova-databricks-showcase",
+    "applicationDisplayName": "Caldova Showcase Statistics",
+    "adminObjectIds": [
+      "715bb744-31d0-4f76-ac85-7193bcf5a4eb"
+    ],
+    "cosmosDatabase": "showcase-analytics",
+    "cosmosContainer": "visits",
+    "cosmosRequestTimeoutMs": 4000,
+    "cosmosMaxRetryAttempts": 1,
+    "cosmosMaxRetryWaitSeconds": 2,
+    "logAnalyticsWorkspaceId": "b41e5454-7d6c-4764-ba87-fa8174e71e1c",
+    "logAnalyticsResourceId": "/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Insights/components/caldova-genie-obo-insights",
+    "logAnalyticsQueryTimeoutMs": 20000,
+    "logAnalyticsQueryMaxResults": 10001,
+    "analyticsTtlSeconds": 7776000
+  },
+  "github": {
+    "repository": "csdmichael/Azure-Databricks-Private-Agent-APIM",
+    "oidcAppName": "gh-databricks-agents-poc"
+  },
+  "observability": {
+    "applicationInsightsName": "caldova-genie-obo-insights",
+    "logAnalyticsWorkspaceName": "caldova-apim-logs-westus",
+    "retentionInDays": 30,
+    "dailyQuotaGb": 1,
+    "samplingPercentage": 100
+  },
+  "network": {
+    "apimLocation": "westus",
+    "databricksLocation": "westus2",
+    "foundryLocation": "westus",
+    "databricksVnetName": "caldova-dbx-vnet-westus2",
+    "apimVnetName": "caldova-apim-westus-vnet",
+    "apimVnetCidr": "10.191.0.0/16",
+    "apimIntegrationSubnetName": "apim-outbound-integration",
+    "apimIntegrationSubnetCidr": "10.191.0.0/24",
+    "privateEndpointSubnetName": "private-endpoints",
+    "privateEndpointSubnetCidr": "10.191.1.0/24",
+    "foundryAgentSubnetName": "foundry-agent",
+    "foundryAgentSubnetCidr": "10.191.2.0/24",
+    "genieOboIntegrationSubnetName": "genie-obo-integration",
+    "showcaseIntegrationSubnetCidr": "10.190.5.0/24",
+    "powerPlatformSubnetName": "power-platform-subnet",
+    "powerPlatformPrimaryRegion": "canadacentral",
+    "powerPlatformSecondaryRegion": "canadaeast",
+    "powerPlatformPrimaryVnetName": "caldova-pp-vnet-canadacentral",
+    "powerPlatformSecondaryVnetName": "caldova-pp-vnet-canadaeast",
+    "powerPlatformPrimaryVnetCidr": "10.194.0.0/16",
+    "powerPlatformPrimarySubnetCidr": "10.194.0.0/24",
+    "powerPlatformSecondaryVnetCidr": "10.195.0.0/16",
+    "powerPlatformSecondarySubnetCidr": "10.195.0.0/24"
+  },
+  "deployments": {
+    "apimPrivateName": "caldova-apim-private",
+    "apimLockdownName": "caldova-apim-private-lockdown",
+    "powerPlatformPrivateName": "caldova-power-platform-private"
+  },
+  "tests": {
+    "localApiBaseUrl": "http://127.0.0.1:8000",
+    "agentIds": [
+      "databricks-sql",
+      "databricks-genie"
+    ],
+    "apiPrompt": "Show total revenue in USD millions by region. Build a labeled bar chart in a PowerPoint named api-smoke-test.pptx.",
+    "geniePrompt": "What was total revenue in USD millions by region? Return the top 5 regions.",
+    "smokePrompt": "What was total revenue by region?",
+    "timeoutSeconds": 900,
+    "genieTimeoutSeconds": 300,
+    "outputDirectory": "artifacts/api-smoke-test"
+  },
+  "tags": {
+    "project": "caldova-databricks-apim-private",
+    "environment": "caldova",
+    "managed_by": "bicep"
+  }
+}
