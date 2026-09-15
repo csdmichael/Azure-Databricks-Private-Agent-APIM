@@ -195,6 +195,7 @@ geo: environment `{Environment Id}` is `canada`, so the VNets are
 |---|---|
 | [terraform](terraform) | VNet-injected Databricks workspace, NSGs, private DNS zone, private endpoints |
 | [bicep/apim-private](bicep/apim-private) | APIM StandardV2, VNet, gateway private endpoint, peering to Databricks |
+| [bicep/foundry-private](bicep/foundry-private) | Foundry with public portal ingress, private Agent Service egress, private endpoint, DNS, and validation runbook |
 | [bicep/power-platform-private](bicep/power-platform-private) | Regional VNets, delegated subnets, peering, network-injection policy |
 | [bicep/power-platform-databricks-direct](bicep/power-platform-databricks-direct) | Peerings and DNS links for the no-APIM path |
 | [bicep/apim-diagnostics](bicep/apim-diagnostics) | Log Analytics workspace and APIM diagnostic settings |

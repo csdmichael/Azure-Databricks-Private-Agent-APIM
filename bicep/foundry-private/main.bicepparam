@@ -1,0 +1,17 @@
+using './main.bicep'
+
+param location = 'westus'
+param foundryAccountName = 'foundry-myaacoub-private'
+param publicNetworkAccess = 'Enabled'
+param projectName = 'sales-poc'
+param projectCapabilityHostName = 'caphostproj'
+param modelDeploymentName = 'gpt-6-astra'
+param modelName = 'gpt-6-astra'
+param modelVersion = '2026-09-03'
+param modelSkuName = 'GlobalStandard'
+param modelCapacity = 500
+param vnetName = 'caldova-apim-westus-vnet'
+param clientVnetName = 'caldova-dbx-vnet-westus2'
+param privateEndpointSubnetName = 'private-endpoints'
+param agentSubnetName = 'foundry-agent'
+param agentSubnetPrefix = '10.191.2.0/24'
