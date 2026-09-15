@@ -10,17 +10,27 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $EnvironmentId = '52456fcd-1d20-ecdb-aa2e-8979e3f794f5',
-  [string] $TenantId = '12a4b86b-e64c-43f9-af05-d9130a72dfd2',
-  [string] $SubscriptionId = 'cf824570-a8ba-497a-a184-0a52f1830aa9',
-  [string] $ResourceGroup = 'm365-myaacoub',
-  [string] $EnterprisePolicyName = 'caldova-pp-network-injection-canada',
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $EnvironmentId,
+  [string] $TenantId,
+  [string] $SubscriptionId,
+  [string] $ResourceGroup,
+  [string] $EnterprisePolicyName,
   [string] $PolicyArmId,
-  [int] $TimeoutSeconds = 900,
+  [Nullable[int]] $TimeoutSeconds,
   [switch] $ForceAuth
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$EnvironmentId = Get-ConfigValue -Config $config -Path 'powerPlatform.connectorEnvironmentId' -Override $EnvironmentId
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$EnterprisePolicyName = Get-ConfigValue -Config $config -Path 'powerPlatform.enterprisePolicyName' -Override $EnterprisePolicyName
+$TimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'powerPlatform.linkTimeoutSeconds' -Override $TimeoutSeconds)
 
 if (-not $PolicyArmId) {
   $PolicyArmId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.PowerPlatform/enterprisePolicies/$EnterprisePolicyName"

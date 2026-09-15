@@ -1,32 +1,45 @@
 @description('Globally unique API Management service name.')
-param apimServiceName string = 'caldova-apim-westus'
+param apimServiceName string
 
 @description('Azure region for the API Management service and its dedicated virtual network.')
-param location string = 'westus'
+param location string
 
 @description('API Management publisher display name.')
-param publisherName string = 'Caldova AI Gateway'
+param publisherName string
 
 @description('API Management publisher email address.')
 param publisherEmail string
 
-@description('Databricks virtual network in West US 2 created by the Terraform layer.')
-param databricksVnetName string = 'caldova-dbx-vnet-westus2'
+@description('Existing Databricks virtual network created by the Terraform layer.')
+param databricksVnetName string
 
-@description('Private DNS zone created by the Terraform layer for the Databricks private endpoints.')
-param databricksPrivateDnsZoneName string = 'privatelink.azuredatabricks.net'
+@description('Name of the peering from the API Management virtual network to the Databricks virtual network.')
+param apimToDatabricksPeeringName string
 
-@description('Private DNS zone for the API Management gateway private endpoint.')
-param apimPrivateDnsZoneName string = 'privatelink.azure-api.net'
+@description('Name of the peering from the Databricks virtual network to the API Management virtual network.')
+param databricksToApimPeeringName string
 
 @description('Address space for the API Management virtual network.')
-param apimVnetCidr string = '10.191.0.0/16'
+param apimVnetCidr string
+
+@description('Subnet name for API Management v2 outbound virtual network integration.')
+param integrationSubnetName string
 
 @description('Subnet delegated to Microsoft.Web/serverFarms for API Management v2 outbound VNet integration.')
-param integrationSubnetCidr string = '10.191.0.0/24'
+param integrationSubnetCidr string
+
+@description('Subnet name for the API Management gateway private endpoint.')
+param privateEndpointSubnetName string
 
 @description('Subnet that hosts the API Management gateway private endpoint.')
-param privateEndpointSubnetCidr string = '10.191.1.0/24'
+param privateEndpointSubnetCidr string
+
+@description('API Management service SKU name.')
+param apimSkuName string
+
+@description('API Management service capacity.')
+@minValue(1)
+param apimCapacity int
 
 @description('Public ingress state. Deploy with Enabled, then redeploy with Disabled after the private endpoint is validated.')
 @allowed([
@@ -35,15 +48,12 @@ param privateEndpointSubnetCidr string = '10.191.1.0/24'
 ])
 param publicNetworkAccess string
 
-param tags object = {
-  project: 'caldova-databricks-apim-private'
-  environment: 'caldova'
-  managed_by: 'bicep'
-}
+@description('Resource tags applied to resources created by this deployment.')
+param tags object
 
 var apimVnetName = '${apimServiceName}-vnet'
-var integrationSubnetName = 'apim-outbound-integration'
-var privateEndpointSubnetName = 'private-endpoints'
+var databricksPrivateDnsZoneName = 'privatelink.azuredatabricks.net'
+var apimPrivateDnsZoneName = 'privatelink.azure-api.net'
 
 resource databricksVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: databricksVnetName
@@ -124,10 +134,10 @@ resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-0
   ]
 }
 
-// Global peering: West US APIM VNet <-> West US 2 Databricks VNet.
+// Global peering between the API Management and Databricks virtual networks.
 resource apimToDatabricksPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-05-01' = {
   parent: apimVnet
-  name: 'apim-to-databricks-westus2'
+  name: apimToDatabricksPeeringName
   properties: {
     allowForwardedTraffic: true
     allowGatewayTransit: false
@@ -144,7 +154,7 @@ resource apimToDatabricksPeering 'Microsoft.Network/virtualNetworks/virtualNetwo
 
 resource databricksToApimPeering 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-05-01' = {
   parent: databricksVnet
-  name: 'databricks-westus2-to-apim'
+  name: databricksToApimPeeringName
   properties: {
     allowForwardedTraffic: true
     allowGatewayTransit: false
@@ -204,8 +214,8 @@ resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   location: location
   tags: tags
   sku: {
-    name: 'StandardV2'
-    capacity: 1
+    name: apimSkuName
+    capacity: apimCapacity
   }
   identity: {
     type: 'SystemAssigned'

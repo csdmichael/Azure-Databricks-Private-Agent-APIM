@@ -11,21 +11,35 @@
   MCP endpoint (once created): https://<apim>.azure-api.net/<mcp-path>/mcp
 
 .EXAMPLE
-  ./apim/enable-mcp.ps1 -SourceApiId databricks -McpPath databricks-mcp
+  ./apim/enable-mcp.ps1 -SourceApiId <source-api-id> -McpPath <mcp-path>
 #>
 [CmdletBinding()]
 param(
-  [string] $ResourceGroup = "m365-myaacoub",
-  [string] $ApimName = "caldova-apim-westus",
-  [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
-  [string] $SourceApiId = "databricks",
-  [string] $McpDisplayName = "Databricks MCP",
-  [string] $McpPath = "databricks-mcp",
-  [string] $ProductId = "databricks-agents",
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $ResourceGroup,
+  [string] $ApimName,
+  [string] $SubscriptionId,
+  [string] $GatewayUrl,
+  [string] $SourceApiId,
+  [string] $McpDisplayName,
+  [string] $McpPath,
+  [string] $ProductId,
   [string] $ApiVersion = "2024-06-01-preview"
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot '../scripts/config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApimName = Get-ConfigValue -Config $config -Path 'apim.serviceName' -Override $ApimName
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$GatewayUrl = (Get-ConfigValue -Config $config -Path 'apim.gatewayUrl' -Override $GatewayUrl).TrimEnd('/')
+$SourceApiId = Get-ConfigValue -Config $config -Path 'apim.sourceApiId' -Override $SourceApiId
+$McpDisplayName = Get-ConfigValue -Config $config -Path 'apim.mcpDisplayName' -Override $McpDisplayName
+$McpPath = Get-ConfigValue -Config $config -Path 'apim.mcpPath' -Override $McpPath
+$ProductId = Get-ConfigValue -Config $config -Path 'apim.productId' -Override $ProductId
+
 $base = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.ApiManagement/service/$ApimName"
 
 # Discover operations on the source API to expose them all as MCP tools.
@@ -71,7 +85,7 @@ if ($LASTEXITCODE -eq 0) {
   }
 
   Write-Host "MCP server created and linked to product '$ProductId'." -ForegroundColor Green
-  Write-Host "MCP endpoint: https://$ApimName.azure-api.net/$McpPath/mcp" -ForegroundColor Green
+  Write-Host "MCP endpoint: $GatewayUrl/$McpPath/mcp" -ForegroundColor Green
 }
 else {
   Write-Warning "Preview MCP API call failed (exit $LASTEXITCODE):"
@@ -83,7 +97,7 @@ Do this in the Azure Portal instead (preview):
   2. Choose 'Expose an API as an MCP server'.
   3. Source API: 'Databricks SQL' ($SourceApiId). Select operations: query, tables.
   4. Name: $McpDisplayName   Path: $McpPath
-  5. Create. MCP endpoint = https://$ApimName.azure-api.net/$McpPath/mcp
+  5. Create. MCP endpoint = $GatewayUrl/$McpPath/mcp
   6. Repeat for 'Databricks Genie' if you want Genie exposed as MCP too.
 "@ -ForegroundColor Cyan
 }

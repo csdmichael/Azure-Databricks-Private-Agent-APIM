@@ -24,16 +24,29 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
-    [string] $ResourceGroup = "m365-myaacoub",
-    [string] $Repository = "csdmichael/Azure-Databricks-Private-Agent-APIM",
-    [string] $AppName = "gh-databricks-agents-poc",
-    [string] $ApiAppName = "databricks-agents-api-my",
-    [string] $FoundryAccountName = "002-ai-poc-private",
-    [string] $FoundryProjectName = "proj-default"
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $SubscriptionId,
+    [string] $TenantId,
+    [string] $ResourceGroup,
+    [string] $Repository,
+    [string] $AppName,
+    [string] $ApiAppName,
+    [string] $FoundryAccountName,
+    [string] $FoundryProjectName
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$Repository = Get-ConfigValue -Config $config -Path 'github.repository' -Override $Repository
+$AppName = Get-ConfigValue -Config $config -Path 'github.oidcAppName' -Override $AppName
+$ApiAppName = Get-ConfigValue -Config $config -Path 'appService.apiAppName' -Override $ApiAppName
+$FoundryAccountName = Get-ConfigValue -Config $config -Path 'foundry.application.accountName' -Override $FoundryAccountName
+$FoundryProjectName = Get-ConfigValue -Config $config -Path 'foundry.application.projectName' -Override $FoundryProjectName
 
 function Get-AzValue {
     param([string[]] $Arguments)
@@ -45,6 +58,11 @@ function Get-AzValue {
     if ([string]::IsNullOrWhiteSpace($value)) { return $null }
     return $value.Trim()
 }
+
+az account set --subscription $SubscriptionId
+if ($LASTEXITCODE -ne 0) { throw "Unable to select Azure subscription $SubscriptionId." }
+$signedInTenantId = Get-AzValue @('account', 'show', '--query', 'tenantId', '-o', 'tsv')
+if ($signedInTenantId -ne $TenantId) { throw "Authenticate to configured tenant $TenantId before creating GitHub OIDC credentials." }
 
 Write-Host "== App registration ==" -ForegroundColor Cyan
 $appId = Get-AzValue @("ad", "app", "list", "--display-name", $AppName, "--query", "[0].appId", "-o", "tsv")
@@ -120,12 +138,11 @@ foreach ($assignment in $assignments) {
 }
 
 Write-Host "== GitHub repository secrets ==" -ForegroundColor Cyan
-$tenantId = Get-AzValue @("account", "show", "--query", "tenantId", "-o", "tsv")
 gh secret set AZURE_CLIENT_ID --repo $Repository --body $appId
-gh secret set AZURE_TENANT_ID --repo $Repository --body $tenantId
+gh secret set AZURE_TENANT_ID --repo $Repository --body $TenantId
 gh secret set AZURE_SUBSCRIPTION_ID --repo $Repository --body $SubscriptionId
 
 Write-Host ""
 Write-Host "OIDC ready for $Repository" -ForegroundColor Green
 Write-Host "  client id : $appId"
-Write-Host "  tenant id : $tenantId"
+Write-Host "  tenant id : $TenantId"

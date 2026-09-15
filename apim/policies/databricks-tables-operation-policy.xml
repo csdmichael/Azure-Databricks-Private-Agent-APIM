@@ -11,7 +11,7 @@
       var body = new Newtonsoft.Json.Linq.JObject();
       body["warehouse_id"] = "{{databricks-warehouse-id}}";
       body["statement"] = "SHOW TABLES IN {{databricks-catalog}}.{{databricks-schema}}";
-      body["wait_timeout"] = "50s";
+      body["wait_timeout"] = "{{databricks-sql-wait-timeout}}";
       body["on_wait_timeout"] = "CONTINUE";
       body["format"] = "JSON_ARRAY";
       body["disposition"] = "INLINE";

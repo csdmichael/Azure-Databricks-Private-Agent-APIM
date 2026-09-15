@@ -1,11 +1,21 @@
 [CmdletBinding()]
 param(
-    [string] $FoundryHost = 'foundry-myaacoub-private.services.ai.azure.com',
-    [string] $ApimHost = 'caldova-apim-westus.azure-api.net'
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $FoundryHost,
+    [string] $ApimHost
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+if ([string]::IsNullOrWhiteSpace($FoundryHost)) {
+    $FoundryHost = "$(Get-ConfigValue -Config $config -Path 'foundry.private.accountName').services.ai.azure.com"
+}
+if ([string]::IsNullOrWhiteSpace($ApimHost)) {
+    $ApimHost = ([uri](Get-ConfigValue -Config $config -Path 'apim.gatewayUrl')).Host
+}
 
 function Test-PrivateAddress {
     param([string] $Address)

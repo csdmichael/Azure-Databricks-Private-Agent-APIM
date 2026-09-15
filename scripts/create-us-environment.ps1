@@ -5,25 +5,40 @@
 
 .DESCRIPTION
   Virtual network support requires a Managed Environment whose Dataverse region
-  matches the enterprise policy location. The Caldova enterprise policy is
-  created in `unitedstates`, so the environment must be in that geo too.
+  matches the enterprise policy location. The configured enterprise policy and
+  environment must use the same geo.
 
 .EXAMPLE
-  ./create-us-environment.ps1 -DisplayName 'Caldova-US-Agents'
+  ./create-us-environment.ps1 -DisplayName '<environment-display-name>'
 #>
 [CmdletBinding()]
 param(
-  [string] $DisplayName = 'Caldova-US-Agents',
-  [string] $DomainName = 'caldova-us-agents',
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $DisplayName,
+  [string] $DomainName,
   [ValidateSet('Sandbox', 'Production', 'Trial')]
-  [string] $EnvironmentSku = 'Sandbox',
-  [string] $Location = 'unitedstates',
-  [string] $CurrencyCode = 'USD',
-  [int] $BaseLanguage = 1033,
-  [string] $TenantId = '12a4b86b-e64c-43f9-af05-d9130a72dfd2'
+  [string] $EnvironmentSku,
+  [string] $Location,
+  [string] $CurrencyCode,
+  [Nullable[int]] $BaseLanguage,
+  [string] $TenantId
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$DisplayName = Get-ConfigValue -Config $config -Path 'powerPlatform.environment.displayName' -Override $DisplayName
+$DomainName = Get-ConfigValue -Config $config -Path 'powerPlatform.environment.domainName' -Override $DomainName
+$EnvironmentSku = Get-ConfigValue -Config $config -Path 'powerPlatform.environment.sku' -Override $EnvironmentSku
+$Location = Get-ConfigValue -Config $config -Path 'powerPlatform.environment.location' -Override $Location
+$CurrencyCode = Get-ConfigValue -Config $config -Path 'powerPlatform.environment.currencyCode' -Override $CurrencyCode
+$BaseLanguage = [int](Get-ConfigValue -Config $config -Path 'powerPlatform.environment.baseLanguage' -Override $BaseLanguage)
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+
+$context = az account show -o json | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $context.tenantId -ne $TenantId) { throw 'Select the configured Entra tenant before managing Power Platform environments.' }
+
 $bap = 'https://api.bap.microsoft.com'
 $apiVersion = '2021-04-01'
 
@@ -76,7 +91,9 @@ $headers = Get-BapHeaders
 $env = Invoke-RestMethod -Method GET -Headers $headers `
   -Uri "$bap/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/$environmentId`?api-version=$apiVersion"
 
-if ($env.properties.governanceConfiguration.protectionLevel -ne 'Standard') {
+$governance = if ($env.properties.PSObject.Properties['governanceConfiguration']) { $env.properties.governanceConfiguration } else { $null }
+$protectionLevel = if ($governance -and $governance.PSObject.Properties['protectionLevel']) { $governance.protectionLevel } else { $null }
+if ($protectionLevel -ne 'Standard') {
   Write-Host 'Enabling Managed Environment ...'
   Invoke-RestMethod -Method PUT -Headers $headers `
     -Body (@{ protectionLevel = 'Standard' } | ConvertTo-Json) `
@@ -86,12 +103,14 @@ if ($env.properties.governanceConfiguration.protectionLevel -ne 'Standard') {
 $headers = Get-BapHeaders
 $env = Invoke-RestMethod -Method GET -Headers $headers `
   -Uri "$bap/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/$environmentId`?api-version=$apiVersion"
+$governance = if ($env.properties.PSObject.Properties['governanceConfiguration']) { $env.properties.governanceConfiguration } else { $null }
+$protectionLevel = if ($governance -and $governance.PSObject.Properties['protectionLevel']) { $governance.protectionLevel } else { $null }
 
 [pscustomobject]@{
   EnvironmentId   = $environmentId
   DisplayName     = $env.properties.displayName
   Geo             = $env.location
   AzureRegion     = $env.properties.azureRegion
-  ProtectionLevel = $env.properties.governanceConfiguration.protectionLevel
+  ProtectionLevel = $protectionLevel
   DataverseUrl    = $env.properties.linkedEnvironmentMetadata.instanceUrl
 }

@@ -13,20 +13,40 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)] [string] $WorkspaceUrl,
-  [Parameter(Mandatory = $true)] [string] $WarehouseId,
-  [string] $ResourceGroup = "m365-myaacoub",
-  [string] $ApimName = "caldova-apim-westus",
-  [string] $Catalog = "caldova_dbx_westus2",
-  [string] $Schema = "arrow_semiconductor"
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $SubscriptionId,
+  [string] $TenantId,
+  [string] $WorkspaceUrl,
+  [string] $WarehouseId,
+  [string] $ResourceGroup,
+  [string] $ApimName,
+  [string] $Catalog,
+  [string] $Schema,
+  [Nullable[int]] $SqlWaitTimeoutSeconds,
+  [int] $SqlPollIntervalSeconds = 2
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot '../scripts/config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+$WorkspaceUrl = (Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl' -Override $WorkspaceUrl).TrimEnd('/')
+$WarehouseId = Get-ConfigValue -Config $config -Path 'databricks.warehouseId' -Override $WarehouseId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApimName = Get-ConfigValue -Config $config -Path 'apim.serviceName' -Override $ApimName
+$Catalog = Get-ConfigValue -Config $config -Path 'databricks.catalog' -Override $Catalog
+$Schema = Get-ConfigValue -Config $config -Path 'databricks.schema' -Override $Schema
+$SqlWaitTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'databricks.sqlWaitTimeoutSeconds' -Override $SqlWaitTimeoutSeconds)
+
+# Databricks is a fixed Microsoft audience ID, not a deployment resource ID.
 $DatabricksResourceId = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
-$WorkspaceUrl = $WorkspaceUrl.TrimEnd("/")
 
 Write-Host "Resolving APIM managed identity..." -ForegroundColor Cyan
-$principalId = az apim show -g $ResourceGroup -n $ApimName --query identity.principalId -o tsv
+$context = az account show -o json | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $context.id -ne $SubscriptionId -or $context.tenantId -ne $TenantId) { throw 'Select the configured Azure subscription and tenant first.' }
+$principalId = az apim show -g $ResourceGroup -n $ApimName --subscription $SubscriptionId --query identity.principalId -o tsv
 if (-not $principalId) { throw "APIM $ApimName has no system-assigned managed identity. Enable it first: az apim update -g $ResourceGroup -n $ApimName --set identity.type=SystemAssigned" }
 $appId = az ad sp show --id $principalId --query appId -o tsv
 Write-Host "  MI principalId=$principalId appId=$appId" -ForegroundColor Green
@@ -65,10 +85,10 @@ $grants = @(
   "GRANT SELECT ON SCHEMA $Catalog.$Schema TO ``$appId``"
 )
 foreach ($g in $grants) {
-  $body = @{ warehouse_id = $WarehouseId; statement = $g; wait_timeout = "30s"; on_wait_timeout = "CONTINUE" } | ConvertTo-Json
+  $body = @{ warehouse_id = $WarehouseId; statement = $g; wait_timeout = "${SqlWaitTimeoutSeconds}s"; on_wait_timeout = "CONTINUE" } | ConvertTo-Json
   $r = Invoke-RestMethod -Method POST -Uri "$WorkspaceUrl/api/2.0/sql/statements" -Headers $headers -Body $body
   $id = $r.statement_id
-  while ($r.status.state -in @("PENDING", "RUNNING")) { Start-Sleep 2; $r = Invoke-RestMethod -Method GET -Uri "$WorkspaceUrl/api/2.0/sql/statements/$id" -Headers $headers }
+  while ($r.status.state -in @("PENDING", "RUNNING")) { Start-Sleep -Seconds $SqlPollIntervalSeconds; $r = Invoke-RestMethod -Method GET -Uri "$WorkspaceUrl/api/2.0/sql/statements/$id" -Headers $headers }
   if ($r.status.state -ne "SUCCEEDED") { throw "Grant failed: $($r.status.error.message)" }
   Write-Host "  OK: $g" -ForegroundColor Green
 }

@@ -1,22 +1,46 @@
 [CmdletBinding()]
 param(
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
     [ValidateSet('Create', 'Test', 'All')]
     [string] $Mode = 'All',
-    [string] $FoundryAccountName = 'foundry-myaacoub-private',
-    [string] $ProjectName = 'sales-poc',
-    [string] $AgentName = 'semiconductor-sales',
-    [string] $ModelDeploymentName = 'gpt-6-astra',
-    [string] $ConnectionName = 'databricks-mcp',
-    [string] $McpServerUrl = 'https://caldova-apim-westus.azure-api.net/databricks-mcp/mcp'
+    [string] $FoundryAccountName,
+    [string] $ProjectName,
+    [string] $ProjectEndpoint,
+    [string] $AgentName,
+    [string] $ModelDeploymentName,
+    [string] $ConnectionName,
+    [string] $McpServerUrl,
+    [string] $AgentInstructions = '',
+    [string] $FoundryFeatures = 'WorkflowAgents=V1Preview,ExternalAgents=V1Preview,DraftAgents=V1Preview,AgentsOptimization=V2Preview',
+    [string] $TestPrompt,
+    [ValidateSet('minimal', 'low', 'medium', 'high')]
+    [string] $ReasoningEffort = 'low',
+    [Nullable[int]] $RequestTimeoutSeconds
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+. (Join-Path $PSScriptRoot 'config.ps1')
 
-$projectEndpoint = "https://$FoundryAccountName.services.ai.azure.com/api/projects/$ProjectName"
+$config = Get-DeploymentConfig -Path $ConfigPath
+$FoundryAccountName = Get-ConfigValue -Config $config -Path 'foundry.private.accountName' -Override $FoundryAccountName
+$ProjectName = Get-ConfigValue -Config $config -Path 'foundry.private.projectName' -Override $ProjectName
+$AgentName = Get-ConfigValue -Config $config -Path 'foundry.private.agentName' -Override $AgentName
+$ModelDeploymentName = Get-ConfigValue -Config $config -Path 'foundry.private.modelDeploymentName' -Override $ModelDeploymentName
+$ConnectionName = Get-ConfigValue -Config $config -Path 'foundry.private.connectionName' -Override $ConnectionName
+$TestPrompt = Get-ConfigValue -Config $config -Path 'tests.smokePrompt' -Override $TestPrompt
+$RequestTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'api.requestTimeoutSeconds' -Override $RequestTimeoutSeconds)
+if ([string]::IsNullOrWhiteSpace($ProjectEndpoint)) {
+    $ProjectEndpoint = "https://$FoundryAccountName.services.ai.azure.com/api/projects/$ProjectName"
+}
+if ([string]::IsNullOrWhiteSpace($McpServerUrl)) {
+    $gatewayUrl = (Get-ConfigValue -Config $config -Path 'apim.gatewayUrl').TrimEnd('/')
+    $mcpPath = (Get-ConfigValue -Config $config -Path 'apim.mcpPath').Trim('/')
+    $McpServerUrl = "$gatewayUrl/$mcpPath/mcp"
+}
+
 $agentNameEncoded = [Uri]::EscapeDataString($AgentName)
-$features = 'WorkflowAgents=V1Preview,ExternalAgents=V1Preview,DraftAgents=V1Preview,AgentsOptimization=V2Preview'
 $tokenResponse = Invoke-RestMethod `
     -Headers @{ Metadata = 'true' } `
     -Uri 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2019-08-01&resource=https%3A%2F%2Fai.azure.com' `
@@ -26,7 +50,7 @@ if (-not $tokenResponse.access_token) { throw 'Managed identity did not return a
 
 $headers = @{
     Authorization = "Bearer $($tokenResponse.access_token)"
-    'Foundry-Features' = $features
+    'Foundry-Features' = $FoundryFeatures
 }
 
 function Invoke-FoundryJson {
@@ -43,7 +67,7 @@ function Invoke-FoundryJson {
         Method = $Method
         Uri = $Uri
         Headers = $headers
-        TimeoutSec = 600
+        TimeoutSec = $RequestTimeoutSeconds
     }
     if ($Body) {
         $parameters.ContentType = 'application/json'
@@ -62,8 +86,8 @@ if ($Mode -in @('Create', 'All')) {
         definition = @{
             kind = 'prompt'
             model = $ModelDeploymentName
-            instructions = ''
-            reasoning = @{ effort = 'low' }
+            instructions = $AgentInstructions
+            reasoning = @{ effort = $ReasoningEffort }
             tools = @(
                 @{
                     type = 'mcp'
@@ -75,7 +99,7 @@ if ($Mode -in @('Create', 'All')) {
                 }
             )
         }
-        description = 'Private Databricks MCP sales agent'
+        description = "$AgentName prompt agent"
     } | ConvertTo-Json -Depth 12 -Compress
 
     $agent = Invoke-FoundryJson `
@@ -105,7 +129,7 @@ if ($Mode -in @('Test', 'All')) {
     try {
         $responseBody = @{
             conversation = $conversation.id
-            input = 'Use the databricks-mcp tool to list available tables. Do not answer without calling the MCP tool. Return only one table name.'
+            input = "Use the $ConnectionName tool to answer this request: $TestPrompt"
         } | ConvertTo-Json -Compress
         $response = Invoke-FoundryJson `
             -Method Post `
@@ -117,7 +141,9 @@ if ($Mode -in @('Test', 'All')) {
             throw "Agent response did not contain an MCP call. Output types: $($outputTypes -join ', ')"
         }
         $failedMcpCalls = @($mcpCalls | Where-Object {
-            $_.error -or ($_.status -and $_.status -notin @('completed', 'succeeded'))
+            $errorValue = if ($_.PSObject.Properties['error']) { $_.error } else { $null }
+            $statusValue = if ($_.PSObject.Properties['status']) { $_.status } else { $null }
+            $errorValue -or ($statusValue -and $statusValue -notin @('completed', 'succeeded'))
         })
         if ($failedMcpCalls.Count) {
             throw 'Agent response contained a failed MCP call.'
@@ -125,10 +151,12 @@ if ($Mode -in @('Test', 'All')) {
         $result.responseStatus = $response.status
         $result.outputTypes = $outputTypes
         $result.mcpCalls = @($mcpCalls | ForEach-Object {
+            $statusValue = if ($_.PSObject.Properties['status']) { $_.status } else { $null }
+            $errorValue = if ($_.PSObject.Properties['error']) { $_.error } else { $null }
             [ordered]@{
                 name = $_.name
-                status = $_.status
-                hasError = [bool]$_.error
+                status = $statusValue
+                hasError = [bool]$errorValue
             }
         })
         $result.foundryIps = $foundryIps

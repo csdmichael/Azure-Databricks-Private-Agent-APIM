@@ -4,6 +4,9 @@ param location string
 @description('Name of the new private Microsoft Foundry account.')
 param foundryAccountName string
 
+@description('Microsoft Foundry account SKU name.')
+param foundrySkuName string
+
 @description('Inbound public network access for the Foundry portal and data-plane APIs.')
 @allowed([
   'Enabled'
@@ -13,6 +16,12 @@ param publicNetworkAccess string
 
 @description('Name of the Foundry project to create.')
 param projectName string
+
+@description('Display name of the Foundry project.')
+param projectDisplayName string
+
+@description('Description of the Foundry project.')
+param projectDescription string
 
 @description('Name of the basic Agents capability host.')
 param projectCapabilityHostName string
@@ -30,7 +39,11 @@ param modelVersion string
 param modelSkuName string
 
 @description('Model deployment capacity in thousands of tokens per minute.')
+@minValue(1)
 param modelCapacity int
+
+@description('Automatic version upgrade behavior for the model deployment.')
+param modelVersionUpgradeOption string
 
 @description('Name of the existing virtual network that contains the private APIM endpoint.')
 param vnetName string
@@ -47,12 +60,8 @@ param agentSubnetName string
 @description('Address prefix for the dedicated Foundry Agent Service subnet.')
 param agentSubnetPrefix string
 
-param tags object = {
-  project: 'caldova-databricks-apim-private'
-  environment: 'caldova'
-  managed_by: 'bicep'
-  component: 'foundry-private'
-}
+@description('Resource tags applied to resources created by this deployment.')
+param tags object
 
 var foundryPrivateDnsZoneNames = [
   'privatelink.cognitiveservices.azure.com'
@@ -107,7 +116,7 @@ resource foundryAccount 'Microsoft.CognitiveServices/accounts@2026-05-01' = {
   location: location
   kind: 'AIServices'
   sku: {
-    name: 'S0'
+    name: foundrySkuName
   }
   identity: {
     type: 'SystemAssigned'
@@ -142,8 +151,8 @@ resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-0
     type: 'SystemAssigned'
   }
   properties: {
-    description: 'Private Foundry project for the Databricks MCP agent'
-    displayName: projectName
+    description: projectDescription
+    displayName: projectDisplayName
   }
 }
 
@@ -160,7 +169,7 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
       name: modelName
       version: modelVersion
     }
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+    versionUpgradeOption: modelVersionUpgradeOption
   }
 }
 

@@ -1,25 +1,25 @@
 @description('Existing API Management service to collect diagnostics from.')
-param apimServiceName string = 'caldova-apim-westus'
+param apimServiceName string
 
-@description('Azure region for the Log Analytics workspace. Keep it with API Management.')
-param location string = 'westus'
+@description('Azure region for the Log Analytics workspace.')
+param location string
 
 @description('Log Analytics workspace name.')
-param workspaceName string = 'caldova-apim-logs-westus'
+param workspaceName string
+
+@description('Log Analytics workspace SKU name.')
+param workspaceSkuName string
 
 @description('Retention in days for the workspace.')
 @minValue(30)
 @maxValue(730)
-param retentionInDays int = 30
+param retentionInDays int
 
 @description('Daily ingestion cap in GB. -1 disables the cap.')
-param dailyQuotaGb int = 1
+param dailyQuotaGb int
 
-param tags object = {
-  project: 'caldova-databricks-apim-private'
-  environment: 'caldova'
-  managed_by: 'bicep'
-}
+@description('Resource tags applied to the Log Analytics workspace.')
+param tags object
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimServiceName
@@ -31,7 +31,7 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   tags: tags
   properties: {
     sku: {
-      name: 'PerGB2018'
+      name: workspaceSkuName
     }
     retentionInDays: retentionInDays
     workspaceCapping: {

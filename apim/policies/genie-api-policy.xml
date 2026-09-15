@@ -5,7 +5,7 @@
 <policies>
   <inbound>
     <base />
-    <rate-limit calls="30" renewal-period="60" />
+    <rate-limit calls="{{genie-rate-limit-calls}}" renewal-period="{{genie-rate-limit-renewal-period}}" />
     <authentication-managed-identity resource="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
                                      output-token-variable-name="msi-access-token" ignore-error="false" />
     <set-header name="Authorization" exists-action="override">

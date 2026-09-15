@@ -11,14 +11,25 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ResourceGroup = "m365-myaacoub",
-    [string] $UiAppName = "databricks-agents-ui-my",
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $SubscriptionId,
+  [string] $ResourceGroup,
+  [string] $UiAppName,
     [switch] $SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$UiAppName = Get-ConfigValue -Config $config -Path 'appService.uiAppName' -Override $UiAppName
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $uiDir = Join-Path $repoRoot "ui"
+
+az account set --subscription $SubscriptionId
+if ($LASTEXITCODE -ne 0) { throw "Unable to select Azure subscription $SubscriptionId." }
 
 if (-not $SkipBuild) {
     Write-Host "Building the UI (production)..." -ForegroundColor Cyan
@@ -29,7 +40,7 @@ if (-not $SkipBuild) {
 $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $token = az staticwebapp secrets list -g $ResourceGroup -n $UiAppName --query "properties.apiKey" -o tsv 2>&1
+    $token = az staticwebapp secrets list -g $ResourceGroup -n $UiAppName --subscription $SubscriptionId --query "properties.apiKey" -o tsv 2>&1
 }
 finally { $ErrorActionPreference = $previous }
 if ($LASTEXITCODE -ne 0 -or -not $token) { throw "Could not read the Static Web App deployment token." }
@@ -48,7 +59,7 @@ finally {
 
 $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-try { $uiHost = az staticwebapp show -g $ResourceGroup -n $UiAppName --query defaultHostname -o tsv 2>&1 }
+try { $uiHost = az staticwebapp show -g $ResourceGroup -n $UiAppName --subscription $SubscriptionId --query defaultHostname -o tsv 2>&1 }
 finally { $ErrorActionPreference = $previous }
 
 Write-Host "UI: https://$uiHost" -ForegroundColor Green

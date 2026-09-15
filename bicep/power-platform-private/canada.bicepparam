@@ -1,11 +1,19 @@
 using './main.bicep'
 
-// Matches the canada geo of Power Platform environment 52456fcd-1d20-ecdb-aa2e-8979e3f794f5.
+param apimServiceName = 'caldova-apim-westus'
 param primaryRegion = 'canadacentral'
 param secondaryRegion = 'canadaeast'
+param primaryVnetName = 'caldova-pp-vnet-canadacentral'
+param secondaryVnetName = 'caldova-pp-vnet-canadaeast'
+param powerPlatformSubnetName = 'power-platform-subnet'
 param primaryVnetCidr = '10.194.0.0/16'
 param primarySubnetCidr = '10.194.0.0/24'
 param secondaryVnetCidr = '10.195.0.0/16'
 param secondarySubnetCidr = '10.195.0.0/24'
 param policyLocation = 'canada'
 param enterprisePolicyName = 'caldova-pp-network-injection-canada'
+param tags = {
+	project: 'caldova-databricks-apim-private'
+	environment: 'caldova'
+	managed_by: 'bicep'
+}

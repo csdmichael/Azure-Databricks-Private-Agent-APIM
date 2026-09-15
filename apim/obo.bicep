@@ -1,10 +1,56 @@
-param apimServiceName string = 'caldova-apim-westus'
-param tenantId string = tenant().tenantId
+@description('Existing API Management service name.')
+param apimServiceName string
+
+@description('Microsoft Entra tenant ID accepted by the delegated API.')
+param tenantId string
+
+@description('Application client ID for the delegated API.')
 param apiClientId string
+
+@description('Application client ID allowed to call the delegated API.')
 param connectorClientId string
-param allowedUserId string = '715bb744-31d0-4f76-ac85-7193bcf5a4eb'
+
+@description('User object ID authorized to call the delegated API.')
+param allowedUserId string
+
+@description('Private Databricks workspace URL.')
+param databricksWorkspaceUrl string
+
+@description('Databricks Genie space ID.')
+@minLength(1)
+param genieSpaceId string
+
+@description('Token broker endpoint used for delegated token exchange.')
 param brokerUrl string
-param insightsName string = 'caldova-genie-obo-insights'
+
+@description('Existing Application Insights component name.')
+param insightsName string
+
+@description('Delegated OAuth scope required from callers.')
+param oboScope string
+
+@description('Maximum calls allowed per verified user in each renewal period.')
+@minValue(1)
+param oboRateLimitCalls int
+
+@description('Per-user rate-limit renewal period in seconds.')
+@minValue(1)
+param oboRateLimitRenewalPeriodSeconds int
+
+@description('Maximum number of seconds APIM waits for the token broker.')
+@minValue(1)
+param oboBrokerTimeoutSeconds int
+
+@description('Delegated Genie API display name.')
+param apiDisplayName string
+
+@description('Delegated Genie API description.')
+param apiDescription string
+
+@description('Percentage of API requests sampled for diagnostics.')
+@minValue(0)
+@maxValue(100)
+param diagnosticSamplingPercentage int
 
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' existing = { name: apimServiceName }
 resource insights 'Microsoft.Insights/components@2020-02-02' existing = { name: insightsName }
@@ -24,11 +70,17 @@ resource auditFragment 'Microsoft.ApiManagement/service/policyFragments@2023-09-
   properties: { format: 'rawxml', value: loadTextContent('./policies/genie-obo-audit-fragment.xml') }
 }
 var settings = [
+  { name: 'databricks-workspace-url', value: databricksWorkspaceUrl }
+  { name: 'databricks-genie-space-id', value: genieSpaceId }
   { name: 'genie-obo-tenant-id', value: tenantId }
   { name: 'genie-obo-api-client-id', value: apiClientId }
   { name: 'genie-obo-connector-client-id', value: connectorClientId }
   { name: 'genie-obo-allowed-user-id', value: allowedUserId }
   { name: 'genie-obo-broker-url', value: brokerUrl }
+  { name: 'genie-obo-scope', value: oboScope }
+  { name: 'genie-obo-rate-limit-calls', value: string(oboRateLimitCalls) }
+  { name: 'genie-obo-rate-limit-renewal-period', value: string(oboRateLimitRenewalPeriodSeconds) }
+  { name: 'genie-obo-broker-timeout', value: string(oboBrokerTimeoutSeconds) }
 ]
 resource namedValues 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = [for setting in settings: {
   parent: apim
@@ -39,8 +91,8 @@ resource api 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
   parent: apim
   name: 'databricks-genie-obo'
   properties: {
-    displayName: 'Databricks Genie - delegated user'
-    description: 'Private Genie API with per-user Entra tokens and Databricks token federation.'
+    displayName: apiDisplayName
+    description: apiDescription
     path: 'databricks-genie-obo'
     protocols: ['https']
     subscriptionRequired: false
@@ -58,7 +110,7 @@ resource diagnostic 'Microsoft.ApiManagement/service/apis/diagnostics@2023-09-01
   properties: {
     loggerId: logger.id
     alwaysLog: 'allErrors'
-    sampling: { samplingType: 'fixed', percentage: 100 }
+    sampling: { samplingType: 'fixed', percentage: diagnosticSamplingPercentage }
     verbosity: 'information'
     logClientIp: false
     httpCorrelationProtocol: 'W3C'

@@ -1,15 +1,67 @@
-param location string = 'westus2'
-param functionName string = 'caldova-genie-obo-fn'
-param planName string = 'caldova-showcase-plan'
-param storageName string = 'genieobo${uniqueString(resourceGroup().id)}'
-param vnetName string = 'caldova-dbx-vnet-westus2'
-param apimVnetName string = 'caldova-apim-westus-vnet'
-param apimName string = 'caldova-apim-westus'
-param insightsName string = 'caldova-genie-obo-insights'
-param tenantId string = tenant().tenantId
+@description('Azure region for the function app and storage account.')
+param location string
+
+@description('Function app name for the delegated token broker.')
+param functionName string
+
+@description('Existing App Service plan name.')
+param planName string
+
+@description('Prefix for the generated storage account name. The resource group hash is appended.')
+@minLength(3)
+@maxLength(11)
+param storageNamePrefix string
+
+@description('Existing virtual network used by the function app.')
+param vnetName string
+
+@description('Existing API Management virtual network name.')
+param apimVnetName string
+
+@description('Existing API Management service name.')
+param apimName string
+
+@description('Existing Application Insights component name.')
+param insightsName string
+
+@description('Microsoft Entra tenant ID used by the token broker.')
+param tenantId string
+
+@description('Application client ID for the token broker API.')
 param apiClientId string
+
+@description('Client application ID allowed to call the token broker.')
 param connectorClientId string
-param workspaceUrl string = 'https://adb-7405616934814750.10.azuredatabricks.net'
+
+@description('Private Databricks workspace URL.')
+param workspaceUrl string
+
+@description('Function app virtual network integration subnet name.')
+param integrationSubnetName string
+
+@description('Private endpoint subnet name.')
+param privateEndpointSubnetName string
+
+@description('Blob container used for deployment packages.')
+param deploymentContainerName string
+
+@description('Storage account SKU name.')
+param storageSkuName string
+
+@description('Blob soft-delete retention in days.')
+@minValue(1)
+param blobDeleteRetentionDays int
+
+@description('Azure Functions extension version setting.')
+param functionsExtensionVersion string
+
+@description('Node.js version setting for the function app.')
+param nodeVersion string
+
+@description('.NET Framework version setting used by the function host.')
+param netFrameworkVersion string
+
+var storageName = '${storageNamePrefix}${uniqueString(resourceGroup().id)}'
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' existing = { name: planName }
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' existing = { name: apimName }
@@ -18,17 +70,17 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = { name: 
 resource apimVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = { name: apimVnetName }
 resource integration 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: vnet
-  name: 'genie-obo-integration'
+  name: integrationSubnetName
 }
 resource privateSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: vnet
-  name: 'private-endpoints'
+  name: privateEndpointSubnetName
 }
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
   location: location
   kind: 'StorageV2'
-  sku: { name: 'Standard_LRS' }
+  sku: { name: storageSkuName }
   properties: {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
@@ -42,11 +94,11 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 resource blobs 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   parent: storage
   name: 'default'
-  properties: { deleteRetentionPolicy: { enabled: true, days: 7 } }
+  properties: { deleteRetentionPolicy: { enabled: true, days: blobDeleteRetentionDays } }
 }
 resource packages 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: blobs
-  name: 'deployments'
+  name: deploymentContainerName
   properties: { publicAccess: 'None' }
 }
 resource blobZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
@@ -88,11 +140,11 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       scmMinTlsVersion: '1.2'
-      netFrameworkVersion: 'v8.0'
+      netFrameworkVersion: netFrameworkVersion
       appSettings: [
-        { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
+        { name: 'FUNCTIONS_EXTENSION_VERSION', value: functionsExtensionVersion }
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'node' }
-        { name: 'WEBSITE_NODE_DEFAULT_VERSION', value: '~22' }
+        { name: 'WEBSITE_NODE_DEFAULT_VERSION', value: nodeVersion }
         { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
         { name: 'AzureWebJobsStorage__accountName', value: storage.name }
         { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }

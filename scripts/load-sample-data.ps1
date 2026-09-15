@@ -2,7 +2,7 @@
 .SYNOPSIS
   Loads the semiconductor sample dataset into Azure Databricks (Unity Catalog)
   using the SQL Statement Execution API. Creates a low-cost serverless SQL
-  warehouse (2X-Small, auto-stop 5 min) if one does not already exist.
+  warehouse with configurable sizing if one does not already exist.
 
 .DESCRIPTION
   Auth options:
@@ -14,17 +14,38 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)] [string] $WorkspaceUrl,
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $WorkspaceUrl,
   [string] $Token,
   [switch] $UseAzureCli,
-  [string] $WarehouseName = "poc-serverless-2xs",
-  [string] $SqlFile = "$PSScriptRoot/../databricks/sql/01_create_and_load.sql"
+  [string] $WarehouseName,
+  [string] $Catalog,
+  [string] $Schema,
+  [string] $SourceCatalogToken,
+  [string] $SourceSchemaToken,
+  [string] $SqlFile = "$PSScriptRoot/../databricks/sql/01_create_and_load.sql",
+  [string] $WarehouseClusterSize = '2X-Small',
+  [int] $WarehouseAutoStopMinutes = 5,
+  [int] $WarehouseMinClusters = 1,
+  [int] $WarehouseMaxClusters = 1,
+  [Nullable[int]] $SqlWaitTimeoutSeconds,
+  [int] $SqlPollIntervalSeconds = 3
 )
 
 $ErrorActionPreference = "Stop"
-# Databricks login application (fixed resource ID for AAD tokens)
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$WorkspaceUrl = (Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl' -Override $WorkspaceUrl).TrimEnd('/')
+$WarehouseName = Get-ConfigValue -Config $config -Path 'databricks.sampleWarehouseName' -Override $WarehouseName
+$Catalog = Get-ConfigValue -Config $config -Path 'databricks.catalog' -Override $Catalog
+$Schema = Get-ConfigValue -Config $config -Path 'databricks.schema' -Override $Schema
+$SourceCatalogToken = Get-ConfigValue -Config $config -Path 'databricks.sourceCatalogToken' -Override $SourceCatalogToken
+$SourceSchemaToken = Get-ConfigValue -Config $config -Path 'databricks.sourceSchemaToken' -Override $SourceSchemaToken
+$SqlWaitTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'databricks.sqlWaitTimeoutSeconds' -Override $SqlWaitTimeoutSeconds)
+
+# Azure Databricks is a fixed Microsoft audience ID.
 $DatabricksResourceId = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
-$WorkspaceUrl = $WorkspaceUrl.TrimEnd("/")
 
 function Get-DbxToken {
   if ($Token) { return $Token }
@@ -55,13 +76,13 @@ function Get-OrCreate-Warehouse {
   if ($list.warehouses) { $wh = $list.warehouses | Where-Object { $_.name -eq $WarehouseName } | Select-Object -First 1 }
   if ($wh) { Write-Host "  Found existing warehouse id=$($wh.id)"; return $wh.id }
 
-  Write-Host "  Creating serverless 2X-Small warehouse (auto-stop 5 min)..." -ForegroundColor Yellow
+  Write-Host "  Creating serverless $WarehouseClusterSize warehouse (auto-stop $WarehouseAutoStopMinutes min)..." -ForegroundColor Yellow
   $body = @{
     name                      = $WarehouseName
-    cluster_size              = "2X-Small"
-    min_num_clusters          = 1
-    max_num_clusters          = 1
-    auto_stop_mins            = 5
+    cluster_size              = $WarehouseClusterSize
+    min_num_clusters          = $WarehouseMinClusters
+    max_num_clusters          = $WarehouseMaxClusters
+    auto_stop_mins            = $WarehouseAutoStopMinutes
     enable_serverless_compute = $true
     warehouse_type            = "PRO"
     spot_instance_policy      = "COST_OPTIMIZED"
@@ -71,7 +92,7 @@ function Get-OrCreate-Warehouse {
     return $created.id
   }
   catch {
-    Write-Warning "Serverless create failed ($_). Falling back to classic PRO 2X-Small."
+    Write-Warning "Serverless create failed ($_). Falling back to classic PRO $WarehouseClusterSize."
     $body.enable_serverless_compute = $false
     $created = Invoke-Dbx POST "/api/2.0/sql/warehouses" $body
     return $created.id
@@ -84,7 +105,7 @@ function Invoke-DbxSql {
   $body = @{
     warehouse_id    = $WarehouseId
     statement       = $Statement
-    wait_timeout    = "30s"
+    wait_timeout    = "${SqlWaitTimeoutSeconds}s"
     on_wait_timeout = "CONTINUE"
     format          = "JSON_ARRAY"
     disposition     = "INLINE"
@@ -92,7 +113,7 @@ function Invoke-DbxSql {
   $resp = Invoke-Dbx POST "/api/2.0/sql/statements" $body
   $id = $resp.statement_id
   while ($resp.status.state -in @("PENDING", "RUNNING")) {
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds $SqlPollIntervalSeconds
     $resp = Invoke-Dbx GET "/api/2.0/sql/statements/$id"
   }
   if ($resp.status.state -ne "SUCCEEDED") {
@@ -105,6 +126,7 @@ $warehouseId = Get-OrCreate-Warehouse
 Write-Host "Using warehouse id=$warehouseId" -ForegroundColor Green
 
 $raw = Get-Content -Path $SqlFile -Raw
+$raw = $raw.Replace("$SourceCatalogToken.$SourceSchemaToken", "$Catalog.$Schema")
 # Keep chunks that contain at least one non-comment, non-blank line. Uses simple
 # per-line checks to avoid catastrophic regex backtracking on big comment blocks.
 $statements = $raw -split '(?m)^\s*--\s*@statement\s*$' |
@@ -130,5 +152,5 @@ if ($lastResp.result.data_array) {
     Write-Host ("  {0,-18} {1,8}" -f $_[0], $_[1])
   }
 }
-Write-Host "`nWarehouse '$WarehouseName' (id=$warehouseId) will auto-stop after 5 idle minutes." -ForegroundColor DarkGray
+Write-Host "`nWarehouse '$WarehouseName' (id=$warehouseId) will auto-stop after $WarehouseAutoStopMinutes idle minutes." -ForegroundColor DarkGray
 Write-Output $warehouseId

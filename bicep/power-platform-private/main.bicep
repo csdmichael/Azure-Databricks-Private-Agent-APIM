@@ -1,11 +1,8 @@
 @description('Existing private API Management service whose virtual network acts as the hub.')
-param apimServiceName string = 'caldova-apim-westus'
+param apimServiceName string
 
 @description('Existing API Management virtual network name.')
 param apimVnetName string = '${apimServiceName}-vnet'
-
-@description('Existing private DNS zone for the API Management gateway private endpoint.')
-param apimPrivateDnsZoneName string = 'privatelink.azure-api.net'
 
 @description('Primary Azure region of the Power Platform region pair, for example eastus or canadacentral.')
 param primaryRegion string
@@ -14,13 +11,13 @@ param primaryRegion string
 param secondaryRegion string
 
 @description('Power Platform virtual network name in the primary region.')
-param primaryVnetName string = 'caldova-pp-vnet-${primaryRegion}'
+param primaryVnetName string
 
 @description('Power Platform virtual network name in the secondary region.')
-param secondaryVnetName string = 'caldova-pp-vnet-${secondaryRegion}'
+param secondaryVnetName string
 
 @description('Dedicated Power Platform subnet name in each regional virtual network.')
-param powerPlatformSubnetName string = 'power-platform-subnet'
+param powerPlatformSubnetName string
 
 @description('Address space for the primary Power Platform virtual network.')
 param primaryVnetCidr string
@@ -60,11 +57,10 @@ param policyLocation string
 @description('Network-injection enterprise policy name.')
 param enterprisePolicyName string
 
-param tags object = {
-  project: 'caldova-databricks-apim-private'
-  environment: 'caldova'
-  managed_by: 'bicep'
-}
+@description('Resource tags applied to resources created by this deployment.')
+param tags object
+
+var apimPrivateDnsZoneName = 'privatelink.azure-api.net'
 
 resource apimVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: apimVnetName

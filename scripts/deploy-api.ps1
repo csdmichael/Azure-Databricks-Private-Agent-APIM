@@ -13,17 +13,32 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $ResourceGroup = "m365-myaacoub",
-    [string] $ApiAppName = "databricks-agents-api-my",
-    [int] $HealthTimeoutSeconds = 900
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $SubscriptionId,
+    [string] $ResourceGroup,
+    [string] $ApiAppName,
+    [Nullable[int]] $HealthTimeoutSeconds,
+    [string] $ArtifactPath,
+    [int] $HealthRequestTimeoutSeconds = 30,
+    [int] $HealthPollIntervalSeconds = 15
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApiAppName = Get-ConfigValue -Config $config -Path 'appService.apiAppName' -Override $ApiAppName
+$HealthTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'appService.healthTimeoutSeconds' -Override $HealthTimeoutSeconds)
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $apiDir = Join-Path $repoRoot "api"
-$zipPath = Join-Path $repoRoot "artifacts/api.zip"
+$zipPath = if ($ArtifactPath) { $ArtifactPath } else { Join-Path $repoRoot 'artifacts/api.zip' }
 $python = Join-Path $repoRoot ".venv/Scripts/python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
+
+az account set --subscription $SubscriptionId
+if ($LASTEXITCODE -ne 0) { throw "Unable to select Azure subscription $SubscriptionId." }
 
 New-Item -ItemType Directory -Force -Path (Split-Path $zipPath) | Out-Null
 Remove-Item $zipPath -ErrorAction SilentlyContinue
@@ -54,7 +69,7 @@ $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
     az webapp deploy --resource-group $ResourceGroup --name $ApiAppName `
-        --src-path $zipPath --type zip --async false 2>&1 | Out-String | Write-Host
+        --subscription $SubscriptionId --src-path $zipPath --type zip --async false 2>&1 | Out-String | Write-Host
 }
 finally { $ErrorActionPreference = $previous }
 
@@ -64,7 +79,7 @@ Write-Host "Waiting for $healthUrl ..." -ForegroundColor Cyan
 $deadline = (Get-Date).AddSeconds($HealthTimeoutSeconds)
 while ((Get-Date) -lt $deadline) {
     try {
-        $response = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 30
+        $response = Invoke-RestMethod -Uri $healthUrl -TimeoutSec $HealthRequestTimeoutSeconds
         if ($response.status -eq "ok") {
             Write-Host "Healthy: $($response | ConvertTo-Json -Compress)" -ForegroundColor Green
             Write-Host "Swagger: https://$ApiAppName.azurewebsites.net/docs" -ForegroundColor Green
@@ -72,6 +87,6 @@ while ((Get-Date) -lt $deadline) {
         }
     }
     catch { Write-Host "  not ready yet..." -ForegroundColor DarkGray }
-    Start-Sleep -Seconds 15
+    Start-Sleep -Seconds $HealthPollIntervalSeconds
 }
 throw "The API did not become healthy within $HealthTimeoutSeconds seconds."

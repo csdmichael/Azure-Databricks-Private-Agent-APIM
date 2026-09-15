@@ -1,20 +1,20 @@
 @description('Name of the original Microsoft Foundry account.')
-param originalFoundryAccountName string = 'foundry-myaacoub'
+param originalFoundryAccountName string
 
 @description('Name of the project in the original Microsoft Foundry account.')
-param originalProjectName string = 'proj-default'
+param originalProjectName string
 
 @description('Name of the private-egress Microsoft Foundry account.')
-param privateFoundryAccountName string = 'foundry-myaacoub-private'
+param privateFoundryAccountName string
 
 @description('Name of the project in the private-egress Microsoft Foundry account.')
-param privateProjectName string = 'sales-poc'
+param privateProjectName string
 
 @description('Name of the existing Log Analytics workspace that receives Foundry diagnostics.')
-param logAnalyticsWorkspaceName string = 'caldova-apim-logs-westus'
+param logAnalyticsWorkspaceName string
 
 @description('Name of the existing workspace-based Application Insights component used for agent traces.')
-param applicationInsightsName string = 'caldova-genie-obo-insights'
+param applicationInsightsName string
 
 var traceReaderRoleDefinitionIds = [
   '73c42c96-874c-492b-b04d-ab87d138a893' // Log Analytics Reader

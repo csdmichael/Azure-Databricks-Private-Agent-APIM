@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Creates (or reuses) the AI/BI Genie space over the Arrow semiconductor sample
-  data and points the APIM `databricks-genie-space-id` named value at it.
+    Creates (or reuses) an AI/BI Genie space over the configured sample data and
+    points the APIM `databricks-genie-space-id` named value at it.
 
 .DESCRIPTION
   Genie spaces are created from a serialized (version 2) payload that lists the
@@ -14,19 +14,43 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $WorkspaceUrl = "https://adb-7405616934814750.10.azuredatabricks.net",
-    [string] $WarehouseId = "a3c7c9526aa58992",
-    [string] $Catalog = "caldova_dbx_westus2",
-    [string] $Schema = "arrow_semiconductor",
-    [string] $Title = "Arrow Semiconductor Analytics",
-    [string] $ResourceGroup = "m365-myaacoub",
-    [string] $ApimName = "caldova-apim-westus",
-    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
-    [string] $ApimApplicationId = "8f7e8889-3159-4a37-b816-1500a2e476ef",
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $WorkspaceUrl,
+    [string] $WarehouseId,
+    [string] $Catalog,
+    [string] $Schema,
+    [string] $Title,
+    [string[]] $SampleQuestions,
+    [string] $ResourceGroup,
+    [string] $ApimName,
+    [string] $SubscriptionId,
+    [string] $ApimApplicationId,
+    [int] $GeniePageSize = 100,
     [switch] $SkipApimUpdate
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$WorkspaceUrl = (Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl' -Override $WorkspaceUrl).TrimEnd('/')
+$WarehouseId = Get-ConfigValue -Config $config -Path 'databricks.warehouseId' -Override $WarehouseId
+$Catalog = Get-ConfigValue -Config $config -Path 'databricks.catalog' -Override $Catalog
+$Schema = Get-ConfigValue -Config $config -Path 'databricks.schema' -Override $Schema
+$Title = Get-ConfigValue -Config $config -Path 'databricks.genieSpaceTitle' -Override $Title
+if (-not $PSBoundParameters.ContainsKey('SampleQuestions')) {
+    $SampleQuestions = @(
+        Get-ConfigValue -Config $config -Path 'tests.geniePrompt'
+        Get-ConfigValue -Config $config -Path 'tests.smokePrompt'
+        Get-ConfigValue -Config $config -Path 'tests.apiPrompt'
+    ) | Select-Object -Unique
+}
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApimName = Get-ConfigValue -Config $config -Path 'apim.serviceName' -Override $ApimName
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ApimApplicationId = Get-ConfigValue -Config $config -Path 'apim.applicationId' -Override $ApimApplicationId
+
+# Azure Databricks is a fixed Microsoft audience ID.
 $DatabricksResourceId = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
 
 function New-GenieId {
@@ -41,7 +65,7 @@ $headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/jso
 # Reuse an existing space with the same title so the script is idempotent.
 $existing = $null
 try {
-    $list = Invoke-RestMethod -Method GET -Uri "$WorkspaceUrl/api/2.0/genie/spaces?page_size=100" -Headers $headers
+    $list = Invoke-RestMethod -Method GET -Uri "$WorkspaceUrl/api/2.0/genie/spaces?page_size=$GeniePageSize" -Headers $headers
     $existing = @($list.spaces) | Where-Object { $_.title -eq $Title } | Select-Object -First 1
 }
 catch {
@@ -64,13 +88,9 @@ else {
         [ordered]@{ identifier = "$fq.supply_chain";    description = @("Supplier lead time days, on-time delivery percent, quality score, and risk level.") }
     ) | Sort-Object -Property { $_.identifier }
 
-    $questions = @(
-        [ordered]@{ id = (New-GenieId); question = @("What was total revenue in USD millions by region for the latest fiscal quarter?") }
-        [ordered]@{ id = (New-GenieId); question = @("Show monthly average wafer yield percent by process node.") }
-        [ordered]@{ id = (New-GenieId); question = @("Which defect categories account for 80 percent of all defects?") }
-        [ordered]@{ id = (New-GenieId); question = @("Rank suppliers by lead time and flag the high risk ones.") }
-        [ordered]@{ id = (New-GenieId); question = @("Compare gross margin percent and revenue by product family.") }
-    ) | Sort-Object -Property { $_.id }
+    $questions = @($SampleQuestions | ForEach-Object {
+        [ordered]@{ id = (New-GenieId); question = @($_) }
+    }) | Sort-Object -Property { $_.id }
 
     $serializedSpace = [ordered]@{
         version      = 2
@@ -80,7 +100,7 @@ else {
 
     $payload = @{
         title            = $Title
-        description      = "Curated Genie space over the Arrow-style semiconductor POC data in $fq."
+        description      = "Curated Genie space over the configured data in $fq."
         warehouse_id     = $WarehouseId
         serialized_space = ($serializedSpace | ConvertTo-Json -Depth 10 -Compress)
     } | ConvertTo-Json -Depth 10

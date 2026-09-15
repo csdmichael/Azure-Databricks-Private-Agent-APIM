@@ -8,28 +8,40 @@
 
 .EXAMPLE
   ./scripts/test-api.ps1
-  ./scripts/test-api.ps1 -BaseUrl https://databricks-agents-api-my.azurewebsites.net
+    ./scripts/test-api.ps1 -BaseUrl https://<api-app>.azurewebsites.net
 #>
 [CmdletBinding()]
 param(
-    [string] $BaseUrl = "http://127.0.0.1:8000",
-    [string[]] $AgentIds = @("databricks-sql", "databricks-genie"),
-    [string] $Message = "Show total revenue in USD millions by region. Build a labeled bar chart in a PowerPoint named api-smoke-test.pptx.",
-    [int] $TimeoutSeconds = 900,
-    [string] $OutputDir = "artifacts/api-smoke-test"
+        [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+        [string] $BaseUrl,
+        [string[]] $AgentIds,
+        [string] $Message,
+        [Nullable[int]] $TimeoutSeconds,
+        [string] $OutputDir,
+        [int] $RequestTimeoutSeconds = 60,
+        [int] $PackageDownloadTimeoutSeconds = 120,
+        [int] $PollIntervalSeconds = 5,
+        [int] $GeneratedFileDownloadTimeoutSeconds = 300
 )
 
 $ErrorActionPreference = "Stop"
-$BaseUrl = $BaseUrl.TrimEnd("/")
+. (Join-Path $PSScriptRoot 'config.ps1')
 
-function Get-Json($path) { Invoke-RestMethod -Uri "$BaseUrl$path" -TimeoutSec 60 }
+$config = Get-DeploymentConfig -Path $ConfigPath
+$BaseUrl = (Get-ConfigValue -Config $config -Path 'tests.localApiBaseUrl' -Override $BaseUrl).TrimEnd('/')
+$AgentIds = @(Get-ConfigValue -Config $config -Path 'tests.agentIds' -Override $AgentIds)
+$Message = Get-ConfigValue -Config $config -Path 'tests.apiPrompt' -Override $Message
+$TimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'tests.timeoutSeconds' -Override $TimeoutSeconds)
+$OutputDir = Get-ConfigValue -Config $config -Path 'tests.outputDirectory' -Override $OutputDir
+
+function Get-Json($path) { Invoke-RestMethod -Uri "$BaseUrl$path" -TimeoutSec $RequestTimeoutSeconds }
 
 Write-Host "== health ==" -ForegroundColor Cyan
 (Get-Json "/health") | ConvertTo-Json -Compress
 
 Write-Host "== swagger ==" -ForegroundColor Cyan
 foreach ($path in @("/openapi.json", "/docs", "/redoc")) {
-    $code = (Invoke-WebRequest -Uri "$BaseUrl$path" -UseBasicParsing -TimeoutSec 60).StatusCode
+    $code = (Invoke-WebRequest -Uri "$BaseUrl$path" -UseBasicParsing -TimeoutSec $RequestTimeoutSeconds).StatusCode
     Write-Host "  $path -> $code"
 }
 
@@ -38,7 +50,7 @@ foreach ($agent in (Get-Json "/api/agents")) { Write-Host "  $($agent.id): $($ag
 
 Write-Host "== microsoft 365 packages ==" -ForegroundColor Cyan
 foreach ($package in (Get-Json "/api/m365/packages")) {
-    $zip = Invoke-WebRequest -Uri "$BaseUrl/api/m365/packages/$($package.agentId)" -UseBasicParsing -TimeoutSec 120
+    $zip = Invoke-WebRequest -Uri "$BaseUrl/api/m365/packages/$($package.agentId)" -UseBasicParsing -TimeoutSec $PackageDownloadTimeoutSeconds
     Write-Host "  $($package.fileName): $($zip.RawContentLength) bytes, appId $($package.teamsAppId)"
 }
 
@@ -47,13 +59,13 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 foreach ($agentId in $AgentIds) {
     Write-Host "== chat: $agentId ==" -ForegroundColor Cyan
     $job = Invoke-RestMethod -Method POST -Uri "$BaseUrl/api/agents/$agentId/chat" `
-        -ContentType "application/json" -Body (@{ message = $Message } | ConvertTo-Json) -TimeoutSec 60
+        -ContentType "application/json" -Body (@{ message = $Message } | ConvertTo-Json) -TimeoutSec $RequestTimeoutSeconds
     Write-Host "  jobId=$($job.jobId)"
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
-        Start-Sleep -Seconds 5
-        $state = Invoke-RestMethod -Uri "$BaseUrl/api/chat/jobs/$($job.jobId)" -TimeoutSec 60
+        Start-Sleep -Seconds $PollIntervalSeconds
+        $state = Invoke-RestMethod -Uri "$BaseUrl/api/chat/jobs/$($job.jobId)" -TimeoutSec $RequestTimeoutSeconds
     } while ($state.status -eq "running" -and (Get-Date) -lt $deadline)
 
     if ($state.status -ne "completed") { throw "Chat job for $agentId ended as '$($state.status)': $($state.error)" }
@@ -65,7 +77,7 @@ foreach ($agentId in $AgentIds) {
 
     foreach ($file in $result.files) {
         $target = Join-Path $OutputDir "$agentId-$($file.filename)"
-        Invoke-WebRequest -Uri $file.downloadUrl -OutFile $target -UseBasicParsing -TimeoutSec 300
+        Invoke-WebRequest -Uri $file.downloadUrl -OutFile $target -UseBasicParsing -TimeoutSec $GeneratedFileDownloadTimeoutSeconds
         $size = (Get-Item $target).Length
         Write-Host "  downloaded $target ($size bytes)" -ForegroundColor Green
         if ($target.ToLower().EndsWith(".pptx")) {

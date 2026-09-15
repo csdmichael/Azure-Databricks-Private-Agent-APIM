@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
   Creates the Unity Catalog schema and loads the sample dataset into the
-  Caldova Databricks workspace using the SQL Statement Execution API.
+  configured Databricks workspace using the SQL Statement Execution API.
 
 .DESCRIPTION
   Reuses the dataset definition in databricks/sql/01_create_and_load.sql from the
-  source repository and retargets it at the Caldova workspace default catalog.
+  source repository and retargets it at the configured catalog and schema.
   Run this while the workspace still allows public network access (stage 1), or
   from a host inside the injected VNet after lockdown.
 
@@ -14,18 +14,36 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)][string] $WorkspaceUrl,
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $WorkspaceUrl,
   [string] $Catalog,
-  [string] $Schema = 'arrow_semiconductor',
-  [string] $WarehouseName = 'caldova-serverless-2xs',
+  [string] $Schema,
+  [string] $WarehouseName,
   [string] $SqlFile = "$PSScriptRoot/../databricks/sql/01_create_and_load.sql",
-  [string] $SourceCatalogToken = 'databricks_ws_ai_poc',
-  [string] $SourceSchemaToken = 'arrow_semiconductor'
+  [string] $SourceCatalogToken,
+  [string] $SourceSchemaToken,
+  [string] $WarehouseClusterSize = '2X-Small',
+  [int] $WarehouseAutoStopMinutes = 5,
+  [int] $WarehouseMinClusters = 1,
+  [int] $WarehouseMaxClusters = 1,
+  [Nullable[int]] $SqlWaitTimeoutSeconds,
+  [int] $SqlPollIntervalSeconds = 3
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$WorkspaceUrl = (Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl' -Override $WorkspaceUrl).TrimEnd('/')
+$Catalog = Get-ConfigValue -Config $config -Path 'databricks.catalog' -Override $Catalog
+$Schema = Get-ConfigValue -Config $config -Path 'databricks.schema' -Override $Schema
+$WarehouseName = Get-ConfigValue -Config $config -Path 'databricks.warehouseName' -Override $WarehouseName
+$SourceCatalogToken = Get-ConfigValue -Config $config -Path 'databricks.sourceCatalogToken' -Override $SourceCatalogToken
+$SourceSchemaToken = Get-ConfigValue -Config $config -Path 'databricks.sourceSchemaToken' -Override $SourceSchemaToken
+$SqlWaitTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'databricks.sqlWaitTimeoutSeconds' -Override $SqlWaitTimeoutSeconds)
+
+# Azure Databricks is a fixed Microsoft audience ID.
 $DatabricksResourceId = '2ff814a6-3304-4ab8-85cb-cd0e6f879c1d'
-$WorkspaceUrl = $WorkspaceUrl.TrimEnd('/')
 
 if (-not (Test-Path $SqlFile)) { throw "SQL file not found: $SqlFile" }
 
@@ -45,13 +63,13 @@ function Get-Warehouse {
   if ($list.warehouses) { $wh = $list.warehouses | Where-Object { $_.name -eq $WarehouseName } | Select-Object -First 1 }
   if ($wh) { Write-Host "Using existing warehouse $($wh.id)"; return $wh.id }
 
-  Write-Host 'Creating serverless 2X-Small warehouse (auto-stop 5 min)...'
+  Write-Host "Creating serverless $WarehouseClusterSize warehouse (auto-stop $WarehouseAutoStopMinutes min)..."
   $body = @{
     name                      = $WarehouseName
-    cluster_size              = '2X-Small'
-    min_num_clusters          = 1
-    max_num_clusters          = 1
-    auto_stop_mins            = 5
+    cluster_size              = $WarehouseClusterSize
+    min_num_clusters          = $WarehouseMinClusters
+    max_num_clusters          = $WarehouseMaxClusters
+    auto_stop_mins            = $WarehouseAutoStopMinutes
     enable_serverless_compute = $true
     warehouse_type            = 'PRO'
     spot_instance_policy      = 'COST_OPTIMIZED'
@@ -69,13 +87,13 @@ function Invoke-DbxSql {
   $resp = Invoke-Dbx POST '/api/2.0/sql/statements' @{
     warehouse_id    = $WarehouseId
     statement       = $Statement
-    wait_timeout    = '30s'
+    wait_timeout    = "${SqlWaitTimeoutSeconds}s"
     on_wait_timeout = 'CONTINUE'
     format          = 'JSON_ARRAY'
     disposition     = 'INLINE'
   }
   while ($resp.status.state -in @('PENDING', 'RUNNING')) {
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds $SqlPollIntervalSeconds
     $resp = Invoke-Dbx GET "/api/2.0/sql/statements/$($resp.statement_id)"
   }
   if ($resp.status.state -ne 'SUCCEEDED') {
@@ -85,13 +103,6 @@ function Invoke-DbxSql {
 }
 
 $warehouseId = Get-Warehouse
-
-# The workspace default catalog is created automatically by Unity Catalog and is
-# the only catalog that works without an explicit managed storage location.
-if (-not $Catalog) {
-  $Catalog = (Invoke-DbxSql $warehouseId 'SELECT current_catalog()').result.data_array[0][0]
-  Write-Host "Detected workspace default catalog: $Catalog"
-}
 
 $raw = Get-Content -Path $SqlFile -Raw
 $raw = $raw.Replace("$SourceCatalogToken.$SourceSchemaToken", "$Catalog.$Schema")

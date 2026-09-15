@@ -1,18 +1,9 @@
-// =====================================================================
-//  Exposes the PRIVATE Azure Databricks workspace through the existing
-//  APIM instance (caldova-apim-westus) as:
-//    - "Databricks SQL"  : POST /databricks/query, GET /databricks/tables
-//    - "Databricks Genie": POST /databricks-genie/genie/ask (+ follow-up, result)
-//  APIM authenticates to Databricks with its managed identity, so no secrets
-//  are stored. Consumers use an APIM subscription key.
-//
-//  Deploy:
-//    az deployment group create -g m365-myaacoub -f apim/main.bicep \
-//      -p databricksWorkspaceUrl=<url> databricksWarehouseId=<id> genieSpaceId=<id>
-// =====================================================================
+// Exposes a private Azure Databricks workspace through an existing API
+// Management service. APIM authenticates to Databricks with its managed
+// identity, so no secrets are stored. Consumers use an APIM subscription key.
 
 @description('Existing API Management service name.')
-param apimServiceName string = 'caldova-apim-westus'
+param apimServiceName string
 
 @description('Databricks workspace URL, e.g. https://adb-123.11.azuredatabricks.net')
 param databricksWorkspaceUrl string
@@ -21,13 +12,50 @@ param databricksWorkspaceUrl string
 param databricksWarehouseId string
 
 @description('Unity Catalog catalog exposed through the Databricks SQL API.')
-param databricksCatalog string = 'databricks_ws_ai_poc'
+param databricksCatalog string
 
 @description('Unity Catalog schema exposed through the Databricks SQL API.')
-param databricksSchema string = 'arrow_semiconductor'
+param databricksSchema string
 
-@description('Databricks Genie space id (optional; set later if not ready).')
-param genieSpaceId string = ''
+@description('Databricks Genie space id.')
+@minLength(1)
+param genieSpaceId string
+
+@description('Maximum Databricks SQL API calls allowed in each renewal period.')
+@minValue(1)
+param databricksRateLimitCalls int
+
+@description('Maximum Databricks Genie API calls allowed in each renewal period.')
+@minValue(1)
+param genieRateLimitCalls int
+
+@description('Rate-limit renewal period in seconds for the Databricks APIs.')
+@minValue(1)
+param rateLimitRenewalPeriodSeconds int
+
+@description('Databricks SQL statement wait timeout, such as 50s.')
+param sqlWaitTimeout string
+
+@description('Display name for the Databricks SQL API.')
+param databricksApiDisplayName string
+
+@description('Description for the Databricks SQL API.')
+param databricksApiDescription string
+
+@description('Display name for the Databricks Genie API.')
+param genieApiDisplayName string
+
+@description('Description for the Databricks Genie API.')
+param genieApiDescription string
+
+@description('Display name for the APIM product that groups the Databricks APIs.')
+param productDisplayName string
+
+@description('Description for the APIM product that groups the Databricks APIs.')
+param productDescription string
+
+@description('Display name for the product subscription.')
+param subscriptionDisplayName string
 
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' existing = {
   name: apimServiceName
@@ -79,7 +107,57 @@ resource nvGenieSpace 'Microsoft.ApiManagement/service/namedValues@2023-09-01-pr
   name: 'databricks-genie-space-id'
   properties: {
     displayName: 'databricks-genie-space-id'
-    value: empty(genieSpaceId) ? 'REPLACE_WITH_GENIE_SPACE_ID' : genieSpaceId
+    value: genieSpaceId
+    secret: false
+  }
+}
+
+resource nvDatabricksRateLimitCalls 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'databricks-rate-limit-calls'
+  properties: {
+    displayName: 'databricks-rate-limit-calls'
+    value: string(databricksRateLimitCalls)
+    secret: false
+  }
+}
+
+resource nvDatabricksRateLimitPeriod 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'databricks-rate-limit-renewal-period'
+  properties: {
+    displayName: 'databricks-rate-limit-renewal-period'
+    value: string(rateLimitRenewalPeriodSeconds)
+    secret: false
+  }
+}
+
+resource nvGenieRateLimitCalls 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'genie-rate-limit-calls'
+  properties: {
+    displayName: 'genie-rate-limit-calls'
+    value: string(genieRateLimitCalls)
+    secret: false
+  }
+}
+
+resource nvGenieRateLimitPeriod 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'genie-rate-limit-renewal-period'
+  properties: {
+    displayName: 'genie-rate-limit-renewal-period'
+    value: string(rateLimitRenewalPeriodSeconds)
+    secret: false
+  }
+}
+
+resource nvSqlWaitTimeout 'Microsoft.ApiManagement/service/namedValues@2023-09-01-preview' = {
+  parent: apim
+  name: 'databricks-sql-wait-timeout'
+  properties: {
+    displayName: 'databricks-sql-wait-timeout'
+    value: sqlWaitTimeout
     secret: false
   }
 }
@@ -89,8 +167,8 @@ resource dbxApi 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
   parent: apim
   name: 'databricks'
   properties: {
-    displayName: 'Databricks SQL'
-    description: 'Query the private Databricks warehouse (${databricksCatalog}.${databricksSchema}).'
+    displayName: databricksApiDisplayName
+    description: databricksApiDescription
     path: 'databricks'
     protocols: [ 'https' ]
     subscriptionRequired: true
@@ -107,7 +185,11 @@ resource dbxApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-01-
     format: 'rawxml'
     value: loadTextContent('./policies/databricks-api-policy.xml')
   }
-  dependsOn: [ nvWorkspaceUrl ]
+  dependsOn: [
+    nvWorkspaceUrl
+    nvDatabricksRateLimitCalls
+    nvDatabricksRateLimitPeriod
+  ]
 }
 
 resource opQuery 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview' = {
@@ -143,7 +225,10 @@ resource opQueryPolicy 'Microsoft.ApiManagement/service/apis/operations/policies
     format: 'rawxml'
     value: loadTextContent('./policies/databricks-query-operation-policy.xml')
   }
-  dependsOn: [ nvWarehouseId ]
+  dependsOn: [
+    nvWarehouseId
+    nvSqlWaitTimeout
+  ]
 }
 
 resource opTables 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview' = {
@@ -153,7 +238,7 @@ resource opTables 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-pr
     displayName: 'List schema tables'
     method: 'GET'
     urlTemplate: '/tables'
-    description: 'Lists tables in ${databricksCatalog}.${databricksSchema}.'
+    description: 'Lists tables in the configured Unity Catalog schema.'
     responses: [ { statusCode: 200, description: 'Table list' } ]
   }
 }
@@ -169,6 +254,7 @@ resource opTablesPolicy 'Microsoft.ApiManagement/service/apis/operations/policie
     nvWarehouseId
     nvCatalog
     nvSchema
+    nvSqlWaitTimeout
   ]
 }
 
@@ -177,8 +263,8 @@ resource genieApi 'Microsoft.ApiManagement/service/apis@2023-09-01-preview' = {
   parent: apim
   name: 'databricks-genie'
   properties: {
-    displayName: 'Databricks Genie'
-    description: 'Ask natural-language questions of the Databricks data via AI/BI Genie.'
+    displayName: genieApiDisplayName
+    description: genieApiDescription
     path: 'databricks-genie'
     protocols: [ 'https' ]
     subscriptionRequired: true
@@ -195,7 +281,11 @@ resource genieApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-09-0
     format: 'rawxml'
     value: loadTextContent('./policies/genie-api-policy.xml')
   }
-  dependsOn: [ nvWorkspaceUrl ]
+  dependsOn: [
+    nvWorkspaceUrl
+    nvGenieRateLimitCalls
+    nvGenieRateLimitPeriod
+  ]
 }
 
 resource opGenieAsk 'Microsoft.ApiManagement/service/apis/operations@2023-09-01-preview' = {
@@ -312,8 +402,8 @@ resource product 'Microsoft.ApiManagement/service/products@2023-09-01-preview' =
   parent: apim
   name: 'databricks-agents'
   properties: {
-    displayName: 'Databricks Agents'
-    description: 'APIs and MCP tools for Foundry / Copilot Studio agents over private Databricks.'
+    displayName: productDisplayName
+    description: productDescription
     subscriptionRequired: true
     approvalRequired: false
     state: 'published'
@@ -341,7 +431,7 @@ resource databricksSubscription 'Microsoft.ApiManagement/service/subscriptions@2
   name: 'DatabricksSubscription'
   properties: {
     allowTracing: false
-    displayName: 'Databricks Subscription'
+    displayName: subscriptionDisplayName
     scope: product.id
     state: 'active'
   }

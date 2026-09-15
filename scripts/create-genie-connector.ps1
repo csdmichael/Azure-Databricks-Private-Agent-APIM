@@ -18,18 +18,35 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $EnvironmentId = '52456fcd-1d20-ecdb-aa2e-8979e3f794f5',
-  [string] $ConnectorName = 'Databricks Genie (Private APIM)',
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $EnvironmentId,
+  [string] $ConnectorName,
   [string] $SwaggerPath = "$PSScriptRoot/../connector/genie-swagger2.json",
   [string] $OutputPath = "$PSScriptRoot/../connector/genie-connector-swagger.json",
-  [string] $IconBrandColor = '#FF3621',
+  [string] $IconBrandColor,
+  [string] $ProductId,
+  [string] $GatewayUrl,
+  [string] $ApiBasePath,
   [switch] $DefinitionOnly
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$EnvironmentId = Get-ConfigValue -Config $config -Path 'powerPlatform.connectorEnvironmentId' -Override $EnvironmentId
+$ConnectorName = Get-ConfigValue -Config $config -Path 'powerPlatform.connectors.genieName' -Override $ConnectorName
+$IconBrandColor = Get-ConfigValue -Config $config -Path 'powerPlatform.connectors.iconBrandColor' -Override $IconBrandColor
+$ProductId = Get-ConfigValue -Config $config -Path 'apim.productId' -Override $ProductId
+$GatewayUrl = (Get-ConfigValue -Config $config -Path 'apim.gatewayUrl' -Override $GatewayUrl).TrimEnd('/')
+if ([string]::IsNullOrWhiteSpace($ApiBasePath)) {
+  $ApiBasePath = "/$(Get-ConfigValue -Config $config -Path 'apim.sourceApiId')-genie"
+}
 
 if (-not (Test-Path $SwaggerPath)) { throw "Swagger not found: $SwaggerPath" }
 $swagger = Get-Content $SwaggerPath -Raw | ConvertFrom-Json
+$swagger.host = ([uri]$GatewayUrl).Host
+$swagger.basePath = $ApiBasePath
 
 # Power Platform requires an explicit security definition so the maker is
 # prompted for the APIM subscription key when creating the connection.
@@ -85,7 +102,6 @@ $token = az account get-access-token --resource 'https://service.powerapps.com/'
 if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Unable to acquire a Power Platform token.' }
 $headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
 
-$apiName = 'caldova-genie-private'
 $uri = "https://api.powerapps.com/providers/Microsoft.PowerApps/apis?api-version=2016-11-01&`$filter=environment eq '$EnvironmentId'"
 
 # The API rejects `apiType` and expects `openApiDefinition`, not `swagger`.
@@ -103,7 +119,7 @@ $body = @{
         type         = 'securestring'
         uiDefinition = @{
           displayName = 'APIM subscription key'
-          description = 'Ocp-Apim-Subscription-Key for the databricks-agents product'
+          description = "Ocp-Apim-Subscription-Key for the $ProductId product"
           tooltip     = 'Paste the APIM subscription key'
           constraints = @{ tabIndex = 2; clearText = $false; required = 'true' }
         }

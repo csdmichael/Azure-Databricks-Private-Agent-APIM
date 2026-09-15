@@ -1,26 +1,22 @@
-@description('Databricks virtual network in West US 2 created by the Terraform layer.')
-param databricksVnetName string = 'caldova-dbx-vnet-westus2'
-
-@description('Private DNS zone that resolves the Databricks private endpoints.')
-param databricksPrivateDnsZoneName string = 'privatelink.azuredatabricks.net'
+@description('Existing Databricks virtual network created by the Terraform layer.')
+param databricksVnetName string
 
 @description('Primary Power Platform region, matching the environment geo.')
-param primaryRegion string = 'canadacentral'
+param primaryRegion string
 
 @description('Secondary Power Platform region of the same region pair.')
-param secondaryRegion string = 'canadaeast'
+param secondaryRegion string
 
 @description('Power Platform virtual network name in the primary region.')
-param primaryVnetName string = 'caldova-pp-vnet-${primaryRegion}'
+param primaryVnetName string
 
 @description('Power Platform virtual network name in the secondary region.')
-param secondaryVnetName string = 'caldova-pp-vnet-${secondaryRegion}'
+param secondaryVnetName string
 
-param tags object = {
-  project: 'caldova-databricks-apim-private'
-  environment: 'caldova'
-  managed_by: 'bicep'
-}
+@description('Resource tags applied to DNS links created by this deployment.')
+param tags object
+
+var databricksPrivateDnsZoneName = 'privatelink.azuredatabricks.net'
 
 resource databricksVnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: databricksVnetName

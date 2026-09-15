@@ -1,16 +1,33 @@
 [CmdletBinding()]
 param(
-    [string] $SubscriptionId = 'cf824570-a8ba-497a-a184-0a52f1830aa9',
-    [string] $ResourceGroup = 'm365-myaacoub',
-    [string] $ApimName = 'caldova-apim-westus',
-    [string] $ApimSubscriptionName = 'DatabricksSubscription',
-    [string] $FoundryAccountName = 'foundry-myaacoub-private',
-    [string] $FoundryProjectName = 'sales-poc',
-    [string] $ConnectionName = 'databricks-mcp',
-    [string] $McpServerUrl = 'https://caldova-apim-westus.azure-api.net/databricks-mcp/mcp'
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $SubscriptionId,
+    [string] $ResourceGroup,
+    [string] $ApimName,
+    [string] $ApimSubscriptionName,
+    [string] $FoundryAccountName,
+    [string] $FoundryProjectName,
+    [string] $ConnectionName,
+    [string] $McpServerUrl
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApimName = Get-ConfigValue -Config $config -Path 'apim.serviceName' -Override $ApimName
+$ApimSubscriptionName = Get-ConfigValue -Config $config -Path 'apim.subscriptionName' -Override $ApimSubscriptionName
+$FoundryAccountName = Get-ConfigValue -Config $config -Path 'foundry.private.accountName' -Override $FoundryAccountName
+$FoundryProjectName = Get-ConfigValue -Config $config -Path 'foundry.private.projectName' -Override $FoundryProjectName
+$ConnectionName = Get-ConfigValue -Config $config -Path 'foundry.private.connectionName' -Override $ConnectionName
+if ([string]::IsNullOrWhiteSpace($McpServerUrl)) {
+    $gatewayUrl = (Get-ConfigValue -Config $config -Path 'apim.gatewayUrl').TrimEnd('/')
+    $mcpPath = (Get-ConfigValue -Config $config -Path 'apim.mcpPath').Trim('/')
+    $McpServerUrl = "$gatewayUrl/$mcpPath/mcp"
+}
+
 $context = az account show -o json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or $context.id -ne $SubscriptionId) {
     throw "Select Azure subscription $SubscriptionId before creating the connection."

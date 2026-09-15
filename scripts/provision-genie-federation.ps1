@@ -1,11 +1,21 @@
 [CmdletBinding()]
 param(
-    [string] $TenantId = '12a4b86b-e64c-43f9-af05-d9130a72dfd2',
-    [string] $AccountId = 'b8f092a5-ba0e-4e36-b3c7-1f6921fb14c0',
-    [string] $ApiClientId = 'bdd127ff-fd4c-45f5-b553-ff77a7755161',
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $TenantId,
+    [string] $AccountId,
+    [string] $ApiClientId,
+    [Nullable[int]] $RequestTimeoutSeconds,
     [switch] $ReadOnly
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+$AccountId = Get-ConfigValue -Config $config -Path 'databricks.accountId' -Override $AccountId
+$ApiClientId = Get-ConfigValue -Config $config -Path 'obo.apiClientId' -Override $ApiClientId
+$RequestTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'databricks.apiTimeoutSeconds' -Override $RequestTimeoutSeconds)
+
 foreach ($identifier in @($TenantId, $AccountId, $ApiClientId)) {
     $parsed = [guid]::Empty
     if (-not [guid]::TryParse($identifier, [ref]$parsed)) { throw 'Tenant, account and API identifiers must be UUIDs.' }
@@ -18,8 +28,8 @@ try {
     $uri = "https://accounts.azuredatabricks.net/api/2.0/accounts/$AccountId/federationPolicies"
     $headers = @{ Authorization = "Bearer $token" }
     $issuer = "https://login.microsoftonline.com/$TenantId/v2.0"
-    $response = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 45
-    if ($response.next_page_token) { throw 'Policy pagination requires review before creating another trust.' }
+    $response = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec $RequestTimeoutSeconds
+    if ($response.PSObject.Properties['next_page_token'] -and $response.next_page_token) { throw 'Policy pagination requires review before creating another trust.' }
     $matching = @($response.policies | Where-Object { $_.oidc_policy.audiences -contains $ApiClientId })
     if ($matching.Count -gt 1) { throw 'Multiple policies trust the API audience; review them explicitly.' }
     if ($matching.Count -eq 1) {
@@ -32,7 +42,7 @@ try {
         return
     } else {
         $body = @{ oidc_policy = @{ issuer = $issuer; audiences = @($ApiClientId); subject_claim = 'preferred_username' } } | ConvertTo-Json -Depth 5
-        $policy = Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 45
+        $policy = Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec $RequestTimeoutSeconds
     }
     [pscustomobject]@{ policyId = $policy.policy_id; issuer = $policy.oidc_policy.issuer; audiences = $policy.oidc_policy.audiences; subjectClaim = $policy.oidc_policy.subject_claim }
 } finally { $token = $null; $headers = $null }

@@ -8,20 +8,36 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $ResourceGroup = "m365-myaacoub",
-  [string] $ApimName = "caldova-apim-westus",
-  [Parameter(Mandatory = $true)] [string] $WorkspaceUrl,
-  [Parameter(Mandatory = $true)] [string] $WarehouseId,
-  [string] $GenieSpaceId = ""
+  [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+  [string] $SubscriptionId,
+  [string] $ResourceGroup,
+  [string] $ApimName,
+  [string] $WorkspaceUrl,
+  [string] $WarehouseId,
+  [string] $GenieSpaceId,
+  [string] $DeploymentName
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot '../scripts/config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$ApimName = Get-ConfigValue -Config $config -Path 'apim.serviceName' -Override $ApimName
+$WorkspaceUrl = Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl' -Override $WorkspaceUrl
+$WarehouseId = Get-ConfigValue -Config $config -Path 'databricks.warehouseId' -Override $WarehouseId
+if ([string]::IsNullOrWhiteSpace($DeploymentName)) {
+  $DeploymentName = "$ApimName-apis-$(Get-Date -Format yyyyMMddHHmmss)"
+}
+
 $bicep = Join-Path $PSScriptRoot "main.bicep"
 
 Write-Host "Deploying APIM APIs to $ApimName ..." -ForegroundColor Cyan
 az deployment group create `
+  --subscription $SubscriptionId `
   --resource-group $ResourceGroup `
-  --name "databricks-apim-$(Get-Date -Format yyyyMMddHHmmss)" `
+  --name $DeploymentName `
   --template-file $bicep `
   --parameters apimServiceName=$ApimName `
   databricksWorkspaceUrl=$WorkspaceUrl `

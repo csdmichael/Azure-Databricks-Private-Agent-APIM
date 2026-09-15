@@ -14,19 +14,48 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SubscriptionId = "cf824570-a8ba-497a-a184-0a52f1830aa9",
-    [string] $ResourceGroup = "m365-myaacoub",
-    [string] $Location = "westus2",
-    [string] $PlanName = "plan-databricks-agents-poc",
+    [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [string] $SubscriptionId,
+    [string] $TenantId,
+    [string] $ResourceGroup,
+    [string] $Location,
+    [string] $PlanName,
     [ValidateSet("F1", "B1")]
-    [string] $PlanSku = "F1",
-    [string] $ApiAppName = "databricks-agents-api-my",
-    [string] $UiAppName = "databricks-agents-ui-my",
-    [string] $FoundryAccountName = "002-ai-poc-private",
-    [string] $FoundryProjectName = "proj-default"
+    [string] $PlanSku,
+    [string] $ApiAppName,
+    [string] $UiAppName,
+    [string] $FoundryAccountName,
+    [string] $FoundryProjectName,
+    [string] $StaticWebAppSku,
+    [string] $PythonRuntime,
+    [Nullable[int]] $ContainerStartTimeLimitSeconds,
+    [Nullable[int]] $GunicornWorkers,
+    [Nullable[int]] $GunicornThreads,
+    [Nullable[int]] $GunicornTimeoutSeconds,
+    [string] $GunicornBind
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$config = Get-DeploymentConfig -Path $ConfigPath
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
+$TenantId = Get-ConfigValue -Config $config -Path 'azure.tenantId' -Override $TenantId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$Location = Get-ConfigValue -Config $config -Path 'appService.location' -Override $Location
+$PlanName = Get-ConfigValue -Config $config -Path 'appService.planName' -Override $PlanName
+$PlanSku = Get-ConfigValue -Config $config -Path 'appService.planSku' -Override $PlanSku
+$ApiAppName = Get-ConfigValue -Config $config -Path 'appService.apiAppName' -Override $ApiAppName
+$UiAppName = Get-ConfigValue -Config $config -Path 'appService.uiAppName' -Override $UiAppName
+$FoundryAccountName = Get-ConfigValue -Config $config -Path 'foundry.application.accountName' -Override $FoundryAccountName
+$FoundryProjectName = Get-ConfigValue -Config $config -Path 'foundry.application.projectName' -Override $FoundryProjectName
+$StaticWebAppSku = Get-ConfigValue -Config $config -Path 'appService.staticWebAppSku' -Override $StaticWebAppSku
+$PythonRuntime = Get-ConfigValue -Config $config -Path 'appService.pythonRuntime' -Override $PythonRuntime
+$ContainerStartTimeLimitSeconds = [int](Get-ConfigValue -Config $config -Path 'appService.containerStartTimeLimitSeconds' -Override $ContainerStartTimeLimitSeconds)
+$GunicornWorkers = [int](Get-ConfigValue -Config $config -Path 'appService.gunicornWorkers' -Override $GunicornWorkers)
+$GunicornThreads = [int](Get-ConfigValue -Config $config -Path 'appService.gunicornThreads' -Override $GunicornThreads)
+$GunicornTimeoutSeconds = [int](Get-ConfigValue -Config $config -Path 'appService.gunicornTimeoutSeconds' -Override $GunicornTimeoutSeconds)
+$GunicornBind = Get-ConfigValue -Config $config -Path 'appService.gunicornBind' -Override $GunicornBind
 
 function Invoke-Az {
     param([string[]] $Arguments, [switch] $AllowFailure)
@@ -54,6 +83,11 @@ function Get-AzValue {
     return $value.Trim()
 }
 
+az account set --subscription $SubscriptionId
+if ($LASTEXITCODE -ne 0) { throw "Unable to select Azure subscription $SubscriptionId." }
+$signedInTenantId = Get-AzValue @('account', 'show', '--query', 'tenantId', '-o', 'tsv')
+if ($signedInTenantId -ne $TenantId) { throw "Authenticate to configured tenant $TenantId before provisioning the app." }
+
 Write-Host "== App Service plan ($PlanSku, Linux) ==" -ForegroundColor Cyan
 $plan = Get-AzValue @("appservice", "plan", "show", "-g", $ResourceGroup, "-n", $PlanName, "--query", "name", "-o", "tsv")
 if (-not $plan) {
@@ -69,7 +103,7 @@ Write-Host "== API web app ==" -ForegroundColor Cyan
 $api = Get-AzValue @("webapp", "show", "-g", $ResourceGroup, "-n", $ApiAppName, "--query", "name", "-o", "tsv")
 if (-not $api) {
     Invoke-Az @("webapp", "create", "-g", $ResourceGroup, "-p", $PlanName, "-n", $ApiAppName,
-        "--runtime", "PYTHON:3.12", "-o", "none") | Out-Null
+        "--runtime", $PythonRuntime, "-o", "none") | Out-Null
     Write-Host "  created $ApiAppName"
 }
 else {
@@ -82,7 +116,7 @@ Write-Host "== Static Web App (Free) ==" -ForegroundColor Cyan
 $ui = Get-AzValue @("staticwebapp", "show", "-g", $ResourceGroup, "-n", $UiAppName, "--query", "name", "-o", "tsv")
 if (-not $ui) {
     Invoke-Az @("staticwebapp", "create", "-g", $ResourceGroup, "-n", $UiAppName,
-        "--location", $Location, "--sku", "Free", "-o", "none") | Out-Null
+        "--location", $Location, "--sku", $StaticWebAppSku, "-o", "none") | Out-Null
     Write-Host "  created $UiAppName"
 }
 else {
@@ -92,19 +126,33 @@ $uiHost = Get-AzValue @("staticwebapp", "show", "-g", $ResourceGroup, "-n", $UiA
 $uiUrl = "https://$uiHost"
 
 Write-Host "== API configuration ==" -ForegroundColor Cyan
+$foundryProjectEndpoint = "https://$FoundryAccountName.services.ai.azure.com/api/projects/$FoundryProjectName"
+$corsOrigins = @(@($uiUrl) + @(Get-ConfigValue -Config $config -Path 'api.corsAllowOrigins') | Where-Object { $_ } | Select-Object -Unique)
 $settings = @(
     "SCM_DO_BUILD_DURING_DEPLOYMENT=true",
-    "WEBSITES_CONTAINER_START_TIME_LIMIT=600",
+    "WEBSITES_CONTAINER_START_TIME_LIMIT=$ContainerStartTimeLimitSeconds",
     "PUBLIC_API_URL=$apiUrl",
-    "CORS_ALLOW_ORIGINS=$uiUrl,http://localhost:4200,http://localhost:8100",
-    "FOUNDRY_PROJECT_ENDPOINT=https://$FoundryAccountName.services.ai.azure.com/api/projects/$FoundryProjectName",
-    "APIM_BASE_URL=https://caldova-apim-westus.azure-api.net",
-    "GITHUB_REPO_URL=https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM"
+    "CORS_ALLOW_ORIGINS=$($corsOrigins -join ',')",
+    "FOUNDRY_PROJECT_ENDPOINT=$foundryProjectEndpoint",
+    "APIM_BASE_URL=$(Get-ConfigValue -Config $config -Path 'apim.gatewayUrl')",
+    "DATABRICKS_WORKSPACE_URL=$(Get-ConfigValue -Config $config -Path 'databricks.workspaceUrl')",
+    "GITHUB_REPO_URL=$(Get-ConfigValue -Config $config -Path 'api.githubRepoUrl')",
+    "TEAMS_APP_ID_NAMESPACE=$(Get-ConfigValue -Config $config -Path 'api.teamsAppIdNamespace')",
+    "DATABRICKS_CATALOG=$(Get-ConfigValue -Config $config -Path 'databricks.catalog')",
+    "DATABRICKS_SCHEMA=$(Get-ConfigValue -Config $config -Path 'databricks.schema')",
+    "REQUEST_TIMEOUT_SECONDS=$(Get-ConfigValue -Config $config -Path 'api.requestTimeoutSeconds')",
+    "JOB_TTL_SECONDS=$(Get-ConfigValue -Config $config -Path 'api.jobTtlSeconds')",
+    "MAX_JOBS=$(Get-ConfigValue -Config $config -Path 'api.maxJobs')",
+    "CHAT_JOB_WORKERS=$(Get-ConfigValue -Config $config -Path 'api.chatJobWorkers')",
+    "MAX_MCP_APPROVAL_ROUNDS=$(Get-ConfigValue -Config $config -Path 'foundry.maxMcpApprovalRounds')",
+    "TEAMS_MANIFEST_VERSION=$(Get-ConfigValue -Config $config -Path 'api.teamsManifestVersion')",
+    "DECLARATIVE_AGENT_VERSION=$(Get-ConfigValue -Config $config -Path 'api.declarativeAgentVersion')",
+    "PLUGIN_SCHEMA_VERSION=$(Get-ConfigValue -Config $config -Path 'api.pluginSchemaVersion')"
 )
 Invoke-Az (@("webapp", "config", "appsettings", "set", "-g", $ResourceGroup, "-n", $ApiAppName, "-o", "none", "--settings") + $settings) | Out-Null
 
-# One worker only: the chat job store lives in process memory.
-$startup = "gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 8 --timeout 600 --bind 0.0.0.0:8000"
+# Keep the worker count aligned with the API's in-process chat job store.
+$startup = "gunicorn app.main:app -k uvicorn.workers.UvicornWorker --workers $GunicornWorkers --threads $GunicornThreads --timeout $GunicornTimeoutSeconds --bind $GunicornBind"
 Invoke-Az @("webapp", "config", "set", "-g", $ResourceGroup, "-n", $ApiAppName,
     "--startup-file", $startup, "--http20-enabled", "true", "-o", "none") | Out-Null
 Write-Host "  app settings and startup command applied"

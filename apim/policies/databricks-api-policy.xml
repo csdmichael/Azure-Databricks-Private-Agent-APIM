@@ -3,14 +3,14 @@
   - Uses APIM's system-assigned managed identity to obtain an Entra token for the
     Databricks login application, then forwards it as the backend Authorization.
     (The APIM MI must be added as a user in the Databricks workspace with access
-    to the SQL warehouse and the caldova_dbx_westus2.arrow_semiconductor schema.)
+    to the SQL warehouse and configured Unity Catalog schema.)
   - Routes all operations to the private workspace control-plane URL.
   - Applies a conservative rate limit for the POC.
 -->
 <policies>
   <inbound>
     <base />
-    <rate-limit calls="60" renewal-period="60" />
+    <rate-limit calls="{{databricks-rate-limit-calls}}" renewal-period="{{databricks-rate-limit-renewal-period}}" />
     <authentication-managed-identity resource="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
                                      output-token-variable-name="msi-access-token" ignore-error="false" />
     <set-header name="Authorization" exists-action="override">
