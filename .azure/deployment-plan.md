@@ -76,7 +76,7 @@ written to source, Terraform state examples, logs, screenshots, or documentation
 - [x] Write `fabric/README.md` with architecture, OBO, deployment, acceptance, and rollback guidance.
 - [x] Run syntax, unit, policy, Bicep, Terraform, secret, and local parity checks.
 - [ ] Run Azure validation and what-if; record proof below.
-- [ ] Commit and push source.
+- [x] Commit and push source.
 - [ ] Deploy Azure resources and application code through the validated Bicep recipe.
 - [ ] Publish connectors and both agents only after the target environment resolves.
 - [ ] Run delegated-user, denial, MCP handshake, Lakehouse query, and deck-generation tests.
@@ -126,6 +126,9 @@ the active status to `Validated` before any Fabric deployment command runs.
 	configuration fingerprints, live Graph provenance, explicit app adoption, transactional
 	credentials/connectors, principal-scoped consent checks, and a hard workspace Private
 	Link gate.
+- Source commit `d0b09b6` (`Add Fabric OBO deployment workflow`) was pushed to
+	`origin/main` before any Fabric Azure resource, Entra registration, Power Platform
+	connector, or Copilot Studio agent mutation.
 - Live Azure ARM validation, reviewed what-if, inherited-policy review, environment
 	resolution, deployment, connector/agent publication, delegated and denied-user tests,
 	and remaining screenshots are not yet complete and are not claimed by this proof.
