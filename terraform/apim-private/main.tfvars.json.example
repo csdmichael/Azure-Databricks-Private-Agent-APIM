@@ -1,0 +1,7 @@
+{
+  "publisher_name": "<publisher-display-name>",
+  "publisher_email": "<publisher-email-address>",
+  "apim_sku_name": "StandardV2",
+  "apim_capacity": 1,
+  "public_network_access": "Enabled"
+}

@@ -1,8 +1,115 @@
-# Showcase Analytics and Genie User Federation
+# Fabric Lakehouse and Data Agent OBO
 
-Status: Validated
+Status: Approved
 
-Current scope: enable logging and agent tracing for `foundry-myaacoub/proj-default`
+## Active Scope
+
+Build, publish, and deploy a customer-portable Microsoft Fabric integration that:
+
+- exposes a Fabric Lakehouse query API and MCP server through Azure API Management;
+- proxies the published Fabric data-agent MCP server through APIM;
+- preserves the signed-in user with the OAuth 2.0 on-behalf-of flow;
+- packages two Copilot Studio agents with the high-fidelity PowerPoint skill;
+- uses one nonsecret JSON configuration contract across PowerShell, Bicep, and Terraform;
+- supplies separate `fabric/bicep` and `fabric/terraform` deployment paths;
+- supplies Terraform parity for the repository's existing Bicep deployment surfaces;
+- documents the complete identity and network flow with sanitized live screenshots; and
+- commits and pushes source before publishing and deploying cloud resources.
+
+The user approved implementation, commit, publication, and deployment in the requests
+dated 2026-09-16. No secret, access token, connector credential, or private key may be
+written to source, Terraform state examples, logs, screenshots, or documentation.
+
+## Active Target
+
+- Tenant: `b158173c-91f6-4f99-b5e9-aa9bcb463863`
+- Subscription: `86b37969-9445-49cf-b03f-d8866235171c`
+- Resource group: `ai-myaacoub`
+- Azure region: `westus2`
+- Fabric workspace: `Fabric IQ Parts Shortages`
+	(`2b2c447d-86e1-4982-a5b6-09d2e0f3482d`, West US)
+- Lakehouse: `lh_part_shortages_v2`
+	(`d487748c-006e-4945-a2ac-9ddb26c999f1`)
+- SQL analytics endpoint: `12c47d8c-d0c6-4cae-8599-760f7c18b048`
+- Published data agent: `agent_part_shortages`
+	(`2ec6cb5e-2f5c-44e7-9c0d-a113cb372741`)
+- Requested Copilot Studio environment: `Caldova Private` (must be resolved by ID
+	before any connector or agent mutation)
+
+## Architecture Decisions
+
+1. Fabric is a multitenant service and has no customer VNet to peer. The supported
+	 private path is a Fabric workspace-level Private Link service plus one or more Azure
+	 private endpoints. VNet peering is used only between customer-owned VNets when the
+	 configured APIM, broker, or Power Platform topology requires it.
+2. The current workspace contains Power BI semantic models. Microsoft documents those
+	 as incompatible with workspace-level Private Link. The deployment must preflight and
+	 stop before creating or restricting the workspace private link; it must not delete,
+	 move, or alter those semantic models automatically.
+3. The Lakehouse API uses a small protocol adapter because APIM cannot issue TDS queries
+	 directly. APIM validates the connector's delegated API token, performs confidential
+	 OBO for the Fabric/Power BI downstream scope, and forwards only the exchanged user
+	 token to the adapter. The adapter allows read-only SQL and uses the Lakehouse SQL
+	 analytics endpoint under that user's Fabric permissions.
+4. The Lakehouse MCP surface is generated from the governed Lakehouse REST operations
+	 in APIM. The Fabric data-agent surface remains native streamable HTTP MCP and is
+	 proxied through APIM after the same delegated OBO exchange. Its upstream endpoint is
+	 `https://api.fabric.microsoft.com/v1/mcp/workspaces/{workspaceId}/dataagents/{dataAgentId}/agent`.
+5. Bicep is the live deployment recipe for this reference tenant. Terraform is an
+	 equivalent customer option and is validated independently, but both tools must never
+	 manage the same deployed resource at the same time.
+6. Entra applications and Power Platform connectors are provisioned by idempotent
+	 PowerShell because they are tenant objects, not Azure resource-group resources.
+	 Credentials are generated only in memory and passed directly to the target service.
+7. Copilot Studio agents are solution/package artifacts driven from configuration. A
+	 deployment must stop if the configured environment is absent, lacks Dataverse, or
+	 cannot support the selected private-network path.
+
+## Execution Plan
+
+- [ ] Reconcile and validate the five resumed Terraform modules without discarding user edits.
+- [ ] Add Terraform parity for every remaining existing Bicep deployment folder.
+- [ ] Implement and test the Fabric OBO adapter and APIM REST/MCP policies.
+- [ ] Add config-driven Fabric Bicep and Terraform stacks with matching outputs.
+- [ ] Add idempotent Entra, connector, MCP, and Copilot Studio packaging scripts.
+- [ ] Copy and generalize the executive PowerPoint skill for Fabric sources.
+- [ ] Write `fabric/README.md` with architecture, OBO, deployment, acceptance, and rollback guidance.
+- [ ] Run syntax, unit, policy, Bicep, Terraform, secret, and drift checks.
+- [ ] Run Azure validation and what-if; record proof below.
+- [ ] Commit and push source.
+- [ ] Deploy Azure resources and application code through the validated Bicep recipe.
+- [ ] Publish connectors and both agents only after the target environment resolves.
+- [ ] Run delegated-user, denial, MCP handshake, Lakehouse query, and deck-generation tests.
+- [ ] Capture sanitized screenshots and publish them in the Fabric README.
+
+## Deployment Gates
+
+- Do not enable workspace inbound restriction while unsupported semantic models remain.
+- Do not create a replacement Power Platform environment without explicit environment
+	region, type, Dataverse, licensing, and irreversible-provisioning approval.
+- Do not repurpose an existing APIM, VNet, subnet, app registration, or App Service until
+	its configuration and ownership are verified.
+- Do not deploy old Databricks parity modules into the active Fabric tenant; they are
+	customer alternatives for the existing Bicep modules only.
+- Do not publish an agent until its OAuth connection is created by an authorized user and
+	its tool returns a live permission-trimmed result.
+
+## Active Validation Proof
+
+Pending implementation. The azure-validate workflow must populate this section and set
+the active status to `Validated` before any Fabric deployment command runs.
+
+---
+
+## Historical Validated Scope: Showcase Analytics and Genie User Federation
+
+The remainder of this document records the previously completed Caldova Databricks
+deployment and is retained as historical evidence. It does not validate the active
+Fabric deployment described above.
+
+Historical status: Validated
+
+Historical scope: enable logging and agent tracing for `foundry-myaacoub/proj-default`
 and `foundry-myaacoub-private/sales-poc`. Reuse the existing workspace-based
 `caldova-genie-obo-insights` component and `caldova-apim-logs-westus` workspace.
 Add shared account-level Application Insights connections, project diagnostics,

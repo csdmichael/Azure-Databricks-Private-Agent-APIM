@@ -1,0 +1,6 @@
+{
+  "config_path": "../../config/deployment.json",
+  "web_principal_id": "<showcase-web-app-managed-identity-principal-id>",
+  "auth_client_id": "<showcase-entra-application-client-id>",
+  "cosmos_data_contributor_role_definition_guid": "00000000-0000-0000-0000-000000000002"
+}

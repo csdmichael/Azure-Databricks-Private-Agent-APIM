@@ -1,0 +1,10 @@
+<!-- GET /genie/conversations/{conversationId}/messages/{messageId} : poll message status and read the text/query attachments. -->
+<policies>
+  <inbound>
+    <base />
+    <rewrite-uri template="/api/2.0/genie/spaces/{{databricks-genie-space-id}}/conversations/{conversationId}/messages/{messageId}" />
+  </inbound>
+  <backend><base /></backend>
+  <outbound><base /></outbound>
+  <on-error><base /></on-error>
+</policies>

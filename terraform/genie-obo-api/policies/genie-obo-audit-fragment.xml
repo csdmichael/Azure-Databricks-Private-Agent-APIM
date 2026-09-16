@@ -1,0 +1,20 @@
+<fragment>
+  <trace source="genie-obo" severity="information">
+    <message>@{
+      var jwt = context.Variables.GetValueOrDefault&lt;Jwt&gt;("genie-user-jwt");
+      return new JObject(
+        new JProperty("event", "genie_request"),
+        new JProperty("source", "apim"),
+        new JProperty("correlationId", context.RequestId.ToString()),
+        new JProperty("stage", context.Variables.GetValueOrDefault&lt;string&gt;("audit-stage", "request_started")),
+        new JProperty("outcome", context.Variables.GetValueOrDefault&lt;string&gt;("audit-outcome", "pending")),
+        new JProperty("status", context.Variables.GetValueOrDefault&lt;int&gt;("audit-status", 0)),
+        new JProperty("userId", jwt == null ? "" : jwt.Claims.GetValueOrDefault("oid", "")),
+        new JProperty("user", jwt == null ? "" : jwt.Claims.GetValueOrDefault("preferred_username", "")),
+        new JProperty("operation", context.Operation.Id),
+        new JProperty("method", context.Request.Method),
+        new JProperty("durationMs", context.Elapsed.TotalMilliseconds)
+      ).ToString(Newtonsoft.Json.Formatting.None);
+    }</message>
+  </trace>
+</fragment>

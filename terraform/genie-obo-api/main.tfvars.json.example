@@ -1,0 +1,4 @@
+{
+  "genie_space_id": "replace-with-databricks-genie-space-id",
+  "api_description": "Private Genie API with per-user Entra tokens and Databricks token federation."
+}

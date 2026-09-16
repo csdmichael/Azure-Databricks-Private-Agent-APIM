@@ -1,0 +1,10 @@
+<!-- POST /genie/ask : start a Genie conversation on the configured space. Body: { "content": "natural-language question" } -->
+<policies>
+  <inbound>
+    <base />
+    <rewrite-uri template="/api/2.0/genie/spaces/{{databricks-genie-space-id}}/start-conversation" />
+  </inbound>
+  <backend><base /></backend>
+  <outbound><base /></outbound>
+  <on-error><base /></on-error>
+</policies>
