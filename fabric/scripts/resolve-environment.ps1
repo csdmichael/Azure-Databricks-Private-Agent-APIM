@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $config = Get-FabricDeploymentConfig -Path $ConfigPath
 $tenantId = [string]$config.powerPlatform.tenantId
 $displayName = [string]$config.powerPlatform.environmentDisplayName
-$token = Get-FabricAzAccessToken -TenantId $tenantId -Resource 'https://service.powerapps.com/'
+$token = Get-FabricAzAccessToken -TenantId $tenantId -Resource 'https://service.powerapps.com/' -SubscriptionId ([string]$config.apim.subscriptionId)
 try {
     $headers = @{ Authorization = "Bearer $token" }
     $uri = 'https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2021-04-01'

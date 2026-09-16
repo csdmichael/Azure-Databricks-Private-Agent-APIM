@@ -165,8 +165,8 @@ if ($identityConnectorKinds.Count -ne 2 -or $identityConnectorKinds[0] -ne 'data
     throw 'Identity metadata must contain exactly one dataAgent and one lakehouse connector.'
 }
 
-$powerPlatformToken = Get-FabricAzAccessToken -TenantId $callerTenantId -Resource 'https://service.powerapps.com/'
-$resourceGraphToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://graph.microsoft.com/'
+$powerPlatformToken = Get-FabricAzAccessToken -TenantId $callerTenantId -Resource 'https://service.powerapps.com/' -SubscriptionId ([string]$config.apim.subscriptionId)
+$resourceGraphToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.azure.subscriptionId)
 
 function Invoke-ResourceGraph {
     param([ValidateSet('GET', 'POST', 'PATCH')] [string] $Method, [string] $Path, [object] $Body)

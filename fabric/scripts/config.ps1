@@ -126,10 +126,22 @@ function Get-FabricAzAccessToken {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)] [string] $TenantId,
-        [Parameter(Mandatory = $true)] [string] $Resource
+        [Parameter(Mandatory = $true)] [string] $Resource,
+        [string] $SubscriptionId
     )
 
-    $token = az account get-access-token --tenant $TenantId --resource $Resource --query accessToken -o tsv
+    $arguments = @('account', 'get-access-token', '--resource', $Resource, '--query', 'accessToken', '-o', 'tsv')
+    if (-not [string]::IsNullOrWhiteSpace($SubscriptionId)) {
+        $subscriptionTenant = az account show --subscription $SubscriptionId --query tenantId -o tsv
+        if ($LASTEXITCODE -ne 0 -or $subscriptionTenant -ne $TenantId) {
+            throw "Subscription '$SubscriptionId' is not available in tenant '$TenantId'."
+        }
+        $arguments += @('--subscription', $SubscriptionId)
+    }
+    else {
+        $arguments += @('--tenant', $TenantId)
+    }
+    $token = az @arguments
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
         throw "Unable to acquire a token for '$Resource' in tenant '$TenantId'."
     }

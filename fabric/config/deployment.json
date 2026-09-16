@@ -82,7 +82,7 @@
   },
   "powerPlatform": {
     "tenantId": "12a4b86b-e64c-43f9-af05-d9130a72dfd2",
-    "environmentId": "",
+    "environmentId": "52456fcd-1d20-ecdb-aa2e-8979e3f794f5",
     "environmentDisplayName": "Caldova Private",
     "publisherPrefix": "caldova",
     "lakehouseConnectorName": "Fabric Lakehouse OBO Private",

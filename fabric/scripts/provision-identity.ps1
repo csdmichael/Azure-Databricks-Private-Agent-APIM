@@ -24,8 +24,8 @@ $config = Get-FabricDeploymentConfig -Path $ConfigPath
 $configFingerprint = Get-FabricConfigFingerprint -Path $ConfigPath
 $resourceTenantId = [string]$config.identity.resourceTenantId
 $callerTenantId = [string]$config.identity.callerTenantId
-$resourceGraphToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://graph.microsoft.com/'
-$callerGraphToken = Get-FabricAzAccessToken -TenantId $callerTenantId -Resource 'https://graph.microsoft.com/'
+$resourceGraphToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.azure.subscriptionId)
+$callerGraphToken = Get-FabricAzAccessToken -TenantId $callerTenantId -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.apim.subscriptionId)
 $credential = $null
 $credentialStored = $false
 $credentialApplicationId = $null
@@ -353,7 +353,7 @@ try {
     Ensure-AppRoleAssignment -Token $callerGraphToken -ClientPrincipalId $apimPrincipal.id -ResourcePrincipalId $brokerApiPrincipal.id -AppRoleId $brokerRole.id
 
     if (-not [string]::IsNullOrWhiteSpace($KeyVaultName)) {
-        $vaultToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://vault.azure.net'
+        $vaultToken = Get-FabricAzAccessToken -TenantId $resourceTenantId -Resource 'https://vault.azure.net' -SubscriptionId ([string]$config.azure.subscriptionId)
         $secretMetadata = $null
         try {
             $secretMetadata = Invoke-RestMethod -Method GET -Uri "https://$KeyVaultName.vault.azure.net/secrets/$OboClientSecretName?api-version=7.4" -Headers @{ Authorization = "Bearer $vaultToken" }

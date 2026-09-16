@@ -33,8 +33,8 @@ written to source, Terraform state examples, logs, screenshots, or documentation
 - SQL analytics endpoint: `12c47d8c-d0c6-4cae-8599-760f7c18b048`
 - Published data agent: `agent_part_shortages`
 	(`2ec6cb5e-2f5c-44e7-9c0d-a113cb372741`)
-- Requested Copilot Studio environment: `Caldova Private` (must be resolved by ID
-	before any connector or agent mutation)
+- Copilot Studio environment: `Caldova Private`
+	(`52456fcd-1d20-ecdb-aa2e-8979e3f794f5`, Canada, Managed Environment with Dataverse)
 
 ## Architecture Decisions
 
@@ -129,6 +129,16 @@ the active status to `Validated` before any Fabric deployment command runs.
 - Source commit `d0b09b6` (`Add Fabric OBO deployment workflow`) was pushed to
 	`origin/main` before any Fabric Azure resource, Entra registration, Power Platform
 	connector, or Copilot Studio agent mutation.
+- Dual-tenant read-only preflight confirmed both configured subscriptions under their
+	configured administrator accounts. The existing Fabric-side Linux B1 plan is in West
+	US 2; the broker VNet is `10.1.0.0/16`; all configured broker/APIM VNets, subnets,
+	resource groups, and the APIM system identity resolved without mutation.
+- `Caldova Private` resolved by exact display name to environment
+	`52456fcd-1d20-ecdb-aa2e-8979e3f794f5`; its Dataverse URL is in Canada and its
+	Managed Environment protection level is `Standard`. No replacement environment was
+	created.
+- Azure Policy assignment queries with inherited scope enabled returned no assignments
+	for either `ai-myaacoub` or `m365-myaacoub`.
 - Live Azure ARM validation, reviewed what-if, inherited-policy review, environment
 	resolution, deployment, connector/agent publication, delegated and denied-user tests,
 	and remaining screenshots are not yet complete and are not claimed by this proof.

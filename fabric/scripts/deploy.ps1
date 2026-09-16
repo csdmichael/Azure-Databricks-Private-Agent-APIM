@@ -194,8 +194,8 @@ function Assert-LiveApplicationPair {
 
 function Assert-LiveIdentityMetadata {
     param([object] $Identity)
-    $resourceToken = Get-FabricAzAccessToken -TenantId ([string]$config.identity.resourceTenantId) -Resource 'https://graph.microsoft.com/'
-    $callerToken = Get-FabricAzAccessToken -TenantId ([string]$config.identity.callerTenantId) -Resource 'https://graph.microsoft.com/'
+    $resourceToken = Get-FabricAzAccessToken -TenantId ([string]$config.identity.resourceTenantId) -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.azure.subscriptionId)
+    $callerToken = Get-FabricAzAccessToken -TenantId ([string]$config.identity.callerTenantId) -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.apim.subscriptionId)
     try {
         Assert-LiveApplicationPair -Token $resourceToken -Metadata $Identity.resourceApi -ExpectedDisplayName ([string]$config.identity.apiDisplayName) -Label 'Resource API'
         foreach ($connector in $Identity.connectors) {
@@ -300,7 +300,7 @@ function Get-BrokerParameters {
 function Invoke-Preflight {
     $resourceContext = Assert-FabricAzureContext -SubscriptionId ([string]$config.azure.subscriptionId) -TenantId ([string]$config.azure.tenantId)
     if ([string]::IsNullOrWhiteSpace($CurrentDeployerPrincipalId)) {
-        $resourceGraphToken = Get-FabricAzAccessToken -TenantId ([string]$config.azure.tenantId) -Resource 'https://graph.microsoft.com/'
+        $resourceGraphToken = Get-FabricAzAccessToken -TenantId ([string]$config.azure.tenantId) -Resource 'https://graph.microsoft.com/' -SubscriptionId ([string]$config.azure.subscriptionId)
         try {
             $signedInUser = Invoke-RestMethod -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=id' -Headers @{ Authorization = "Bearer $resourceGraphToken" }
             $script:CurrentDeployerPrincipalId = [string]$signedInUser.id
@@ -431,7 +431,7 @@ if (Test-Step 'package') {
                 if ($LASTEXITCODE -ne 0) { throw 'Unable to add the temporary storage upload rule.' }
                 $uploadRuleCreated = $true
             }
-            $storageToken = Get-FabricAzAccessToken -TenantId ([string]$config.azure.tenantId) -Resource 'https://storage.azure.com/'
+            $storageToken = Get-FabricAzAccessToken -TenantId ([string]$config.azure.tenantId) -Resource 'https://storage.azure.com/' -SubscriptionId ([string]$config.azure.subscriptionId)
             try {
                 Invoke-WebRequest -Method PUT -Uri "https://$storageAccountName.blob.core.windows.net/deployments/fabric-obo-broker.zip" -Headers @{
                     Authorization = "Bearer $storageToken"
