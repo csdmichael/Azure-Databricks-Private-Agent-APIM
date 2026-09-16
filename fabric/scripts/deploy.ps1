@@ -257,6 +257,12 @@ function Get-IdentityMetadata {
 
 function Get-BrokerParameters {
     param([bool] $DeployFunction, [object] $Identity)
+    $connectorClientIds = [object[]]@()
+    $allowedUserObjectIds = [object[]]@()
+    if ($DeployFunction) {
+        $connectorClientIds = [object[]]@($Identity.connectors.clientId)
+        $allowedUserObjectIds = [object[]]@($Identity.allowedUserObjectIds)
+    }
     return @{
         location = [string]$config.azure.location
         functionAppName = [string]$config.broker.appName
@@ -270,8 +276,8 @@ function Get-BrokerParameters {
         entraApiClientId = if ($DeployFunction) { [string]$Identity.resourceApi.clientId } else { '' }
         brokerAudience = if ($DeployFunction) { [string]$Identity.brokerApi.clientId } else { '' }
         apimPrincipalId = if ($DeployFunction) { [string]$Identity.apimPrincipalId } else { '' }
-        allowedConnectorClientIds = if ($DeployFunction) { @($Identity.connectors.clientId) } else { @() }
-        allowedUserObjectIds = if ($DeployFunction) { @($Identity.allowedUserObjectIds) } else { @() }
+        allowedConnectorClientIds = $connectorClientIds
+        allowedUserObjectIds = $allowedUserObjectIds
         currentDeployerPrincipalId = $CurrentDeployerPrincipalId
         deploymentContainerName = 'deployments'
         packageBlobName = 'fabric-obo-broker.zip'
@@ -327,6 +333,9 @@ function Invoke-Preflight {
     $script:LiveApimPrincipalId = az apim show --subscription $config.apim.subscriptionId --resource-group $config.apim.resourceGroup --name $config.apim.serviceName --query identity.principalId --only-show-errors -o tsv
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($script:LiveApimPrincipalId)) { throw "Configured APIM service or system identity is unavailable: $($config.apim.serviceName)" }
     $script:LiveApimPrincipalId = Assert-FabricGuid -Value $script:LiveApimPrincipalId -Name 'APIM system-assigned identity'
+    $webPrivateDnsZoneId = "/subscriptions/$($config.apim.subscriptionId)/resourceGroups/$($config.apim.resourceGroup)/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net"
+    az resource show --ids $webPrivateDnsZoneId --subscription $config.apim.subscriptionId --only-show-errors -o none 2>$null
+    $script:ApimWebPrivateDnsZoneExists = $LASTEXITCODE -eq 0
 
     [pscustomobject]@{
         ResourceSubscription = $resourceContext.name
@@ -339,6 +348,7 @@ function Invoke-Preflight {
 $brokerBaseDeploymentName = "$deploymentPrefix-broker-base"
 $brokerAppDeploymentName = "$deploymentPrefix-broker-app"
 $script:LiveApimPrincipalId = $null
+$script:ApimWebPrivateDnsZoneExists = $false
 $baseOutputs = $null
 $appOutputs = $null
 $package = $null
@@ -499,7 +509,7 @@ if (Test-Step 'apim') {
         brokerPrivateEndpointIp = $brokerPrivateEndpointIp
         applicationInsightsName = $ApplicationInsightsName
         applicationInsightsResourceGroupName = $ApplicationInsightsResourceGroupName
-        createPrivateDnsZone = -not [bool]$ReusePrivateDnsZone
+        createPrivateDnsZone = -not ([bool]$ReusePrivateDnsZone -or $script:ApimWebPrivateDnsZoneExists)
         privateDnsZoneResourceGroupName = [string]$config.apim.resourceGroup
     }
     $null = Assert-FabricAzureContext -SubscriptionId ([string]$config.apim.subscriptionId) -TenantId ([string]$config.apim.tenantId)

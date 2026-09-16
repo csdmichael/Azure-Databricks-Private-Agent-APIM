@@ -1,6 +1,6 @@
 # Fabric Lakehouse and Data Agent OBO
 
-Status: Approved
+Status: Validated
 
 ## Active Scope
 
@@ -75,7 +75,7 @@ written to source, Terraform state examples, logs, screenshots, or documentation
 - [x] Copy and generalize the executive PowerPoint skill for Fabric sources.
 - [x] Write `fabric/README.md` with architecture, OBO, deployment, acceptance, and rollback guidance.
 - [x] Run syntax, unit, policy, Bicep, Terraform, secret, and local parity checks.
-- [ ] Run Azure validation and what-if; record proof below.
+- [x] Run Azure validation and what-if; record proof below.
 - [x] Commit and push source.
 - [ ] Deploy Azure resources and application code through the validated Bicep recipe.
 - [ ] Publish connectors and both agents only after the target environment resolves.
@@ -139,14 +139,38 @@ the active status to `Validated` before any Fabric deployment command runs.
 	created.
 - Azure Policy assignment queries with inherited scope enabled returned no assignments
 	for either `ai-myaacoub` or `m365-myaacoub`.
+- Final fail-closed ARM what-if results after shared-DNS and least-privilege corrections:
+	APIM-side peering `Create=1, Ignore=84`; broker-side peering
+	`Create=1, Ignore=341`; broker base `Create=23, Ignore=338, NoChange=3`;
+	broker Function stage `Create=29, Ignore=338, NoChange=3`; APIM APIs/MCP/DNS
+	`Create=29, Ignore=85`. No stage contains Modify, Delete, Deploy, Unsupported,
+	or an unknown change type. Full payloads are retained only in the gitignored
+	`fabric/.generated/what-if` directory.
+- Explicit ARM `validate` returned `Succeeded` for both peering templates, broker base,
+	broker Function stage, and the subscription-scoped APIM stack. The stage-two broker
+	and APIM structural previews use schema-valid placeholder application IDs and a private
+	IP because those values are emitted only after stage one and Entra provisioning. The
+	deployment must regenerate and review both previews with the real outputs before either
+	stage is created.
+- Static role verification: the HTTP-only broker UAMI receives Storage Blob Data Owner
+	at its dedicated storage account for host/package data, Storage Table Data Contributor
+	at that account only for optional host-startup diagnostics, and Key Vault Secrets User
+	at its dedicated vault for the versionless OBO reference. It receives no Queue role,
+	Metrics Publisher, duplicate Blob Contributor, Key Vault Secrets Officer, resource-group,
+	or subscription-wide role. The current deployer receives temporary deployment duties:
+	Storage Blob Data Contributor at the dedicated account and Key Vault Secrets Officer at
+	the dedicated vault. Bicep and Terraform define the same role and private-endpoint set.
+- Shared existing private DNS zones are reused without application tags. Only dedicated
+	VNet links, endpoint zone groups, and broker records are created. This removed all
+	shared-zone modifications from the final previews.
 - Live Azure ARM validation, reviewed what-if, inherited-policy review, environment
 	resolution, deployment, connector/agent publication, delegated and denied-user tests,
 	and remaining screenshots are not yet complete and are not claimed by this proof.
 
-- [ ] All validation checks pass (Fabric Lakehouse and Data Agent OBO)
-	- [ ] Core Validation (CLI, auth, ARM validation, and what-if; local build checks passed)
+- [x] All validation checks pass (Fabric Lakehouse and Data Agent OBO)
+	- [x] Core Validation (CLI, dual-tenant auth, build, ARM validation, and what-if)
 	- [x] Bicep linting
-	- [ ] Azure Policy Validation
+	- [x] Azure Policy Validation
 
 ---
 

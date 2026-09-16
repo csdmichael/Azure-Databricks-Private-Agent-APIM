@@ -134,12 +134,10 @@ var logAnalyticsWorkspaceName = take('log-${functionAppName}', 63)
 var applicationInsightsName = take('appi-${functionAppName}', 260)
 var functionPrivateEndpointName = take('pe-${functionAppName}-sites', 64)
 var blobPrivateEndpointName = take('pe-${functionAppName}-blob', 64)
-var queuePrivateEndpointName = take('pe-${functionAppName}-queue', 64)
 var tablePrivateEndpointName = take('pe-${functionAppName}-table', 64)
 var vaultPrivateEndpointName = take('pe-${functionAppName}-vault', 64)
 var webPrivateDnsZoneName = 'privatelink.azurewebsites.net'
 var blobPrivateDnsZoneName = 'privatelink.blob.${environment().suffixes.storage}'
-var queuePrivateDnsZoneName = 'privatelink.queue.${environment().suffixes.storage}'
 var tablePrivateDnsZoneName = 'privatelink.table.${environment().suffixes.storage}'
 var vaultPrivateDnsZoneName = 'privatelink.vaultcore.azure.net'
 var keyVaultSecretReference = '@Microsoft.KeyVault(SecretUri=https://${keyVaultName}.${environment().suffixes.keyvaultDns}/secrets/${oboClientSecretName})'
@@ -148,17 +146,10 @@ var deploymentPackageBlobUrl = 'https://${storageAccountName}.blob.${environment
 var storageBlobDataContributorRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 var storageRoleDefinitionIds = [
   subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b') // Storage Blob Data Owner
-  storageBlobDataContributorRoleDefinitionId // Storage Blob Data Contributor
-  subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '974c5e8b-45b9-4653-ba55-5f855dd0fb88') // Storage Queue Data Contributor
-  subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3') // Storage Table Data Contributor
-  subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '3913510d-42f4-4e42-8a64-420c390055eb') // Monitoring Metrics Publisher
+  subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3') // Storage Table Data Contributor for host diagnostics
 ]
 var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 var keyVaultSecretsOfficerRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
-var identityKeyVaultRoleDefinitionIds = [
-  keyVaultSecretsUserRoleDefinitionId
-  keyVaultSecretsOfficerRoleDefinitionId
-]
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
   name: existingPlanName
@@ -309,15 +300,15 @@ resource storageRoleAssignments 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }]
 
-resource identityKeyVaultRoleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for roleDefinitionId in identityKeyVaultRoleDefinitionIds: {
+resource identityKeyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
-  name: guid(keyVault.id, brokerIdentity.id, roleDefinitionId)
+  name: guid(keyVault.id, brokerIdentity.id, keyVaultSecretsUserRoleDefinitionId)
   properties: {
     principalId: brokerIdentity.properties.principalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: roleDefinitionId
+    roleDefinitionId: keyVaultSecretsUserRoleDefinitionId
   }
-}]
+}
 
 resource deployerKeyVaultSecretsOfficer 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: keyVault
@@ -340,31 +331,21 @@ resource deployerStorageBlobDataContributor 'Microsoft.Authorization/roleAssignm
 resource webPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: webPrivateDnsZoneName
   location: 'global'
-  tags: tags
 }
 
 resource blobPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: blobPrivateDnsZoneName
   location: 'global'
-  tags: tags
-}
-
-resource queuePrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: queuePrivateDnsZoneName
-  location: 'global'
-  tags: tags
 }
 
 resource tablePrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: tablePrivateDnsZoneName
   location: 'global'
-  tags: tags
 }
 
 resource vaultPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: vaultPrivateDnsZoneName
   location: 'global'
-  tags: tags
 }
 
 resource webPrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
@@ -383,19 +364,6 @@ resource webPrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetwork
 resource blobPrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: blobPrivateDnsZone
   name: take('link-${functionAppName}-blob', 80)
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: brokerVnetResourceId
-    }
-  }
-}
-
-resource queuePrivateDnsVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: queuePrivateDnsZone
-  name: take('link-${functionAppName}-queue', 80)
   location: 'global'
   tags: tags
   properties: {
@@ -463,43 +431,6 @@ resource blobPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZ
         name: 'blob'
         properties: {
           privateDnsZoneId: blobPrivateDnsZone.id
-        }
-      }
-    ]
-  }
-}
-
-resource queuePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: queuePrivateEndpointName
-  location: location
-  tags: tags
-  properties: {
-    privateLinkServiceConnections: [
-      {
-        name: 'queue'
-        properties: {
-          groupIds: [
-            'queue'
-          ]
-          privateLinkServiceId: storageAccount.id
-        }
-      }
-    ]
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-  }
-}
-
-resource queuePrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: queuePrivateEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'queue'
-        properties: {
-          privateDnsZoneId: queuePrivateDnsZone.id
         }
       }
     ]
@@ -744,13 +675,13 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = if (deployFunction) {
     deploymentContainer
     storageRoleAssignments
     deployerStorageBlobDataContributor
-    identityKeyVaultRoleAssignments
+    identityKeyVaultSecretsUser
     blobPrivateDnsVnetLink
-    queuePrivateDnsVnetLink
     tablePrivateDnsVnetLink
+    vaultPrivateDnsVnetLink
     blobPrivateDnsZoneGroup
-    queuePrivateDnsZoneGroup
     tablePrivateDnsZoneGroup
+    vaultPrivateDnsZoneGroup
   ]
 }
 

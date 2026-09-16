@@ -19,7 +19,6 @@ locals {
   uuid_pattern                          = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
   web_private_dns_zone_name             = "privatelink.azurewebsites.net"
   blob_private_dns_zone_name            = "privatelink.blob.core.windows.net"
-  queue_private_dns_zone_name           = "privatelink.queue.core.windows.net"
   table_private_dns_zone_name           = "privatelink.table.core.windows.net"
   vault_private_dns_zone_name           = "privatelink.vaultcore.azure.net"
   package_blob_url                      = "${azurerm_storage_account.broker.primary_blob_endpoint}${var.deployment_container_name}/${var.package_blob_name}"
@@ -28,22 +27,17 @@ locals {
   storage_blob_data_contributor_role_id = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 
   storage_role_definition_ids = {
-    blob_data_owner              = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b"
-    blob_data_contributor        = local.storage_blob_data_contributor_role_id
-    queue_data_contributor       = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/974c5e8b-45b9-4653-ba55-5f855dd0fb88"
-    table_data_contributor       = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
-    monitoring_metrics_publisher = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/3913510d-42f4-4e42-8a64-420c390055eb"
+    blob_data_owner        = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/b7e6dc6d-f1e8-4753-8033-0f276bb0955b"
+    table_data_contributor = "/subscriptions/${local.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3"
   }
 
   identity_key_vault_role_definition_ids = {
-    secrets_user    = local.key_vault_secrets_user_role_id
-    secrets_officer = local.key_vault_secrets_officer_role_id
+    secrets_user = local.key_vault_secrets_user_role_id
   }
 
-  private_endpoint_kinds = toset(["blob", "queue", "sites", "table", "vault"])
+  private_endpoint_kinds = toset(["blob", "sites", "table", "vault"])
   private_dns_zones = {
     blob  = azurerm_private_dns_zone.blob.name
-    queue = azurerm_private_dns_zone.queue.name
     sites = azurerm_private_dns_zone.web.name
     table = azurerm_private_dns_zone.table.name
     vault = azurerm_private_dns_zone.vault.name
@@ -253,31 +247,21 @@ resource "azurerm_role_assignment" "deployer_storage_blob_data_contributor" {
 resource "azurerm_private_dns_zone" "web" {
   name                = local.web_private_dns_zone_name
   resource_group_name = data.azurerm_resource_group.broker.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone" "blob" {
   name                = local.blob_private_dns_zone_name
   resource_group_name = data.azurerm_resource_group.broker.name
-  tags                = local.tags
-}
-
-resource "azurerm_private_dns_zone" "queue" {
-  name                = local.queue_private_dns_zone_name
-  resource_group_name = data.azurerm_resource_group.broker.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone" "table" {
   name                = local.table_private_dns_zone_name
   resource_group_name = data.azurerm_resource_group.broker.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone" "vault" {
   name                = local.vault_private_dns_zone_name
   resource_group_name = data.azurerm_resource_group.broker.name
-  tags                = local.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "broker" {
@@ -308,26 +292,6 @@ resource "azurerm_private_endpoint" "blob" {
   private_dns_zone_group {
     name                 = "default"
     private_dns_zone_ids = [azurerm_private_dns_zone.blob.id]
-  }
-}
-
-resource "azurerm_private_endpoint" "queue" {
-  name                = data.azurecaf_name.private_endpoint["queue"].result
-  location            = local.location
-  resource_group_name = data.azurerm_resource_group.broker.name
-  subnet_id           = local.private_endpoint_subnet_id
-  tags                = local.tags
-
-  private_service_connection {
-    name                           = data.azurecaf_name.private_service_connection["queue"].result
-    private_connection_resource_id = azurerm_storage_account.broker.id
-    subresource_names              = ["queue"]
-    is_manual_connection           = false
-  }
-
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.queue.id]
   }
 }
 
@@ -474,7 +438,6 @@ resource "azurerm_linux_function_app" "broker" {
     azapi_resource.deployment_container,
     azurerm_private_dns_zone_virtual_network_link.broker,
     azurerm_private_endpoint.blob,
-    azurerm_private_endpoint.queue,
     azurerm_private_endpoint.table,
     azurerm_role_assignment.deployer_storage_blob_data_contributor,
     azurerm_role_assignment.identity_key_vault,

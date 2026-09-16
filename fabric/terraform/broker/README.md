@@ -2,11 +2,11 @@
 
 This root module decodes `../../config/deployment.json` by default and explicitly configures AzureRM/AzAPI for `azure.subscriptionId` and `azure.tenantId`. It targets `azure.resourceGroup`, references `broker.existingPlanName`, and uses the existing broker VNet/subnet resource IDs without managing them. AzureRM uses `storage_use_azuread=true`; AzureCAF generates deterministic, policy-compatible names from the broker name and a stable configuration hash.
 
-The module creates blob, queue, and table storage private endpoints plus the private deployment-package container. It does not create a Fabric workspace Private Link or change any Fabric item. Its five private DNS zones link only to `network.brokerVnetResourceId`.
+The module creates Blob and Table storage private endpoints plus the private deployment-package container. It does not create a Fabric workspace Private Link or change any Fabric item. Its four private DNS zones link only to `network.brokerVnetResourceId`.
 
 ## Two-stage deployment
 
-1. Create a working `terraform.tfvars.json` from `main.tfvars.json.example` and set `current_deployer_principal_id`. Keep `deploy_function=false` for the first plan/apply. This creates the UAMI, locked host storage, private deployment container, RBAC Key Vault, observability, DNS, and blob/queue/table/vault private endpoints. The deployer receives Key Vault Secrets Officer and Storage Blob Data Contributor at storage-account scope.
+1. Create a working `terraform.tfvars.json` from `main.tfvars.json.example` and set `current_deployer_principal_id`. Keep `deploy_function=false` for the first plan/apply. This creates the UAMI, locked host storage, private deployment container, RBAC Key Vault, observability, DNS, and Blob/Table/Vault private endpoints. The deployer receives Key Vault Secrets Officer and Storage Blob Data Contributor at their resource scopes.
 2. Put the OBO credential in the output vault using an approved secret-management process. Terraform accepts only `obo_client_secret_name`; it has no secret value variable, `azurerm_key_vault_secret` resource, or secret data source.
 3. Build the package outside Terraform. A config-driven deployment script may temporarily enable storage public network access, allow only the deployer's current public `<IP>/32`, upload to `deployment_container_name`/`package_blob_name` with `az storage blob upload --auth-mode login`, remove the rule, and restore public network access to disabled in a `finally` block. Do not use account keys or connection strings. The package must exist before stage 2.
 4. Complete Entra/APIM provisioning, then populate `entra_api_client_id`, `broker_audience`, `apim_principal_id`, `allowed_connector_client_ids`, and the user allowlist. By default the user list comes from `identity.allowedUserObjectIds`; a nonempty variable overrides it.
@@ -16,7 +16,7 @@ The deployment container is created through the ARM management plane with AzAPI,
 
 Key Vault intentionally keeps public network access enabled as required for this broker workflow while also exposing a private endpoint. Storage public network and shared-key access are disabled.
 
-The Function App explicitly waits for the deployment container, UAMI storage roles, storage private DNS links, and blob/queue/table private endpoints. This prevents the Functions host from starting before its identity-based package and host-storage paths are available.
+The HTTP-only Function UAMI receives Storage Blob Data Owner for required host/package storage, Storage Table Data Contributor for optional host diagnostics, and Key Vault Secrets User for the OBO reference. It receives no Queue, Metrics Publisher, duplicate Blob Contributor, or Key Vault write role. The Function App waits for these roles plus the Blob/Table/Vault private paths before startup.
 
 ## Commands
 

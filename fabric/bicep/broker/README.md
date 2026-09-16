@@ -1,6 +1,6 @@
 # Fabric-tenant broker Bicep
 
-This resource-group deployment creates the Fabric-tenant OBO broker infrastructure. It references the existing App Service plan by `broker.existingPlanName` and the existing broker VNet/subnets by resource ID. It creates blob, queue, and table storage private endpoints plus the private deployment-package container. It does not create a Fabric workspace Private Link, change a Fabric item, or link private DNS to any VNet other than `network.brokerVnetResourceId`.
+This resource-group deployment creates the Fabric-tenant OBO broker infrastructure. It references the existing App Service plan by `broker.existingPlanName` and the existing broker VNet/subnets by resource ID. It creates Blob and Table storage private endpoints plus the private deployment-package container. It does not create a Fabric workspace Private Link, change a Fabric item, or link private DNS to any VNet other than `network.brokerVnetResourceId`.
 
 ## Shared configuration contract
 
@@ -45,7 +45,7 @@ The working parameter file is the deployment script's output and must not contai
 
 ## Two-stage deployment
 
-1. Deploy with `deployFunction=false`. This creates the UAMI, storage account, private deployment container, Key Vault, Log Analytics workspace, Application Insights, RBAC, private DNS, and the blob/queue/table/vault private endpoints. The current deployer receives Key Vault Secrets Officer and Storage Blob Data Contributor at storage-account scope.
+1. Deploy with `deployFunction=false`. This creates the UAMI, storage account, private deployment container, Key Vault, Log Analytics workspace, Application Insights, RBAC, private DNS, and the Blob/Table/Vault private endpoints. The current deployer receives Key Vault Secrets Officer and Storage Blob Data Contributor at their resource scopes.
 2. Put the OBO credential in the output vault using an approved secret-management process. The template never creates or reads a secret resource.
 3. Build the package outside this template. A config-driven deployment script may temporarily enable storage public network access, allow only the deployer's current public `<IP>/32`, upload to the configured container/blob with `az storage blob upload --auth-mode login`, remove the rule, and restore public network access to `Disabled` in a `finally` block. Do not use account keys or connection strings. The package must exist before stage 2.
 4. Complete the Entra/APIM identity provisioning and populate all generated ID parameters plus both nonempty allowlists.
@@ -55,7 +55,7 @@ The working parameter file is the deployment script's output and must not contai
 
 Key Vault intentionally keeps `publicNetworkAccess=Enabled` as required for this broker workflow while also exposing a private endpoint. Storage and the Function App have public network access disabled.
 
-The Function App explicitly waits for the deployment container, UAMI storage roles, storage private DNS links, and blob/queue/table private endpoint DNS zone groups. This prevents the Functions host from starting before its identity-based package and host-storage paths are available.
+The HTTP-only Function UAMI receives Storage Blob Data Owner for required host/package storage, Storage Table Data Contributor for optional host diagnostics, and Key Vault Secrets User for the OBO reference. It receives no Queue, Metrics Publisher, duplicate Blob Contributor, or Key Vault write role. The Function App waits for these roles plus the Blob/Table/Vault private DNS paths before startup.
 
 ## Validation
 
