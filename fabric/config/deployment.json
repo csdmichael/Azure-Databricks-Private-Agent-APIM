@@ -48,6 +48,11 @@
     "brokerApplicationRole": "Fabric.Broker.Invoke",
     "fabricApiScope": "https://api.fabric.microsoft.com/.default",
     "powerBiApiScope": "https://analysis.windows.net/powerbi/api/.default",
+    "downstreamDelegatedPermissions": [
+      "DataAgent.Execute.All",
+      "Lakehouse.Read.All",
+      "SQLEndpoint.Read.All"
+    ],
     "caldovaAdminUserPrincipalName": "admin@Caldova37587778.onmicrosoft.com",
     "allowedUserObjectIds": []
   },
@@ -61,7 +66,6 @@
     "powerPlatformPrimarySubnetResourceId": "/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Network/virtualNetworks/caldova-pp-vnet-canadacentral/subnets/power-platform-subnet",
     "powerPlatformSecondarySubnetResourceId": "/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.Network/virtualNetworks/caldova-pp-vnet-canadaeast/subnets/power-platform-subnet",
     "fabricPrivateLinkServiceResourceId": "",
-    "deployWorkspacePrivateLink": false,
     "workspacePrivateLinkBlocker": "Power BI semantic models and external Copilot integrations are unsupported with workspace-level Private Link."
   },
   "broker": {
@@ -80,10 +84,17 @@
     "tenantId": "12a4b86b-e64c-43f9-af05-d9130a72dfd2",
     "environmentId": "",
     "environmentDisplayName": "Caldova Private",
+    "publisherPrefix": "caldova",
     "lakehouseConnectorName": "Fabric Lakehouse OBO Private",
     "dataAgentConnectorName": "Fabric Data Agent OBO Private",
     "lakehouseAgentName": "Fabric Parts Shortages Analyst",
     "dataAgentAgentName": "Fabric Data Agent Analyst",
+    "lakehouseAgentSchemaName": "caldova_fabricPartsShortagesAnalyst",
+    "dataAgentAgentSchemaName": "caldova_fabricDataAgentAnalyst",
+    "lakehouseAgentSolutionName": "caldova_FabricPartsShortagesAnalyst",
+    "dataAgentAgentSolutionName": "caldova_FabricDataAgentAnalyst",
+    "lakehouseDeckPromptName": "Create Fabric Lakehouse Executive PowerPoint",
+    "dataAgentDeckPromptName": "Create Fabric Data Agent Executive PowerPoint",
     "iconBrandColor": "#0078D4"
   },
   "deployment": {

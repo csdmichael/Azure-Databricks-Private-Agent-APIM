@@ -67,14 +67,14 @@ written to source, Terraform state examples, logs, screenshots, or documentation
 
 ## Execution Plan
 
-- [ ] Reconcile and validate the five resumed Terraform modules without discarding user edits.
-- [ ] Add Terraform parity for every remaining existing Bicep deployment folder.
-- [ ] Implement and test the Fabric OBO adapter and APIM REST/MCP policies.
-- [ ] Add config-driven Fabric Bicep and Terraform stacks with matching outputs.
-- [ ] Add idempotent Entra, connector, MCP, and Copilot Studio packaging scripts.
-- [ ] Copy and generalize the executive PowerPoint skill for Fabric sources.
-- [ ] Write `fabric/README.md` with architecture, OBO, deployment, acceptance, and rollback guidance.
-- [ ] Run syntax, unit, policy, Bicep, Terraform, secret, and drift checks.
+- [x] Reconcile and validate the five resumed Terraform modules without discarding user edits.
+- [x] Add Terraform parity for every remaining existing Bicep deployment folder.
+- [x] Implement and test the Fabric OBO adapter and APIM REST/MCP policies.
+- [x] Add config-driven Fabric Bicep and Terraform stacks with matching outputs.
+- [x] Add idempotent Entra, connector, MCP, and Copilot Studio packaging scripts.
+- [x] Copy and generalize the executive PowerPoint skill for Fabric sources.
+- [x] Write `fabric/README.md` with architecture, OBO, deployment, acceptance, and rollback guidance.
+- [x] Run syntax, unit, policy, Bicep, Terraform, secret, and local parity checks.
 - [ ] Run Azure validation and what-if; record proof below.
 - [ ] Commit and push source.
 - [ ] Deploy Azure resources and application code through the validated Bicep recipe.
@@ -98,6 +98,42 @@ written to source, Terraform state examples, logs, screenshots, or documentation
 
 Pending implementation. The azure-validate workflow must populate this section and set
 the active status to `Validated` before any Fabric deployment command runs.
+
+2026-09-16 local source validation:
+
+- `pwsh fabric/scripts/validate.ps1 -SkipTerraformInit -IncludeParity`: passed.
+	The broker compiled; all 8 unit tests passed; production dependency audit reported
+	zero vulnerabilities; both OpenAPI documents and all four APIM policies parsed;
+	all four Fabric Bicep entry points built and linted without diagnostics; all four
+	Fabric Terraform modules and ten repository Bicep-parity modules passed formatting
+	and `terraform validate`; every Fabric PowerShell script parsed successfully.
+- `pwsh fabric/tests/scripts.test.ps1`: passed StrictMode collection behavior,
+	fail-closed Azure what-if change policy, portable Function ZIP entries, deterministic
+	empty/partial/complete agent-package evidence, and disabled automated agent mutation.
+- `pwsh fabric/scripts/build-broker-package.ps1 -SkipInstall`: produced a portable
+	POSIX-path Function ZIP after running all 8 broker tests; staged production packages
+	reported zero vulnerabilities.
+- Both PAC agent workspaces package successfully as local Dataverse solutions. The
+	packages currently contain only their agent components, and the tooling reports zero
+	bound connector/prompt components and performs no cloud import or publication.
+- Three sanitized reference screenshots were captured for the live Lakehouse, Data
+	Agent, and published Data Agent MCP settings; every image link in `fabric/README.md`
+	resolves.
+- High-confidence scan of 88 Fabric source files found no private key, connection-key,
+	credential-shaped value, or JWT. `git diff --check` passed.
+- Final blocker-only code review passed after adding full-payload fail-closed what-if
+	handling, exact storage-firewall restoration, explicit-tenant data-plane tokens,
+	configuration fingerprints, live Graph provenance, explicit app adoption, transactional
+	credentials/connectors, principal-scoped consent checks, and a hard workspace Private
+	Link gate.
+- Live Azure ARM validation, reviewed what-if, inherited-policy review, environment
+	resolution, deployment, connector/agent publication, delegated and denied-user tests,
+	and remaining screenshots are not yet complete and are not claimed by this proof.
+
+- [ ] All validation checks pass (Fabric Lakehouse and Data Agent OBO)
+	- [ ] Core Validation (CLI, auth, ARM validation, and what-if; local build checks passed)
+	- [x] Bicep linting
+	- [ ] Azure Policy Validation
 
 ---
 
