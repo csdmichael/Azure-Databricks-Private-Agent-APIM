@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "description": "Runs read-only Lakehouse SQL through the private OBO broker.",
     "contact": {
-      "name": "Caldova APIM Operations"
+      "name": "Fabric Parts Shortages Operations"
     }
   },
   "x-security-controls": {

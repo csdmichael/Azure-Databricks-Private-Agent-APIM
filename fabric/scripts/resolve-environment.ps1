@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
+    [switch] $EnsureManaged,
     [switch] $WriteConfig
 )
 
@@ -31,8 +32,14 @@ try {
     }
     $governance = if ($environment.properties.PSObject.Properties['governanceConfiguration']) { $environment.properties.governanceConfiguration } else { $null }
     $protectionLevel = if ($governance -and $governance.PSObject.Properties['protectionLevel']) { [string]$governance.protectionLevel } else { '' }
+    if ($protectionLevel -ne 'Standard' -and $EnsureManaged) {
+        Invoke-RestMethod -Method PUT -Uri "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/$environmentId/governanceConfiguration?api-version=2021-04-01" -Headers $headers -ContentType 'application/json' -Body (@{ protectionLevel = 'Standard' } | ConvertTo-Json) | Out-Null
+        $environment = Invoke-RestMethod -Method GET -Uri "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/$environmentId`?api-version=2021-04-01" -Headers $headers
+        $governance = if ($environment.properties.PSObject.Properties['governanceConfiguration']) { $environment.properties.governanceConfiguration } else { $null }
+        $protectionLevel = if ($governance -and $governance.PSObject.Properties['protectionLevel']) { [string]$governance.protectionLevel } else { '' }
+    }
     if ($protectionLevel -ne 'Standard') {
-        throw "Power Platform environment '$displayName' is not a Managed Environment (protectionLevel=Standard)."
+        throw "Power Platform environment '$displayName' is not Managed. Rerun with -EnsureManaged after approval."
     }
 
     if ($WriteConfig) {

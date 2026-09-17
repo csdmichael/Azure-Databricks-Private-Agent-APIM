@@ -6,7 +6,7 @@ param callerTenantId string
 param resourceApiClientId string
 param delegatedScope string
 param connectorClientIds array
-param allowedFabricGuestObjectIds array
+param allowedUserObjectIds array
 param brokerAudience string
 param brokerRole string
 param brokerPrivateUrl string
@@ -36,7 +36,7 @@ var namedValueSettings = [
   { name: 'fabric-obo-resource-api-client-id', value: resourceApiClientId }
   { name: 'fabric-obo-delegated-scope', value: delegatedScope }
   { name: 'fabric-obo-connector-client-ids', value: join(connectorClientIds, ',') }
-  { name: 'fabric-obo-allowed-guest-oids', value: join(allowedFabricGuestObjectIds, ',') }
+  { name: 'fabric-obo-allowed-user-oids', value: join(allowedUserObjectIds, ',') }
   { name: 'fabric-obo-broker-audience', value: brokerAudience }
   { name: 'fabric-obo-broker-role', value: brokerRole }
   { name: 'fabric-obo-broker-private-url', value: brokerPrivateUrl }

@@ -26,15 +26,15 @@ variable "connector_client_ids" {
   }
 }
 
-variable "allowed_fabric_guest_object_ids" {
-  description = "Fabric-tenant guest object IDs allowed to call the APIs."
+variable "allowed_user_object_ids" {
+  description = "Fabric-tenant user object IDs allowed to call the APIs."
   type        = list(string)
 
   validation {
-    condition = length(var.allowed_fabric_guest_object_ids) > 0 && alltrue([
-      for value in var.allowed_fabric_guest_object_ids : can(regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$", trimspace(value)))
+    condition = length(var.allowed_user_object_ids) > 0 && alltrue([
+      for value in var.allowed_user_object_ids : can(regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$", trimspace(value)))
     ])
-    error_message = "allowed_fabric_guest_object_ids must contain at least one nonempty GUID."
+    error_message = "allowed_user_object_ids must contain at least one nonempty GUID."
   }
 }
 
@@ -58,16 +58,6 @@ variable "broker_private_url" {
   }
 }
 
-variable "broker_private_endpoint_ip" {
-  description = "IPv4 address assigned to the broker private endpoint."
-  type        = string
-
-  validation {
-    condition     = can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}$", trimspace(var.broker_private_endpoint_ip))) && can(cidrhost("${trimspace(var.broker_private_endpoint_ip)}/32", 0))
-    error_message = "broker_private_endpoint_ip must be a nonempty IPv4 address."
-  }
-}
-
 variable "application_insights_name" {
   description = "Optional existing Application Insights component name. Diagnostics are omitted when null or empty."
   type        = string
@@ -82,15 +72,3 @@ variable "application_insights_resource_group_name" {
   nullable    = true
 }
 
-variable "create_private_dns_zone" {
-  description = "Create the Caldova-side privatelink.azurewebsites.net zone. Set false to reuse an existing zone."
-  type        = bool
-  default     = true
-}
-
-variable "private_dns_zone_resource_group_name" {
-  description = "Optional resource group containing the private DNS zone. Defaults to config.apim.resourceGroup."
-  type        = string
-  default     = null
-  nullable    = true
-}

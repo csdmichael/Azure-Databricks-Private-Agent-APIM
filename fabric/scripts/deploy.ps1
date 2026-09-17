@@ -2,7 +2,7 @@
 param(
     [string] $ConfigPath = (Join-Path $PSScriptRoot '../config/deployment.json'),
     [string] $IdentityPath = (Join-Path $PSScriptRoot '../.generated/identity.json'),
-    [ValidateSet('preflight', 'network-apim', 'network-broker', 'broker-base', 'identity', 'package', 'broker-app', 'apim', 'all')]
+    [ValidateSet('preflight', 'apim-base', 'network-apim', 'network-broker', 'broker-base', 'identity', 'package', 'broker-app', 'apim', 'all')]
     [string] $Step = 'preflight',
     [switch] $WhatIf,
     [switch] $InviteConfiguredAdmin,
@@ -42,6 +42,7 @@ New-Item -ItemType Directory -Path $whatIfDirectory -Force | Out-Null
 function Test-Step {
     param([string] $Name)
     $enabled = switch ($Name) {
+        'apim-base' { [bool]$config.apim.createService }
         'network-apim' { [bool]$config.deployment.deployNetworking }
         'network-broker' { [bool]$config.deployment.deployNetworking }
         'broker-base' { [bool]$config.deployment.deployBroker }
@@ -330,12 +331,33 @@ function Invoke-Preflight {
     $callerContext = Assert-FabricAzureContext -SubscriptionId ([string]$config.apim.subscriptionId) -TenantId ([string]$config.apim.tenantId)
     az resource show --ids $config.network.apimVnetResourceId --subscription $config.apim.subscriptionId --only-show-errors -o none
     if ($LASTEXITCODE -ne 0) { throw "Configured APIM VNet is unavailable: $($config.network.apimVnetResourceId)" }
-    $script:LiveApimPrincipalId = az apim show --subscription $config.apim.subscriptionId --resource-group $config.apim.resourceGroup --name $config.apim.serviceName --query identity.principalId --only-show-errors -o tsv
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($script:LiveApimPrincipalId)) { throw "Configured APIM service or system identity is unavailable: $($config.apim.serviceName)" }
-    $script:LiveApimPrincipalId = Assert-FabricGuid -Value $script:LiveApimPrincipalId -Name 'APIM system-assigned identity'
-    $webPrivateDnsZoneId = "/subscriptions/$($config.apim.subscriptionId)/resourceGroups/$($config.apim.resourceGroup)/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net"
-    az resource show --ids $webPrivateDnsZoneId --subscription $config.apim.subscriptionId --only-show-errors -o none 2>$null
-    $script:ApimWebPrivateDnsZoneExists = $LASTEXITCODE -eq 0
+    $apimJson = az apim show --subscription $config.apim.subscriptionId --resource-group $config.apim.resourceGroup --name $config.apim.serviceName --only-show-errors -o json 2>$null
+    $apimExists = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($apimJson)
+    if ($apimExists) {
+        $apim = $apimJson | ConvertFrom-Json
+        $expectedSubnetId = "$($config.network.apimVnetResourceId)/subnets/$($config.network.apimSubnetName)"
+        if ($apim.location -ne $config.apim.location -or $apim.sku.name -ne $config.apim.skuName -or $apim.virtualNetworkType -ne 'External' -or
+            $apim.virtualNetworkConfiguration.subnetResourceId -ne $expectedSubnetId -or $apim.publicNetworkAccess -ne 'Enabled') {
+            throw "Existing APIM '$($config.apim.serviceName)' does not match the dedicated single-tenant configuration."
+        }
+        $script:LiveApimPrincipalId = Assert-FabricGuid -Value $apim.identity.principalId -Name 'APIM system-assigned identity'
+    }
+    elseif (-not [bool]$config.apim.createService) {
+        throw "Configured APIM service is unavailable and apim.createService is false: $($config.apim.serviceName)"
+    }
+    else {
+        $armToken = Get-FabricAzAccessToken -TenantId ([string]$config.apim.tenantId) -SubscriptionId ([string]$config.apim.subscriptionId) -Resource 'https://management.azure.com/'
+        try {
+            $availability = Invoke-RestMethod -Method POST -Uri "https://management.azure.com/subscriptions/$($config.apim.subscriptionId)/providers/Microsoft.ApiManagement/checkNameAvailability?api-version=2024-05-01" -Headers @{ Authorization = "Bearer $armToken" } -ContentType 'application/json' -Body (@{ name = [string]$config.apim.serviceName } | ConvertTo-Json -Compress)
+            if (-not $availability.nameAvailable) { throw "APIM name '$($config.apim.serviceName)' is unavailable: $($availability.reason) $($availability.message)" }
+        }
+        finally {
+            $armToken = $null
+        }
+        if ($WhatIf) {
+            $script:LiveApimPrincipalId = '33333333-3333-4333-8333-333333333333'
+        }
+    }
 
     [pscustomobject]@{
         ResourceSubscription = $resourceContext.name
@@ -347,14 +369,33 @@ function Invoke-Preflight {
 
 $brokerBaseDeploymentName = "$deploymentPrefix-broker-base"
 $brokerAppDeploymentName = "$deploymentPrefix-broker-app"
+$apimBaseDeploymentName = "$deploymentPrefix-apim-base"
 $script:LiveApimPrincipalId = $null
-$script:ApimWebPrivateDnsZoneExists = $false
 $baseOutputs = $null
 $appOutputs = $null
 $package = $null
 $preflight = Invoke-Preflight
 if ($Step -eq 'preflight') {
     return $preflight
+}
+
+if (Test-Step 'apim-base') {
+    $apimBaseParameterPath = Join-Path $parameterDirectory 'apim-base.parameters.json'
+    Write-ArmParameters -Path $apimBaseParameterPath -Values @{
+        location = [string]$config.apim.location
+        apimServiceName = [string]$config.apim.serviceName
+        publisherEmail = [string]$config.apim.publisherEmail
+        publisherName = [string]$config.apim.publisherName
+        skuName = [string]$config.apim.skuName
+        vnetResourceId = [string]$config.network.apimVnetResourceId
+        subnetName = [string]$config.network.apimSubnetName
+        subnetPrefix = [string]$config.network.apimSubnetPrefix
+        tags = $config.tags
+    }
+    $apimBaseOutputs = Invoke-GroupDeployment -Name $apimBaseDeploymentName -SubscriptionId $config.apim.subscriptionId -ResourceGroup $config.apim.resourceGroup -TemplateFile (Join-Path $fabricRoot 'bicep/apim/service.bicep') -ParametersFile $apimBaseParameterPath
+    if (-not $WhatIf) {
+        $script:LiveApimPrincipalId = Assert-FabricGuid -Value (Get-OutputValue -Outputs $apimBaseOutputs -Name 'apimPrincipalId') -Name 'APIM system-assigned identity'
+    }
 }
 
 if (Test-Step 'network-apim') {
@@ -490,27 +531,15 @@ if (Test-Step 'broker-app') {
 
 if (Test-Step 'apim') {
     $identity = Get-IdentityMetadata
-    if ($WhatIf) {
-        $brokerPrivateEndpointIp = '10.0.0.10'
-    }
-    else {
-        if (-not $appOutputs) {
-            $appOutputs = Get-DeploymentOutputs -Name $brokerAppDeploymentName -SubscriptionId $config.azure.subscriptionId -ResourceGroup $config.azure.resourceGroup
-        }
-        $brokerPrivateEndpointIp = Get-OutputValue -Outputs $appOutputs -Name 'functionPrivateEndpointIp'
-    }
     $apimParameterPath = Join-Path $parameterDirectory 'apim.parameters.json'
     Write-ArmParameters -Path $apimParameterPath -Values @{
         resourceApiClientId = [string]$identity.resourceApi.clientId
         connectorClientIds = @($identity.connectors.clientId)
-        allowedFabricGuestObjectIds = @($identity.allowedUserObjectIds)
+        allowedUserObjectIds = @($identity.allowedUserObjectIds)
         brokerAudience = [string]$identity.brokerApi.clientId
         brokerPrivateUrl = "https://$($config.broker.appName).azurewebsites.net"
-        brokerPrivateEndpointIp = $brokerPrivateEndpointIp
         applicationInsightsName = $ApplicationInsightsName
         applicationInsightsResourceGroupName = $ApplicationInsightsResourceGroupName
-        createPrivateDnsZone = -not ([bool]$ReusePrivateDnsZone -or $script:ApimWebPrivateDnsZoneExists)
-        privateDnsZoneResourceGroupName = [string]$config.apim.resourceGroup
     }
     $null = Assert-FabricAzureContext -SubscriptionId ([string]$config.apim.subscriptionId) -TenantId ([string]$config.apim.tenantId)
     Invoke-SubscriptionDeployment -Name "$deploymentPrefix-apim" -TemplateFile (Join-Path $fabricRoot 'bicep/apim/main.bicep') -ParametersFile $apimParameterPath | Out-Null
@@ -521,4 +550,5 @@ if (Test-Step 'apim') {
     WhatIf = [bool]$WhatIf
     BrokerBaseDeployment = $brokerBaseDeploymentName
     BrokerAppDeployment = $brokerAppDeploymentName
+    ApimBaseDeployment = $apimBaseDeploymentName
 }

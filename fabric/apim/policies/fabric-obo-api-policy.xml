@@ -27,7 +27,7 @@
         var connectorId = jwt.Claims.GetValueOrDefault("azp", "").ToLowerInvariant();
         var objectId = (string)context.Variables["fabric-user-object-id"];
         var connectorIds = "," + "{{fabric-obo-connector-client-ids}}".Replace(" ", "").ToLowerInvariant() + ",";
-        var allowedObjectIds = "," + "{{fabric-obo-allowed-guest-oids}}".Replace(" ", "").ToLowerInvariant() + ",";
+        var allowedObjectIds = "," + "{{fabric-obo-allowed-user-oids}}".Replace(" ", "").ToLowerInvariant() + ",";
         return string.Equals(tokenType, "app", StringComparison.OrdinalIgnoreCase)
           || string.IsNullOrEmpty(scope)
           || string.IsNullOrEmpty(connectorId)

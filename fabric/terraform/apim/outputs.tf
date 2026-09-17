@@ -1,6 +1,6 @@
 output "apim_principal_id" {
   description = "System-assigned managed identity principal ID that must receive the broker application role."
-  value       = data.azurerm_api_management.this.identity[0].principal_id
+  value       = local.apim_principal_id
 }
 
 output "lakehouse_api_url" {
@@ -28,7 +28,3 @@ output "product_id" {
   value       = azapi_resource.product.id
 }
 
-output "private_dns_zone_id" {
-  description = "Resource ID of the created or reused privatelink.azurewebsites.net zone."
-  value       = local.private_dns_zone_id
-}

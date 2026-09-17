@@ -27,6 +27,22 @@ if ($config.azure.tenantId -ne $config.identity.resourceTenantId) {
 if ($config.apim.tenantId -ne $config.identity.callerTenantId -or $config.powerPlatform.tenantId -ne $config.identity.callerTenantId) {
     throw 'APIM and Power Platform tenant IDs must match identity.callerTenantId.'
 }
+if ($config.azure.tenantId -ne $config.apim.tenantId -or $config.azure.tenantId -ne $config.powerPlatform.tenantId -or
+    $config.azure.subscriptionId -ne $config.apim.subscriptionId -or $config.azure.resourceGroup -ne $config.apim.resourceGroup) {
+    throw 'Fabric, broker, APIM, and Power Platform must use the same configured tenant; Azure resources must use one subscription and resource group.'
+}
+if ($config.network.mode -notin @('single-tenant-shared-vnet', 'single-tenant-existing-peering') -or [bool]$config.deployment.deployNetworking) {
+    throw 'The active topology must use an existing single-tenant network path and must not deploy VNet peerings.'
+}
+if ($config.network.mode -eq 'single-tenant-shared-vnet' -and $config.network.apimVnetResourceId -ne $config.network.brokerVnetResourceId) {
+    throw 'single-tenant-shared-vnet requires APIM and broker to use the same VNet.'
+}
+if ($config.network.mode -eq 'single-tenant-existing-peering' -and $config.network.apimVnetResourceId -eq $config.network.brokerVnetResourceId) {
+    throw 'single-tenant-existing-peering requires distinct APIM and broker VNets.'
+}
+foreach ($path in 'apim.location', 'apim.serviceName', 'apim.skuName', 'apim.publisherEmail', 'apim.publisherName', 'network.apimSubnetName', 'network.apimSubnetPrefix', 'identity.allowedUserPrincipalName') {
+    $null = Get-FabricConfigValue -Config $config -Path $path
+}
 if ([bool]$config.deployment.deployWorkspacePrivateLink) {
     throw 'deployment.deployWorkspacePrivateLink must remain false while unsupported semantic models or external Copilot integrations exist.'
 }
@@ -71,8 +87,7 @@ try {
     Write-Host 'PASS APIM OpenAPI and policy syntax'
 
     $bicepFiles = @(
-        'fabric/bicep/network-apim-side/main.bicep',
-        'fabric/bicep/network-broker-side/main.bicep',
+        'fabric/bicep/apim/service.bicep',
         'fabric/bicep/broker/main.bicep',
         'fabric/bicep/apim/main.bicep'
     )
@@ -89,8 +104,6 @@ try {
     Write-Host 'PASS Bicep build and lint'
 
     $terraformModules = @(
-        'fabric/terraform/network-apim-side',
-        'fabric/terraform/network-broker-side',
         'fabric/terraform/broker',
         'fabric/terraform/apim'
     )

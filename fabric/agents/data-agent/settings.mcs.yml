@@ -1,5 +1,5 @@
 displayName: "Fabric Data Agent Analyst"
-schemaName: "caldova_fabricDataAgentAnalyst"
+schemaName: "fabric_fabricDataAgentAnalyst"
 accessControlPolicy: GroupMembership
 authenticationMode: Integrated
 authenticationTrigger: Always

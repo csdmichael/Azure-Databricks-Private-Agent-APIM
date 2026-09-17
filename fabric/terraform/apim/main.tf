@@ -4,9 +4,18 @@ locals {
   apim_tenant_id           = trimspace(local.config.apim.tenantId)
   apim_subscription_id     = trimspace(local.config.apim.subscriptionId)
   apim_resource_group_name = trimspace(local.config.apim.resourceGroup)
+  apim_location            = trimspace(local.config.apim.location)
+  create_apim_service      = local.config.apim.createService
   apim_service_name        = trimspace(local.config.apim.serviceName)
+  apim_sku_name            = trimspace(local.config.apim.skuName)
+  apim_publisher_email     = trimspace(local.config.apim.publisherEmail)
+  apim_publisher_name      = trimspace(local.config.apim.publisherName)
   apim_gateway_url         = trimsuffix(trimspace(local.config.apim.gatewayUrl), "/")
   apim_vnet_resource_id    = trimspace(local.config.network.apimVnetResourceId)
+  apim_vnet_parts          = split("/", local.apim_vnet_resource_id)
+  apim_vnet_name           = local.apim_vnet_parts[8]
+  apim_subnet_name         = trimspace(local.config.network.apimSubnetName)
+  apim_subnet_prefix       = trimspace(local.config.network.apimSubnetPrefix)
   broker_app_name          = trimspace(local.config.broker.appName)
   broker_private_url       = trimsuffix(trimspace(var.broker_private_url), "/")
   expected_broker_url      = "https://${local.broker_app_name}.azurewebsites.net"
@@ -17,12 +26,10 @@ locals {
   broker_role        = trimspace(local.config.identity.brokerApplicationRole)
 
   connector_client_ids                     = [for value in var.connector_client_ids : lower(trimspace(value))]
-  allowed_fabric_guest_object_ids          = [for value in var.allowed_fabric_guest_object_ids : lower(trimspace(value))]
+  allowed_user_object_ids                  = [for value in var.allowed_user_object_ids : lower(trimspace(value))]
   application_insights_name                = trimspace(coalesce(var.application_insights_name, ""))
   diagnostics_enabled                      = local.application_insights_name != ""
   application_insights_resource_group_name = trimspace(coalesce(var.application_insights_resource_group_name, "")) != "" ? trimspace(var.application_insights_resource_group_name) : local.apim_resource_group_name
-  private_dns_zone_resource_group_name     = trimspace(coalesce(var.private_dns_zone_resource_group_name, "")) != "" ? trimspace(var.private_dns_zone_resource_group_name) : local.apim_resource_group_name
-  private_dns_zone_name                    = "privatelink.azurewebsites.net"
 
   named_values = {
     fabric-obo-resource-tenant-id         = local.resource_tenant_id
@@ -30,7 +37,7 @@ locals {
     fabric-obo-resource-api-client-id     = lower(trimspace(var.resource_api_client_id))
     fabric-obo-delegated-scope            = local.delegated_scope
     fabric-obo-connector-client-ids       = join(",", local.connector_client_ids)
-    fabric-obo-allowed-guest-oids         = join(",", local.allowed_fabric_guest_object_ids)
+    fabric-obo-allowed-user-oids          = join(",", local.allowed_user_object_ids)
     fabric-obo-broker-audience            = lower(trimspace(var.broker_audience))
     fabric-obo-broker-role                = local.broker_role
     fabric-obo-broker-private-url         = local.broker_private_url
@@ -95,7 +102,11 @@ locals {
     local.apim_tenant_id,
     local.apim_subscription_id,
     local.apim_resource_group_name,
+    local.apim_location,
     local.apim_service_name,
+    local.apim_sku_name,
+    local.apim_publisher_email,
+    local.apim_publisher_name,
     local.apim_gateway_url,
     local.apim_vnet_resource_id,
     local.broker_app_name,
@@ -113,6 +124,19 @@ locals {
     local.config.apim.dataAgentMcpPath,
     local.config.apim.productId,
   ]
+
+  apim_nsg_rules = {
+    internet-client = { priority = 100, direction = "Inbound", source = "Internet", destination = "VirtualNetwork", ports = ["80", "443"] }
+    control-plane   = { priority = 110, direction = "Inbound", source = "ApiManagement", destination = "VirtualNetwork", ports = ["3443"] }
+    load-balancer   = { priority = 120, direction = "Inbound", source = "AzureLoadBalancer", destination = "VirtualNetwork", ports = ["6390"] }
+    traffic-manager = { priority = 130, direction = "Inbound", source = "AzureTrafficManager", destination = "VirtualNetwork", ports = ["443"] }
+    certificates    = { priority = 200, direction = "Outbound", source = "VirtualNetwork", destination = "Internet", ports = ["80"] }
+    storage         = { priority = 210, direction = "Outbound", source = "VirtualNetwork", destination = "Storage", ports = ["443"] }
+    sql             = { priority = 220, direction = "Outbound", source = "VirtualNetwork", destination = "Sql", ports = ["1433"] }
+    key-vault       = { priority = 230, direction = "Outbound", source = "VirtualNetwork", destination = "AzureKeyVault", ports = ["443"] }
+    monitor         = { priority = 240, direction = "Outbound", source = "VirtualNetwork", destination = "AzureMonitor", ports = ["1886", "443"] }
+    entra           = { priority = 250, direction = "Outbound", source = "VirtualNetwork", destination = "AzureActiveDirectory", ports = ["443"] }
+  }
 }
 
 resource "terraform_data" "guardrails" {
@@ -131,16 +155,12 @@ resource "terraform_data" "guardrails" {
       error_message = "The generated resource API client ID and broker audience must not be empty."
     }
     precondition {
-      condition     = length(local.connector_client_ids) > 0 && length(local.allowed_fabric_guest_object_ids) > 0 && alltrue([for value in concat(local.connector_client_ids, local.allowed_fabric_guest_object_ids) : length(value) > 0])
-      error_message = "Connector and Fabric guest allowlists must contain nonempty IDs."
+      condition     = length(local.connector_client_ids) > 0 && length(local.allowed_user_object_ids) > 0 && alltrue([for value in concat(local.connector_client_ids, local.allowed_user_object_ids) : length(value) > 0])
+      error_message = "Connector and Fabric user allowlists must contain nonempty IDs."
     }
     precondition {
       condition     = local.broker_private_url == local.expected_broker_url
       error_message = "broker_private_url must be the fixed origin https://<config.broker.appName>.azurewebsites.net."
-    }
-    precondition {
-      condition     = length(trimspace(var.broker_private_endpoint_ip)) > 0
-      error_message = "broker_private_endpoint_ip must not be empty."
     }
     precondition {
       condition     = local.config.apim.rateLimitCalls > 0 && local.config.apim.rateLimitRenewalSeconds > 0 && local.config.apim.requestTimeoutSeconds > 0
@@ -149,11 +169,105 @@ resource "terraform_data" "guardrails" {
   }
 }
 
+data "azurerm_resource_group" "apim" {
+  name = local.apim_resource_group_name
+}
+
+data "azurerm_virtual_network" "apim" {
+  name                = local.apim_vnet_name
+  resource_group_name = local.apim_resource_group_name
+}
+
+resource "azurerm_network_security_group" "apim" {
+  count = local.create_apim_service ? 1 : 0
+
+  name                = "nsg-${local.apim_service_name}"
+  location            = local.apim_location
+  resource_group_name = local.apim_resource_group_name
+  tags                = tomap(local.config.tags)
+}
+
+resource "azurerm_network_security_rule" "apim" {
+  for_each = local.create_apim_service ? local.apim_nsg_rules : {}
+
+  name                        = "Allow-${each.key}"
+  priority                    = each.value.priority
+  direction                   = each.value.direction
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_ranges     = each.value.ports
+  source_address_prefix       = each.value.source
+  destination_address_prefix  = each.value.destination
+  resource_group_name         = local.apim_resource_group_name
+  network_security_group_name = azurerm_network_security_group.apim[0].name
+}
+
+resource "azurerm_subnet" "apim" {
+  count = local.create_apim_service ? 1 : 0
+
+  name                 = local.apim_subnet_name
+  resource_group_name  = local.apim_resource_group_name
+  virtual_network_name = data.azurerm_virtual_network.apim.name
+  address_prefixes     = [local.apim_subnet_prefix]
+  service_endpoints    = ["Microsoft.Storage", "Microsoft.Sql", "Microsoft.KeyVault", "Microsoft.EventHub"]
+}
+
+resource "azurerm_subnet_network_security_group_association" "apim" {
+  count = local.create_apim_service ? 1 : 0
+
+  subnet_id                 = azurerm_subnet.apim[0].id
+  network_security_group_id = azurerm_network_security_group.apim[0].id
+}
+
+resource "azurerm_api_management" "this" {
+  count = local.create_apim_service ? 1 : 0
+
+  name                          = local.apim_service_name
+  location                      = local.apim_location
+  resource_group_name           = local.apim_resource_group_name
+  publisher_name                = local.apim_publisher_name
+  publisher_email               = local.apim_publisher_email
+  sku_name                      = "${local.apim_sku_name}_1"
+  public_network_access_enabled = true
+  virtual_network_type          = "External"
+  tags                          = tomap(local.config.tags)
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  virtual_network_configuration {
+    subnet_id = azurerm_subnet.apim[0].id
+  }
+
+  security {
+    enable_backend_ssl30  = false
+    enable_backend_tls10  = false
+    enable_backend_tls11  = false
+    enable_frontend_ssl30 = false
+    enable_frontend_tls10 = false
+    enable_frontend_tls11 = false
+  }
+
+  depends_on = [
+    azurerm_network_security_rule.apim,
+    azurerm_subnet_network_security_group_association.apim,
+  ]
+}
+
 data "azurerm_api_management" "this" {
+  count = local.create_apim_service ? 0 : 1
+
   name                = local.apim_service_name
   resource_group_name = local.apim_resource_group_name
 
   depends_on = [terraform_data.guardrails]
+}
+
+locals {
+  apim_id           = local.create_apim_service ? azurerm_api_management.this[0].id : data.azurerm_api_management.this[0].id
+  apim_principal_id = local.create_apim_service ? azurerm_api_management.this[0].identity[0].principal_id : data.azurerm_api_management.this[0].identity[0].principal_id
 }
 
 resource "azapi_resource" "named_value" {
@@ -161,7 +275,7 @@ resource "azapi_resource" "named_value" {
 
   type      = "Microsoft.ApiManagement/service/namedValues@2024-06-01-preview"
   name      = each.key
-  parent_id = data.azurerm_api_management.this.id
+  parent_id = local.apim_id
 
   body = {
     properties = {
@@ -177,7 +291,7 @@ resource "azapi_resource" "api" {
 
   type      = "Microsoft.ApiManagement/service/apis@2024-06-01-preview"
   name      = each.value.name
-  parent_id = data.azurerm_api_management.this.id
+  parent_id = local.apim_id
 
   body = {
     properties = {
@@ -229,7 +343,7 @@ resource "azapi_resource" "mcp_server" {
 
   type      = "Microsoft.ApiManagement/service/apis@2024-06-01-preview"
   name      = each.value.name
-  parent_id = data.azurerm_api_management.this.id
+  parent_id = local.apim_id
 
   body = {
     properties = {
@@ -255,7 +369,7 @@ resource "azapi_resource" "mcp_server" {
 resource "azapi_resource" "product" {
   type      = "Microsoft.ApiManagement/service/products@2024-06-01-preview"
   name      = local.config.apim.productId
-  parent_id = data.azurerm_api_management.this.id
+  parent_id = local.apim_id
 
   body = {
     properties = {
@@ -307,7 +421,7 @@ resource "azapi_resource" "logger" {
 
   type      = "Microsoft.ApiManagement/service/loggers@2024-06-01-preview"
   name      = "fabric-obo-insights"
-  parent_id = data.azurerm_api_management.this.id
+  parent_id = local.apim_id
 
   body = {
     properties = {
@@ -362,65 +476,3 @@ resource "azapi_resource" "diagnostic" {
   }
 }
 
-resource "azurerm_private_dns_zone" "broker" {
-  count = var.create_private_dns_zone ? 1 : 0
-
-  name                = local.private_dns_zone_name
-  resource_group_name = local.private_dns_zone_resource_group_name
-  tags                = tomap(local.config.tags)
-
-  depends_on = [terraform_data.guardrails]
-}
-
-data "azurerm_private_dns_zone" "broker" {
-  count = var.create_private_dns_zone ? 0 : 1
-
-  name                = local.private_dns_zone_name
-  resource_group_name = local.private_dns_zone_resource_group_name
-
-  depends_on = [terraform_data.guardrails]
-}
-
-locals {
-  private_dns_zone_id = var.create_private_dns_zone ? azurerm_private_dns_zone.broker[0].id : data.azurerm_private_dns_zone.broker[0].id
-}
-
-resource "azurerm_private_dns_a_record" "broker" {
-  name                = local.broker_app_name
-  zone_name           = local.private_dns_zone_name
-  resource_group_name = local.private_dns_zone_resource_group_name
-  ttl                 = 300
-  records             = [trimspace(var.broker_private_endpoint_ip)]
-
-  depends_on = [
-    azurerm_private_dns_zone.broker,
-    data.azurerm_private_dns_zone.broker,
-  ]
-}
-
-resource "azurerm_private_dns_a_record" "broker_scm" {
-  name                = "${local.broker_app_name}.scm"
-  zone_name           = local.private_dns_zone_name
-  resource_group_name = local.private_dns_zone_resource_group_name
-  ttl                 = 300
-  records             = [trimspace(var.broker_private_endpoint_ip)]
-
-  depends_on = [
-    azurerm_private_dns_zone.broker,
-    data.azurerm_private_dns_zone.broker,
-  ]
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "apim" {
-  name                  = "${local.apim_service_name}-broker"
-  resource_group_name   = local.private_dns_zone_resource_group_name
-  private_dns_zone_name = local.private_dns_zone_name
-  virtual_network_id    = local.apim_vnet_resource_id
-  registration_enabled  = false
-  tags                  = tomap(local.config.tags)
-
-  depends_on = [
-    azurerm_private_dns_zone.broker,
-    data.azurerm_private_dns_zone.broker,
-  ]
-}

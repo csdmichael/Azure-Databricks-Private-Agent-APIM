@@ -209,7 +209,7 @@ try {
         $effectiveAllowedUsers = Assert-FabricGuidList -Values @($config.identity.allowedUserObjectIds) -Name 'identity.allowedUserObjectIds' -AllowEmpty
     }
     if ($effectiveAllowedUsers.Count -eq 0) {
-        $configuredAdmin = [string]$config.identity.caldovaAdminUserPrincipalName
+        $configuredAdmin = [string]$config.identity.allowedUserPrincipalName
         $escapedAdmin = $configuredAdmin.Replace("'", "''")
         $filter = [uri]::EscapeDataString("mail eq '$escapedAdmin' or userPrincipalName eq '$escapedAdmin'")
         $users = @((Invoke-Graph -Token $resourceGraphToken -Method GET -Path "users?`$filter=$filter&`$select=id,displayName,userPrincipalName,mail,userType" -Body $null).value)

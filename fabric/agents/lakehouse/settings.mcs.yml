@@ -1,5 +1,5 @@
 displayName: "Fabric Parts Shortages Analyst"
-schemaName: "caldova_fabricPartsShortagesAnalyst"
+schemaName: "fabric_fabricPartsShortagesAnalyst"
 accessControlPolicy: GroupMembership
 authenticationMode: Integrated
 authenticationTrigger: Always
