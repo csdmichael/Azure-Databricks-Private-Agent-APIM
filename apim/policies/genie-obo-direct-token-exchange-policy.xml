@@ -1,0 +1,198 @@
+<!--
+  Direct APIM-to-Databricks delegated token exchange. This policy does not use a
+  Function App, client secret, managed identity, or Databricks client_id.
+
+  Create these APIM named values before applying the policy:
+    genie-obo-tenant-id
+    genie-obo-api-client-id
+    genie-obo-connector-client-id
+    genie-obo-allowed-user-id
+    genie-obo-scope
+    genie-obo-rate-limit-calls
+    genie-obo-rate-limit-renewal-period
+    genie-obo-token-exchange-timeout
+    databricks-workspace-url
+
+  databricks-workspace-url must be the HTTPS workspace origin without a trailing
+  slash. The Databricks account federation policy must trust the Entra issuer,
+  audience, and preferred_username subject claim represented by these values.
+  Keep APIM request/response body and Authorization-header diagnostics disabled.
+-->
+<policies>
+  <inbound>
+    <base />
+    <!-- Start a sanitized audit trail; identity is untrusted until JWT validation succeeds. -->
+    <include-fragment fragment-id="genie-obo-audit" />
+    <!-- Require this tenant's signed, unexpired API token with the configured delegated scope. -->
+    <validate-jwt header-name="Authorization" require-scheme="Bearer" require-expiration-time="true" require-signed-tokens="true" failed-validation-httpcode="401" failed-validation-error-message="A valid delegated Genie token is required." output-token-variable-name="genie-user-jwt">
+      <openid-config url="https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0/.well-known/openid-configuration" />
+      <audiences><audience>{{genie-obo-api-client-id}}</audience></audiences>
+      <issuers><issuer>https://login.microsoftonline.com/{{genie-obo-tenant-id}}/v2.0</issuer></issuers>
+      <required-claims>
+        <claim name="tid" match="all"><value>{{genie-obo-tenant-id}}</value></claim>
+        <claim name="azp" match="all"><value>{{genie-obo-connector-client-id}}</value></claim>
+        <claim name="scp" match="any" separator=" "><value>{{genie-obo-scope}}</value></claim>
+      </required-claims>
+    </validate-jwt>
+    <set-variable name="audit-stage" value="identity_validated" />
+    <include-fragment fragment-id="genie-obo-audit" />
+    <!-- Require a delegated user and authorize the verified user object ID. -->
+    <choose>
+      <when condition='@{
+        var jwt = (Jwt)context.Variables["genie-user-jwt"];
+        return jwt.Claims.GetValueOrDefault("oid", "") != "{{genie-obo-allowed-user-id}}"
+          || String.IsNullOrWhiteSpace(jwt.Claims.GetValueOrDefault("preferred_username", ""))
+          || String.Equals(jwt.Claims.GetValueOrDefault("idtyp", ""), "app", StringComparison.OrdinalIgnoreCase);
+      }'>
+        <set-variable name="audit-stage" value="request_completed" />
+        <set-variable name="audit-outcome" value="failure" />
+        <set-variable name="audit-status" value="@(403)" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+          <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+          <set-body>{"error":"User is not authorized for this Genie API."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- Limit each verified user independently. -->
+    <rate-limit-by-key calls="{{genie-obo-rate-limit-calls}}" renewal-period="{{genie-obo-rate-limit-renewal-period}}" counter-key='@(((Jwt)context.Variables["genie-user-jwt"]).Claims.GetValueOrDefault("oid", ""))' />
+    <!-- Preserve only the validated JWT value for the fixed Databricks exchange request. -->
+    <set-variable name="genie-user-assertion" value='@(context.Request.Headers.GetValueOrDefault("Authorization", "").Substring(7))' />
+    <choose>
+      <when condition='@(((string)context.Variables["genie-user-assertion"]).Length > 32768)'>
+        <return-response>
+          <set-status code="401" reason="Unauthorized" />
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+          <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+          <set-body>{"error":"Invalid delegated token."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- Account-wide user federation uses RFC 8693 without client_id or client credentials. -->
+    <send-request mode="new" response-variable-name="genie-exchange" timeout="{{genie-obo-token-exchange-timeout}}" ignore-error="true">
+      <set-url>{{databricks-workspace-url}}/oidc/v1/token</set-url>
+      <set-method>POST</set-method>
+      <set-header name="Content-Type" exists-action="override"><value>application/x-www-form-urlencoded</value></set-header>
+      <set-header name="Accept" exists-action="override"><value>application/json</value></set-header>
+      <set-body>@{
+        var assertion = (string)context.Variables["genie-user-assertion"];
+        return "grant_type=" + System.Net.WebUtility.UrlEncode("urn:ietf:params:oauth:grant-type:token-exchange")
+          + "&amp;subject_token_type=" + System.Net.WebUtility.UrlEncode("urn:ietf:params:oauth:token-type:jwt")
+          + "&amp;subject_token=" + System.Net.WebUtility.UrlEncode(assertion)
+          + "&amp;scope=" + System.Net.WebUtility.UrlEncode("all-apis");
+      }</set-body>
+    </send-request>
+    <set-variable name="audit-stage" value="token_exchange_completed" />
+    <set-variable name="audit-status" value='@(context.Variables.GetValueOrDefault&lt;IResponse&gt;("genie-exchange") == null ? 502 : ((IResponse)context.Variables["genie-exchange"]).StatusCode)' />
+    <set-variable name="audit-outcome" value='@((int)context.Variables["audit-status"] == 200 ? "success" : "failure")' />
+    <!-- Fail closed: an unreachable token endpoint is 502; identity rejection is 403. -->
+    <choose>
+      <when condition='@(context.Variables.GetValueOrDefault&lt;IResponse&gt;("genie-exchange") == null)'>
+        <include-fragment fragment-id="genie-obo-audit" />
+        <set-variable name="audit-stage" value="request_completed" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <return-response>
+          <set-status code="502" reason="Token exchange unavailable" />
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+          <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+          <set-body>{"error":"User token exchange is unavailable."}</set-body>
+        </return-response>
+      </when>
+      <when condition='@(((IResponse)context.Variables["genie-exchange"]).StatusCode != 200)'>
+        <set-variable name="audit-status" value='@{
+          var status = ((IResponse)context.Variables["genie-exchange"]).StatusCode;
+          return status == 400 || status == 401 || status == 403 ? 403 : 502;
+        }' />
+        <set-variable name="audit-outcome" value="failure" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <set-variable name="audit-stage" value="request_completed" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <return-response>
+          <set-status code='@((int)context.Variables["audit-status"])' reason="Token exchange failed" />
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+          <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+          <set-body>{"error":"User token exchange failed."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- Accept only the documented bearer response shape before forwarding its token. -->
+    <set-variable name="genie-databricks-access-token" value='@{
+      var payload = ((IResponse)context.Variables["genie-exchange"]).Body.As&lt;JObject&gt;();
+      var accessTokenValue = payload["access_token"];
+      var tokenTypeValue = payload["token_type"];
+      var expiresInValue = payload["expires_in"];
+      if (accessTokenValue == null || accessTokenValue.Type != JTokenType.String
+          || tokenTypeValue == null || tokenTypeValue.Type != JTokenType.String
+          || expiresInValue == null
+          || (expiresInValue.Type != JTokenType.Integer &amp;&amp; expiresInValue.Type != JTokenType.Float)) {
+        return "";
+      }
+      var accessToken = (string)accessTokenValue;
+      var lifetime = (double)expiresInValue;
+      if (String.IsNullOrWhiteSpace(accessToken) || accessToken.Length > 32768
+          || accessToken.Contains("\r") || accessToken.Contains("\n")
+          || !String.Equals((string)tokenTypeValue, "Bearer", StringComparison.OrdinalIgnoreCase)
+          || Double.IsNaN(lifetime) || Double.IsInfinity(lifetime) || lifetime &lt;= 0) {
+        return "";
+      }
+      return accessToken;
+    }' />
+    <choose>
+      <when condition='@(String.IsNullOrEmpty((string)context.Variables["genie-databricks-access-token"]))'>
+        <set-variable name="audit-status" value="@(502)" />
+        <set-variable name="audit-outcome" value="failure" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <set-variable name="audit-stage" value="request_completed" />
+        <include-fragment fragment-id="genie-obo-audit" />
+        <return-response>
+          <set-status code="502" reason="Invalid token exchange response" />
+          <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+          <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+          <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+          <set-body>{"error":"User token exchange returned an invalid response."}</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <include-fragment fragment-id="genie-obo-audit" />
+    <!-- Forward only the exchanged user token; strip assertion and subscription credentials. -->
+    <set-header name="Authorization" exists-action="override"><value>@("Bearer " + (string)context.Variables["genie-databricks-access-token"])</value></set-header>
+    <set-variable name="genie-user-assertion" value="@((string)String.Empty)" />
+    <set-header name="x-user-assertion" exists-action="delete" />
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <set-query-parameter name="subscription-key" exists-action="delete" />
+    <set-backend-service base-url="{{databricks-workspace-url}}" />
+  </inbound>
+  <backend><base /></backend>
+  <outbound>
+    <base />
+    <!-- Successful exchange does not imply permission to read data; record the backend result separately. -->
+    <set-variable name="audit-stage" value="request_completed" />
+    <set-variable name="audit-status" value="@(context.Response.StatusCode)" />
+    <set-variable name="audit-outcome" value='@(context.Response.StatusCode &lt; 400 ? "success" : "failure")' />
+    <include-fragment fragment-id="genie-obo-audit" />
+    <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+    <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+    <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+  </outbound>
+  <on-error>
+    <base />
+    <!-- Hide policy exceptions and upstream response bodies. Never log either token. -->
+    <set-variable name="audit-stage" value="request_completed" />
+    <set-variable name="audit-outcome" value="failure" />
+    <set-variable name="audit-status" value='@(context.LastError.Source == "validate-jwt" ? 401 : (context.LastError.Source == "rate-limit-by-key" ? 429 : 502))' />
+    <include-fragment fragment-id="genie-obo-audit" />
+    <return-response>
+      <set-status code='@((int)context.Variables["audit-status"])' reason="Genie request failed" />
+      <set-header name="Cache-Control" exists-action="override"><value>no-store</value></set-header>
+      <set-header name="Pragma" exists-action="override"><value>no-cache</value></set-header>
+      <set-header name="x-correlation-id" exists-action="override"><value>@(context.RequestId.ToString())</value></set-header>
+      <set-body>{"error":"Genie request failed."}</set-body>
+    </return-response>
+  </on-error>
+</policies>

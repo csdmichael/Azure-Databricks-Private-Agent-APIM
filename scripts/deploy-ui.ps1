@@ -22,8 +22,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'config.ps1')
 
 $config = Get-DeploymentConfig -Path $ConfigPath
-$SubscriptionId = Get-ConfigValue -Config $config -Path 'azure.subscriptionId' -Override $SubscriptionId
-$ResourceGroup = Get-ConfigValue -Config $config -Path 'azure.resourceGroup' -Override $ResourceGroup
+$SubscriptionId = Get-ConfigValue -Config $config -Path 'appService.uiSubscriptionId' -Override $SubscriptionId
+$ResourceGroup = Get-ConfigValue -Config $config -Path 'appService.uiResourceGroup' -Override $ResourceGroup
 $UiAppName = Get-ConfigValue -Config $config -Path 'appService.uiAppName' -Override $UiAppName
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $uiDir = Join-Path $repoRoot "ui"
@@ -36,6 +36,9 @@ if (-not $SkipBuild) {
     npm --prefix $uiDir run build -- --configuration production | Out-String | Write-Host
     if ($LASTEXITCODE -ne 0) { throw "UI build failed." }
 }
+
+Copy-Item (Join-Path $repoRoot 'showcase-server/staticwebapp.config.json') `
+  (Join-Path $uiDir 'www/staticwebapp.config.json') -Force
 
 $previous = $ErrorActionPreference
 $ErrorActionPreference = "Continue"

@@ -1,0 +1,14 @@
+{
+  "routes": [
+    {
+      "route": "/history*",
+      "redirect": "https://caldova-databricks-showcase.azurewebsites.net/history",
+      "statusCode": 302
+    },
+    {
+      "route": "/stats*",
+      "redirect": "https://caldova-databricks-showcase.azurewebsites.net/stats",
+      "statusCode": 302
+    }
+  ]
+}

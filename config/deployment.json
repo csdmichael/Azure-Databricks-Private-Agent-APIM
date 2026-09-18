@@ -86,6 +86,8 @@
     "planSku": "F1",
     "apiAppName": "databricks-agents-api-my",
     "uiAppName": "databricks-agents-ui-my",
+    "uiSubscriptionId": "86b37969-9445-49cf-b03f-d8866235171c",
+    "uiResourceGroup": "ai-myaacoub",
     "staticWebAppSku": "Free",
     "pythonRuntime": "PYTHON:3.12",
     "containerStartTimeLimitSeconds": 600,
