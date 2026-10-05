@@ -20,6 +20,27 @@ query runs as the signed-in user rather than as a shared service identity.
 >
 > **Teams package:** [`Teams Package/Foundry-Databricks-Agent.zip`](Teams%20Package/Foundry-Databricks-Agent.zip)
 
+## Table of contents
+
+- [Architecture](#architecture)
+- [Security model](#security-model)
+- [Repository layout](#repository-layout)
+- [Prerequisites](#prerequisites)
+- [Setup guide](#setup-guide)
+  - [1. Configure the Entra applications](#1-configure-the-entra-applications)
+  - [2. Provision with Bicep](#2-provision-with-bicep)
+  - [3. Provision with Terraform](#3-provision-with-terraform)
+  - [4. Publish the Foundry agent](#4-publish-the-foundry-agent)
+  - [5. Build and deploy the Teams bridge](#5-build-and-deploy-the-teams-bridge)
+  - [6. Install and test in Teams](#6-install-and-test-in-teams)
+  - [7. Deploy through GitHub Actions](#7-deploy-through-github-actions)
+- [Playwright screenshots](#playwright-screenshots)
+- [Sample prompts](#sample-prompts)
+- [Validation checklist](#validation-checklist)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
+- [Detailed Foundry OBO setup guide](docs/obo/README.md)
+
 ## Architecture
 
 The diagram reads left to right:
