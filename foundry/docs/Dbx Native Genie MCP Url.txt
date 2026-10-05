@@ -1,1 +1,0 @@
-https://adb-7405616934814750.10.azuredatabricks.net/api/2.0/mcp/genie/01f1abe9e51e19ddbb15297aee9a5850
