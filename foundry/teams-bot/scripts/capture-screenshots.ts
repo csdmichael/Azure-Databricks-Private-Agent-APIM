@@ -23,9 +23,9 @@ const pages = [
     ready: /caldova-foundry-databricks-bot/i,
   },
   {
-    name: "03-teams-chat.png",
-    url: process.env.TEAMS_AGENT_URL,
-    ready: /Foundry Databricks/i,
+    name: "03-bot-web-chat.png",
+    url: process.env.AZURE_BOT_WEB_CHAT_URL,
+    ready: /Test in Web Chat/i,
   },
 ];
 

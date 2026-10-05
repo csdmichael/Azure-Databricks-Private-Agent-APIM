@@ -70,6 +70,8 @@
       "projectName": "sales-poc",
       "agentName": "semiconductor-sales",
       "teamsAgentName": "semiconductor-sales-genie",
+      "teamsConnectionName": "databricks-genie-obo-oauth",
+      "teamsConnectionAuthType": "OAuth2",
       "publishedAgentUrl": "https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2",
       "modelDeploymentName": "gpt-6-astra",
       "modelName": "gpt-6-astra",

@@ -52,14 +52,66 @@ param delegatedScope string = 'https://ai.azure.com/.default'
 @description('Foundry prompt agent name.')
 param foundryAgentName string
 
+@description('Foundry OAuth project connection name.')
+param foundryMcpConnectionName string = 'databricks-genie-obo-oauth'
+
+@description('Client ID used by the Foundry custom OAuth MCP connection.')
+param foundryMcpOAuthClientId string
+
+@secure()
+@description('Client secret used by the Foundry custom OAuth MCP connection.')
+param foundryMcpOAuthClientSecret string
+
+@description('Client ID of the APIM API application that exposes Genie.Access.')
+param apimApiClientId string
+
 @description('Resource tags.')
 param tags object = {}
 
 var foundryProjectEndpoint = 'https://${foundryAccountName}.services.ai.azure.com/api/projects/${foundryProjectName}'
 var mcpServerUrl = 'https://${apimName}.azure-api.net/${oboMcpPath}/mcp'
+var entraAuthority = '${environment().authentication.loginEndpoint}${tenantId}/oauth2/v2.0'
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimName
+}
+
+resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  name: foundryAccountName
+}
+
+resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
+  parent: foundryAccount
+  name: foundryProjectName
+}
+
+resource foundryMcpConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
+  parent: foundryProject
+  name: foundryMcpConnectionName
+  properties: any({
+    authType: 'OAuth2'
+    authorizationUrl: '${entraAuthority}/authorize'
+    category: 'RemoteTool'
+    credentials: {
+      clientId: foundryMcpOAuthClientId
+      clientSecret: foundryMcpOAuthClientSecret
+    }
+    group: 'GenericProtocol'
+    isDefault: false
+    isSharedToAll: false
+    metadata: {
+      type: 'custom_MCP'
+    }
+    refreshUrl: '${entraAuthority}/token'
+    scopes: [
+      'api://${apimApiClientId}/Genie.Access'
+      'offline_access'
+    ]
+    target: mcpServerUrl
+    tokenUrl: '${entraAuthority}/token'
+    useCustomConnector: false
+    useWorkspaceManagedIdentity: false
+  })
 }
 
 resource sourceApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' existing = {
@@ -266,3 +318,4 @@ output botPrincipalId string = botApp.identity.principalId
 output foundryProjectEndpoint string = foundryProjectEndpoint
 output mcpServerUrl string = mcpServerUrl
 output publishedAgentUrl string = 'https://ai.azure.com/nextgen/build/agents/${foundryAgentName}'
+output foundryMcpOAuthRedirectUrl string = any(foundryMcpConnection.properties).redirectUrl

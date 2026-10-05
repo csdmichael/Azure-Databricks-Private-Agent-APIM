@@ -33,6 +33,28 @@ variable "foundry_agent_name" {
   type        = string
 }
 
+variable "foundry_mcp_connection_name" {
+  description = "Foundry OAuth project connection name."
+  type        = string
+  default     = "databricks-genie-obo-oauth"
+}
+
+variable "foundry_mcp_oauth_client_id" {
+  description = "Client ID used by the Foundry custom OAuth MCP connection."
+  type        = string
+}
+
+variable "foundry_mcp_oauth_client_secret" {
+  description = "Client secret used by the Foundry custom OAuth MCP connection."
+  type        = string
+  sensitive   = true
+}
+
+variable "apim_api_client_id" {
+  description = "Client ID of the APIM API application that exposes Genie.Access."
+  type        = string
+}
+
 variable "apim_name" {
   description = "Existing API Management service name."
   type        = string

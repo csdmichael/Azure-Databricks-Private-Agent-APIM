@@ -12,6 +12,10 @@ param botAppName = 'caldova-foundry-databricks-bot'
 param appServicePlanName = 'caldova-tokenomics-api-plan'
 param delegatedScope = 'https://ai.azure.com/.default'
 param foundryAgentName = 'semiconductor-sales-genie'
+param foundryMcpConnectionName = 'databricks-genie-obo-oauth'
+param foundryMcpOAuthClientId = '00000000-0000-0000-0000-000000000000'
+param foundryMcpOAuthClientSecret = readEnvironmentVariable('FOUNDRY_MCP_OAUTH_CLIENT_SECRET')
+param apimApiClientId = '00000000-0000-0000-0000-000000000000'
 param tags = {
   component: 'foundry-teams-obo'
   environment: 'poc'

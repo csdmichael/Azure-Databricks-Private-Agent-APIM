@@ -32,4 +32,48 @@ test("invokes Foundry with the delegated user token", async () => {
     input: "Revenue by region",
     agent_reference: { type: "agent_reference", name: "agent" },
   });
+
+  test("surfaces OAuth consent and resumes the previous response", async () => {
+    const responseBodies: unknown[] = [];
+    let responseNumber = 0;
+    const fetcher: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/conversations")) {
+        return new Response(JSON.stringify({ id: "conversation-2" }), { status: 200 });
+      }
+      responseBodies.push(JSON.parse(String(init?.body ?? "{}")) as unknown);
+      responseNumber += 1;
+      if (responseNumber === 1) {
+        return new Response(
+          JSON.stringify({
+            id: "response-1",
+            output: [
+              {
+                type: "oauth_consent_request",
+                consent_link: "https://consent.example.test/login",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ output_text: "Authorized result" }), { status: 200 });
+    };
+    const client = new FoundryClient(
+      "https://example.services.ai.azure.com/api/projects/project",
+      "agent",
+      fetcher,
+    );
+
+    const consent = await client.ask("teams-oauth", "Revenue by region", "user-token");
+    const result = await client.ask("teams-oauth", "continue", "user-token");
+
+    assert.match(consent, /Authorize Databricks access/);
+    assert.equal(result, "Authorized result");
+    assert.deepEqual(responseBodies[1], {
+      previous_response_id: "response-1",
+      input: "Revenue by region",
+      agent_reference: { type: "agent_reference", name: "agent" },
+    });
+  });
 });

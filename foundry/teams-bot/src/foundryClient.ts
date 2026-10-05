@@ -1,13 +1,16 @@
 interface FoundryResponse {
+  id?: string;
   output_text?: string;
   output?: Array<{
     type?: string;
+    consent_link?: string;
     content?: Array<{ type?: string; text?: string }>;
   }>;
 }
 
 export class FoundryClient {
   private readonly conversations = new Map<string, string>();
+  private readonly pendingOAuth = new Map<string, { responseId: string; prompt: string }>();
 
   constructor(
     private readonly projectEndpoint: string,
@@ -33,14 +36,37 @@ export class FoundryClient {
       this.conversations.set(conversationKey, conversationId);
     }
 
+    const pending = this.pendingOAuth.get(conversationKey);
     const response = await this.request<FoundryResponse>("/openai/v1/responses", {
       method: "POST",
-      body: JSON.stringify({
-        conversation: conversationId,
-        input: prompt,
-        agent_reference: { type: "agent_reference", name: this.agentName },
-      }),
+      body: JSON.stringify(
+        pending
+          ? {
+              previous_response_id: pending.responseId,
+              input: pending.prompt,
+              agent_reference: { type: "agent_reference", name: this.agentName },
+            }
+          : {
+              conversation: conversationId,
+              input: prompt,
+              agent_reference: { type: "agent_reference", name: this.agentName },
+            },
+      ),
     }, foundryUserToken);
+    const consent = response.output?.find(
+      (item) => item.type === "oauth_consent_request" && item.consent_link,
+    );
+    if (consent?.consent_link) {
+      if (!response.id) {
+        throw new Error("Foundry OAuth consent response did not include a response ID");
+      }
+      this.pendingOAuth.set(conversationKey, { responseId: response.id, prompt });
+      return [
+        "Databricks access requires one-time authorization.",
+        `[Authorize Databricks access](${consent.consent_link})`,
+        "After authorization succeeds, return here and send `continue`.",
+      ].join("\n\n");
+    }
     const text =
       response.output_text ??
       response.output
@@ -50,6 +76,7 @@ export class FoundryClient {
     if (!text) {
       throw new Error("Foundry completed without a text response");
     }
+    this.pendingOAuth.delete(conversationKey);
     return text;
   }
 

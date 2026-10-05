@@ -44,11 +44,11 @@ The data and identity flow has eight logical hops:
 3. **The bridge calls Foundry.** The Node bridge sends the user's prompt to the
    Foundry Responses API with the delegated Foundry token.
 4. **Foundry resolves the MCP connection.** The prompt agent references the
-   `databricks-genie-obo-user` project connection. Its authentication type is
-   `UserEntraToken`, with the APIM API application as the token audience.
-5. **Foundry calls APIM as the user.** Foundry obtains a short-lived delegated
-   access token for the configured APIM audience and sends it as the MCP request's
-   bearer token.
+   `databricks-genie-obo-oauth` custom OAuth2 project connection.
+5. **The user authorizes the MCP connection.** On first use, Foundry returns an
+   `oauth_consent_request`. The bridge surfaces its consent link, then resumes the
+   original response after authorization. Foundry sends the resulting APIM bearer
+   token with the MCP request.
 6. **APIM validates and exchanges the assertion.** APIM validates signature,
    issuer, tenant, audience, delegated scope, authorized client, user identity,
    and rate limit. The existing OBO policy exchanges the assertion through the
@@ -70,9 +70,9 @@ Verified on 2026-10-04:
 | Component | Deployed configuration |
 | --- | --- |
 | Foundry account/project | `foundry-myaacoub-private/sales-poc` |
-| Prompt agent | `semiconductor-sales-genie`, active version 6 |
+| Prompt agent | `semiconductor-sales-genie`, active version 7 |
 | Model deployment | `gpt-6-astra` |
-| MCP project connection | `databricks-genie-obo-user`, `UserEntraToken`, audience `api://bdd127ff-fd4c-45f5-b553-ff77a7755161` |
+| MCP project connection | `databricks-genie-obo-oauth`, custom `OAuth2`, scope `api://bdd127ff-fd4c-45f5-b553-ff77a7755161/Genie.Access` |
 | APIM MCP endpoint | `https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp` |
 | Azure Bot Service | `caldova-foundry-databricks-bot`, Teams channel enabled and terms accepted |
 | Bot diagnostics | `BotRequest` and `AllMetrics` sent to `caldova-foundry-databricks-bot-insights-logs` |
@@ -86,9 +86,19 @@ Useful links:
 - [Bot health endpoint](https://caldova-foundry-databricks-bot.azurewebsites.net/health)
 - [Foundry project endpoint](https://foundry-myaacoub-private.services.ai.azure.com/api/projects/sales-poc)
 
-The infrastructure and Foundry agent are deployed. A complete production sign-off
-still requires an authenticated Teams conversation, a permitted-user data query,
-a genuine denied-user query, and correlated APIM/Databricks audit evidence.
+The infrastructure and Foundry agent are deployed. Azure Bot Test in Web Chat
+completed the OAuth flow and returned a grounded Databricks Genie result. Production
+sign-off still requires a genuine denied-user query and correlated APIM/Databricks
+audit evidence.
+
+### Live Web Chat verification
+
+The administrator sent `sales by qtr` through Azure Bot **Test in Web Chat**. After
+Bot OAuth and one-time Foundry MCP consent, the agent returned 2025 quarterly sales,
+identified `product_sales` as the source, stated the revenue aggregation and the 2025
+filter, and summarized the increasing quarterly trend.
+
+![Azure Bot Test in Web Chat returning a grounded quarterly sales answer from Databricks Genie](../screenshots/03-bot-web-chat.png)
 
 ## What OBO means in this solution
 
@@ -97,14 +107,15 @@ There are two delegated transitions. They serve different resources:
 1. **Teams user → Foundry.** Azure Bot OAuth supplies a delegated token accepted by
    the Foundry project. The bridge must not replace it with managed identity if the
    goal is end-user authorization.
-2. **Foundry user → APIM API → Databricks.** The Foundry `UserEntraToken`
-   connection requests a token for the APIM API audience. APIM then performs the
-   existing Databricks token exchange.
+2. **Foundry user → APIM API → Databricks.** The custom OAuth2 MCP connection
+   obtains a delegated `Genie.Access` token after one-time user consent. APIM then
+   performs the existing Databricks token exchange.
 
 The flow does **not** pass the original Teams token in a prompt, message body,
 structured input, custom MCP header, or agent instruction. Foundry rejects
-sensitive `Authorization` values in MCP tool definitions. The supported mechanism
-is a project connection with `authType: UserEntraToken`.
+sensitive `Authorization` values in MCP tool definitions. Custom audiences are not
+supported by Foundry's first-party-only `UserEntraToken` broker. The supported
+mechanism for this custom APIM API is a project connection with `authType: OAuth2`.
 
 No hop stores a Databricks personal access token. No application-only Databricks
 fallback is permitted. When user token acquisition, APIM authorization, federation,
@@ -117,7 +128,7 @@ or Databricks authorization fails, the request fails closed.
 | Teams → Bot Service | Bot Framework bot application | Bot Framework service and Teams user context | Bot Framework JWT validation |
 | Bot OAuth → bridge | Microsoft Foundry | Signed-in Teams user | Tenant, consent, expiry |
 | Bridge → Foundry | Microsoft Foundry project | Signed-in Teams user | Foundry RBAC and project access |
-| Foundry → APIM MCP | APIM API application | Signed-in Teams user | `aud`, `iss`, `tid`, `scp`, `oid`, authorized client |
+| Foundry → APIM MCP | APIM API application | OAuth-consented user | `aud`, `iss`, `tid`, `scp`, `oid`, authorized client |
 | APIM → Databricks token endpoint | Original APIM user assertion | Signed-in Teams user | Databricks federation issuer, audience, subject |
 | APIM → Genie | Azure Databricks | Mapped Databricks user | Workspace, Genie, warehouse, Unity Catalog |
 
@@ -150,8 +161,9 @@ removing the authorized-client check.
 ### Microsoft Foundry
 
 - The prompt agent contains business instructions and an MCP tool reference.
-- `project_connection_id` is `databricks-genie-obo-user`.
-- The connection contains an audience and authentication mode, not a user token.
+- `project_connection_id` is `databricks-genie-obo-oauth`.
+- The connection stores custom OAuth client configuration; user access and refresh
+  tokens remain in the managed Foundry connection service.
 - Agent invocations are authorized by the signed-in user's Foundry access.
 
 ### API Management
@@ -289,52 +301,42 @@ az rest --method get `
 An anonymous MCP initialize or tool call must fail. A valid delegated user call
 must reach the underlying operation without a subscription key.
 
-## 5. Create the Foundry user-token connection
+## 5. Create the Foundry OAuth2 MCP connection
 
-Create a project connection with:
-
-```text
-name       = databricks-genie-obo-user
-category   = RemoteTool
-authType   = UserEntraToken
-target     = https://<apim>.azure-api.net/databricks-genie-obo-mcp/mcp
-audience   = api://<APIM-API-client-id>
-```
-
-Using Azure Developer CLI:
-
-```powershell
-$env:AZURE_DEV_USER_AGENT = 'GitHubCopilot'
-azd ai connection create databricks-genie-obo-user `
-  --kind remote-tool `
-  --target 'https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp' `
-  --auth-type user-entra-token `
-  --audience 'api://bdd127ff-fd4c-45f5-b553-ff77a7755161' `
-  --project-endpoint 'https://foundry-myaacoub-private.services.ai.azure.com/api/projects/sales-poc'
-```
-
-If the `azd` extension cannot authenticate but Azure CLI is authenticated, deploy the
-same `Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01` resource
-through ARM. The connection has no secret:
+Create a custom OAuth project connection with the bot/connector application client
+ID and a separately rotated secret:
 
 ```json
 {
   "properties": {
-    "audience": "api://<APIM-API-client-id>",
-    "authType": "UserEntraToken",
+    "authType": "OAuth2",
+    "authorizationUrl": "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize",
     "category": "RemoteTool",
+    "credentials": {
+      "clientId": "<oauth-client-id>",
+      "clientSecret": "<secret>"
+    },
     "group": "GenericProtocol",
     "isDefault": false,
     "isSharedToAll": false,
     "metadata": { "type": "custom_MCP" },
+    "refreshUrl": "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token",
+    "scopes": [
+      "api://<APIM-API-client-id>/Genie.Access",
+      "offline_access"
+    ],
     "target": "https://<apim-host>/<obo-mcp-path>/mcp",
+    "tokenUrl": "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token",
+    "useCustomConnector": false,
     "useWorkspaceManagedIdentity": false
   }
 }
 ```
 
-Read the connection back and confirm `credentials` is absent. Do not substitute
-`CustomKeys`, a PAT, or a static bearer token.
+Foundry returns a generated `redirectUrl`. Add it to the OAuth application's **Web**
+redirect URIs before testing. Keep `offline_access` so Foundry can refresh the
+delegated token. Never commit the client secret or replace OAuth with a PAT/static
+bearer token.
 
 ## 6. Publish the Foundry prompt agent
 
@@ -347,7 +349,7 @@ $env:FOUNDRY_PROJECT_ENDPOINT = 'https://foundry-myaacoub-private.services.ai.az
 $env:FOUNDRY_AGENT_NAME = 'semiconductor-sales-genie'
 $env:FOUNDRY_MODEL_DEPLOYMENT_NAME = 'gpt-6-astra'
 $env:MCP_SERVER_URL = 'https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp'
-$env:MCP_CONNECTION_ID = 'databricks-genie-obo-user'
+$env:MCP_CONNECTION_ID = 'databricks-genie-obo-oauth'
 python .\foundry\agent\provision_agent.py
 ```
 
@@ -358,7 +360,7 @@ The resulting MCP tool must contain:
   "type": "mcp",
   "server_label": "databricks-genie-obo",
   "server_url": "https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp",
-  "project_connection_id": "databricks-genie-obo-user",
+  "project_connection_id": "databricks-genie-obo-oauth",
   "require_approval": "never"
 }
 ```
@@ -423,9 +425,10 @@ Required App Service settings:
 | `FOUNDRY_AGENT_NAME` | Published prompt-agent name |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Bridge telemetry |
 
-The bridge does not use a managed identity token for Foundry requests. It uses the
-user token returned by the OAuth prompt. This is necessary for Foundry's
-`UserEntraToken` connection to resolve the downstream user identity.
+The bridge uses the user token returned by the Bot OAuth prompt for Foundry. When
+Foundry returns `oauth_consent_request`, the bridge sends the `consent_link` to chat,
+stores the response ID in memory, and resumes with `previous_response_id` after the
+user sends `continue`.
 
 For reliable App Service deployment, publish a prebuilt ZIP containing `dist/`,
 `package.json`, `package-lock.json`, and production `node_modules/`. This avoids a
@@ -593,7 +596,8 @@ Do not declare the OBO path production-ready until all checks pass:
 ### Infrastructure
 
 - [ ] Foundry project, model, and agent version are active.
-- [ ] `databricks-genie-obo-user` reads back as `UserEntraToken`.
+- [ ] `databricks-genie-obo-oauth` reads back as custom `OAuth2`.
+- [ ] Its generated redirect URL is registered on the OAuth application.
 - [ ] APIM OBO MCP resolves privately from Foundry.
 - [ ] Teams channel is enabled and terms are accepted.
 - [ ] Bot OAuth **Test Connection** succeeds.
@@ -630,7 +634,9 @@ Do not declare the OBO path production-ready until all checks pass:
 | --- | --- | --- |
 | Sign-in card repeats | OAuth connection mismatch, redirect URI, secret, consent, or conditional access | Test the Azure Bot OAuth connection and verify `OAUTH_CONNECTION_NAME` |
 | Foundry returns 401/403 before MCP | User token does not target Foundry or user lacks `Foundry User` | Inspect OAuth scope and project RBAC |
-| Foundry agent creation rejects `Authorization` header | Sensitive MCP headers are prohibited | Use a `UserEntraToken` project connection |
+| Foundry agent creation rejects `Authorization` header | Sensitive MCP headers are prohibited | Use the custom OAuth2 project connection |
+| `ARA OBO token request failed` | `UserEntraToken` was used with a custom audience | Use custom OAuth identity passthrough for the APIM application |
+| Consent link is never shown | Client ignores `oauth_consent_request` output | Surface `consent_link`, then resume with `previous_response_id` |
 | MCP returns 401 | Wrong APIM audience, issuer, tenant, scope, or expired token | Decode only nonsecret claims in a secure session and compare to policy |
 | MCP returns 401 for authorized user after Foundry OBO | APIM `azp` allowlist still expects the old client | Approve the observed Foundry downstream client; do not remove client validation |
 | MCP returns 403 | User allowlist/group policy or Databricks federation rejects the user | Check `oid`, federation subject, user provisioning, and consent |

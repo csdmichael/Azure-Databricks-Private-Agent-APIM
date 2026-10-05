@@ -8,9 +8,41 @@ data "azurerm_api_management" "this" {
 }
 
 locals {
-  foundry_endpoint = "https://${var.foundry_account_name}.services.ai.azure.com/api/projects/${var.foundry_project_name}"
-  mcp_server_url   = "https://${var.apim_name}.azure-api.net/${var.obo_mcp_path}/mcp"
-  source_api_id    = "${data.azurerm_api_management.this.id}/apis/${var.obo_source_api_id}"
+  foundry_project_id = "${data.azurerm_resource_group.this.id}/providers/Microsoft.CognitiveServices/accounts/${var.foundry_account_name}/projects/${var.foundry_project_name}"
+  foundry_endpoint   = "https://${var.foundry_account_name}.services.ai.azure.com/api/projects/${var.foundry_project_name}"
+  mcp_server_url     = "https://${var.apim_name}.azure-api.net/${var.obo_mcp_path}/mcp"
+  source_api_id      = "${data.azurerm_api_management.this.id}/apis/${var.obo_source_api_id}"
+}
+
+resource "azapi_resource" "foundry_mcp_connection" {
+  type                      = "Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01"
+  name                      = var.foundry_mcp_connection_name
+  parent_id                 = local.foundry_project_id
+  schema_validation_enabled = false
+
+  body = {
+    properties = {
+      authType         = "OAuth2"
+      authorizationUrl = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/authorize"
+      category         = "RemoteTool"
+      credentials = {
+        clientId     = var.foundry_mcp_oauth_client_id
+        clientSecret = var.foundry_mcp_oauth_client_secret
+      }
+      group         = "GenericProtocol"
+      isDefault     = false
+      isSharedToAll = false
+      metadata = {
+        type = "custom_MCP"
+      }
+      refreshUrl                  = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/token"
+      scopes                      = ["api://${var.apim_api_client_id}/Genie.Access", "offline_access"]
+      target                      = local.mcp_server_url
+      tokenUrl                    = "https://login.microsoftonline.com/${var.tenant_id}/oauth2/v2.0/token"
+      useCustomConnector          = false
+      useWorkspaceManagedIdentity = false
+    }
+  }
 }
 
 resource "azapi_resource" "obo_mcp" {

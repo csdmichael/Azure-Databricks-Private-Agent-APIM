@@ -17,3 +17,8 @@ output "published_agent_url" {
   description = "Stable published-agent URL recorded by the deployment."
   value       = "https://ai.azure.com/nextgen/build/agents/${var.foundry_agent_name}"
 }
+
+output "foundry_mcp_oauth_redirect_url" {
+  description = "Redirect URL that must be registered on the Foundry MCP OAuth app."
+  value       = try(azapi_resource.foundry_mcp_connection.output.properties.redirectUrl, null)
+}

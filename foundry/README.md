@@ -51,9 +51,10 @@ The diagram reads left to right:
 3. The lightweight Teams bridge invokes `semiconductor-sales-genie` through the
    Foundry Responses API with that delegated token, so Foundry sees the signed-in
    user rather than an application identity.
-4. The Foundry agent calls the APIM-hosted MCP server. Its MCP definition sets
-   `databricks-genie-obo-user` project connection uses `UserEntraToken` with the APIM
-   API audience. Foundry acquires and forwards the user's delegated APIM token.
+4. The Foundry agent calls the APIM-hosted MCP server through the
+   `databricks-genie-obo-oauth` custom OAuth connection. On first use, Foundry returns
+   a consent link; the bridge surfaces it in chat and resumes the original response
+   after authorization.
 5. APIM validates tenant, audience, authorized client, delegated scope, user identity,
    and rate limit. It then exchanges the assertion for a short-lived Databricks token.
 6. Databricks Genie runs under the signed-in user's Unity Catalog and workspace
@@ -76,7 +77,7 @@ For a full replication and operations walkthrough, see the
 | Teams to Azure Bot Service | Bot Framework activity JWT | Registered bot and Teams channel |
 | User to Azure Bot OAuth | Entra delegated sign-in | Foundry delegated consent |
 | Bot bridge to Foundry | Delegated user token | `Foundry User` on the project |
-| Foundry to APIM MCP | `UserEntraToken` project connection | APIM JWT claims and per-user rate limit |
+| Foundry to APIM MCP | Custom OAuth2 project connection | APIM JWT claims and per-user rate limit |
 | APIM to Databricks | RFC 8693 token exchange | Databricks user, workspace, and Unity Catalog grants |
 
 No Databricks PAT is stored in Teams, Bot Service, the web app, Foundry, APIM, or
@@ -114,11 +115,15 @@ diagnostics continue to suppress request bodies and `Authorization` headers.
 ### 1. Configure the Entra applications
 
 1. In the APIM API application, expose the delegated scope `Genie.Access`.
-2. In the bot application, add delegated permission to that scope and grant tenant
-   admin consent.
+2. Add delegated Azure Machine Learning Services `user_impersonation` permission to
+   the bot application and grant tenant admin consent.
 3. Add the Teams SSO application ID URI `api://botid-<bot-client-id>`.
-4. Create a client secret and store it as `TEAMS_BOT_CLIENT_SECRET`.
-5. Set APIM named value `genie-obo-connector-client-id` to the bot client ID.
+4. Register `https://token.botframework.com/.auth/web/redirect`.
+5. Create separate bot and Foundry MCP OAuth client secrets. Store them as
+   `TEAMS_BOT_CLIENT_SECRET` and `FOUNDRY_MCP_OAUTH_CLIENT_SECRET`.
+6. After the Foundry OAuth connection is deployed, add its generated redirect URL to
+   the application's Web redirect URIs.
+7. Set APIM named value `genie-obo-connector-client-id` to the OAuth client ID.
 
 The current sample package uses client ID
 `8127fb92-0641-4f6e-9d6e-f508e18e9606`; override it during packaging if a different
@@ -128,6 +133,7 @@ registration is used.
 
 ```powershell
 $env:TEAMS_BOT_CLIENT_SECRET = '<secret-from-key-vault-or-entra>'
+$env:FOUNDRY_MCP_OAUTH_CLIENT_SECRET = '<separate-secret-from-key-vault-or-entra>'
 
 az deployment group create `
   --resource-group m365-myaacoub `
@@ -144,7 +150,11 @@ az deployment group create `
     botAppName=caldova-foundry-databricks-bot `
     appServicePlanName=caldova-tokenomics-api-plan `
     delegatedScope='https://ai.azure.com/.default' `
-    foundryAgentName=semiconductor-sales-genie
+    foundryAgentName=semiconductor-sales-genie `
+    foundryMcpConnectionName=databricks-genie-obo-oauth `
+    foundryMcpOAuthClientId=8127fb92-0641-4f6e-9d6e-f508e18e9606 `
+    foundryMcpOAuthClientSecret=$env:FOUNDRY_MCP_OAUTH_CLIENT_SECRET `
+    apimApiClientId=bdd127ff-fd4c-45f5-b553-ff77a7755161
 ```
 
 This creates or updates:
@@ -153,6 +163,7 @@ This creates or updates:
 - the Bot Service registration and Teams channel;
 - Bot Service `BotRequest` logs and `AllMetrics` routed to Log Analytics;
 - the Bot OAuth connection;
+- the Foundry custom OAuth2 MCP connection and generated consent redirect URL;
 - a Linux App Service on the existing `caldova-tokenomics-api-plan` and Application Insights;
 - the bot bridge application settings needed for delegated Foundry access.
 
@@ -182,7 +193,7 @@ $env:FOUNDRY_PROJECT_ENDPOINT = 'https://foundry-myaacoub-private.services.ai.az
 $env:FOUNDRY_AGENT_NAME = 'semiconductor-sales-genie'
 $env:FOUNDRY_MODEL_DEPLOYMENT_NAME = 'gpt-6-astra'
 $env:MCP_SERVER_URL = 'https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp'
-$env:MCP_CONNECTION_ID = 'databricks-genie-obo-user'
+$env:MCP_CONNECTION_ID = 'databricks-genie-obo-oauth'
 $env:FOUNDRY_AGENT_PORTAL_URL = 'https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2'
 
 python -m pip install -r .\foundry\agent\requirements.txt
@@ -228,6 +239,7 @@ Run **Deploy Foundry Teams OBO Agent** after configuring:
 | `AZURE_SUBSCRIPTION_ID` | Target subscription |
 | `TEAMS_BOT_CLIENT_ID` | Single-tenant bot application |
 | `TEAMS_BOT_CLIENT_SECRET` | Bot and OAuth connection credential |
+| `FOUNDRY_MCP_OAUTH_CLIENT_SECRET` | Foundry custom OAuth MCP client credential |
 | `APIM_OBO_CLIENT_ID` | Audience application exposing `Genie.Access` |
 | `DELEGATED_SMOKE_TEST_TOKEN` | Optional, short-lived manual-dispatch test only |
 
@@ -246,7 +258,7 @@ credentials are never automated or committed.
 Set-Location .\foundry\teams-bot
 $env:FOUNDRY_AGENT_PORTAL_URL = 'https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2'
 $env:AZURE_BOT_PORTAL_URL = 'https://portal.azure.com/#resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.BotService/botServices/caldova-foundry-databricks-bot/overview'
-$env:TEAMS_AGENT_URL = 'https://teams.microsoft.com'
+$env:AZURE_BOT_WEB_CHAT_URL = 'https://portal.azure.com/#resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.BotService/botServices/caldova-foundry-databricks-bot/testwebchat'
 $env:PLAYWRIGHT_STORAGE_STATE = '.\playwright-auth.json'
 npm run screenshots
 ```
@@ -257,7 +269,15 @@ The script waits for the expected resource or app name before writing:
 |---|---|
 | `docs/screenshots/01-foundry-agent.png` | Agent model, instructions, and MCP tool |
 | `docs/screenshots/02-bot-service.png` | Bot Service endpoint and Teams channel |
-| `docs/screenshots/03-teams-chat.png` | Teams chat with a grounded sample response |
+| `docs/screenshots/03-bot-web-chat.png` | Azure Bot Web Chat with a grounded Databricks result |
+
+### Captured deployment evidence
+
+![Microsoft Foundry agent in the agent playground](docs/screenshots/01-foundry-agent.png)
+
+![Deployed Azure Bot Service overview](docs/screenshots/02-bot-service.png)
+
+![Azure Bot Test in Web Chat returning a grounded Databricks Genie result](docs/screenshots/03-bot-web-chat.png)
 
 The first browser run requires interactive sign-in. Keep `playwright-auth.json` and
 `docs/screenshots/.auth-state.json` out of source control because they contain
@@ -283,6 +303,8 @@ authenticated browser state.
 - `/health` proves the deployed bridge is running.
 - The optional workflow smoke test invokes the published agent with a short-lived
   delegated token.
+- Azure Bot **Test in Web Chat** returned grounded 2025 quarterly revenue with the
+  Databricks source table and filters shown in the answer.
 - The final Teams test must be performed by an authenticated tenant user because
   Teams sideloading and OAuth consent cannot be validated anonymously.
 

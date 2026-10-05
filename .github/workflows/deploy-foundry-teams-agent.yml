@@ -31,7 +31,7 @@ env:
   FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-6-astra
   FOUNDRY_AGENT_PORTAL_URL: https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2
   MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp
-  MCP_CONNECTION_ID: databricks-genie-obo-user
+  MCP_CONNECTION_ID: databricks-genie-obo-oauth
   BOT_NAME: caldova-foundry-databricks-bot
   BOT_APP_NAME: caldova-foundry-databricks-bot
   OAUTH_CONNECTION_NAME: DatabricksGenieOBO
@@ -74,8 +74,10 @@ jobs:
         if: ${{ inputs.deploy_infrastructure }}
         env:
           TEAMS_BOT_CLIENT_SECRET: ${{ secrets.TEAMS_BOT_CLIENT_SECRET }}
+          FOUNDRY_MCP_OAUTH_CLIENT_SECRET: ${{ secrets.FOUNDRY_MCP_OAUTH_CLIENT_SECRET }}
         run: |
           az deployment group create \
+            --name github-foundry-teams-obo \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file foundry/infra/bicep/main.bicep \
             --parameters \
@@ -91,7 +93,34 @@ jobs:
               appServicePlanName=caldova-tokenomics-api-plan \
               oauthConnectionName="$OAUTH_CONNECTION_NAME" \
               delegatedScope="https://ai.azure.com/.default" \
-              foundryAgentName="$FOUNDRY_AGENT_NAME"
+              foundryAgentName="$FOUNDRY_AGENT_NAME" \
+              foundryMcpConnectionName="$MCP_CONNECTION_ID" \
+              foundryMcpOAuthClientId="${{ secrets.TEAMS_BOT_CLIENT_ID }}" \
+              foundryMcpOAuthClientSecret="$FOUNDRY_MCP_OAUTH_CLIENT_SECRET" \
+              apimApiClientId="${{ secrets.APIM_OBO_CLIENT_ID }}"
+
+      - name: Register Foundry OAuth redirect
+        if: ${{ inputs.deploy_infrastructure }}
+        shell: pwsh
+        run: |
+          $redirect = az deployment group show `
+            --resource-group $env:AZURE_RESOURCE_GROUP `
+            --name github-foundry-teams-obo `
+            --query properties.outputs.foundryMcpOAuthRedirectUrl.value `
+            --output tsv
+          if ([string]::IsNullOrWhiteSpace($redirect)) {
+            throw 'The Foundry MCP connection did not return an OAuth redirect URL.'
+          }
+          $app = az ad app show --id '${{ secrets.TEAMS_BOT_CLIENT_ID }}' --output json |
+            ConvertFrom-Json
+          $redirectUris = @($app.web.redirectUris)
+          if ($redirect -notin $redirectUris) {
+            $redirectUris += $redirect
+            az ad app update `
+              --id '${{ secrets.TEAMS_BOT_CLIENT_ID }}' `
+              --web-redirect-uris $redirectUris `
+              --only-show-errors
+          }
 
       - name: Deploy Teams bridge
         run: >-
