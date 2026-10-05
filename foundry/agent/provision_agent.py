@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import MCPTool, PromptAgentDefinition, StructuredInputDefinition
+from azure.ai.projects.models import MCPTool, PromptAgentDefinition
+from azure.core.credentials import AccessToken, TokenCredential
 from azure.identity import DefaultAzureCredential
 
 
@@ -16,6 +18,14 @@ def required(name: str) -> str:
     if not value:
         raise RuntimeError(f"Required environment variable {name} is not set")
     return value
+
+
+class StaticTokenCredential(TokenCredential):
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    def get_token(self, *scopes: str, **kwargs: object) -> AccessToken:
+        return AccessToken(self._token, int(time.time()) + 300)
 
 
 def instructions() -> str:
@@ -43,9 +53,14 @@ def main() -> int:
     parser.add_argument("--test-prompt", default="What can you help me analyze?")
     args = parser.parse_args()
 
+    credential: TokenCredential = (
+        StaticTokenCredential(args.test_token)
+        if args.test_token
+        else DefaultAzureCredential()
+    )
     project = AIProjectClient(
         endpoint=required("FOUNDRY_PROJECT_ENDPOINT"),
-        credential=DefaultAzureCredential(),
+        credential=credential,
     )
     agent = project.agents.create_version(
         agent_name=required("FOUNDRY_AGENT_NAME"),
@@ -53,18 +68,11 @@ def main() -> int:
             model=required("FOUNDRY_MODEL_DEPLOYMENT_NAME"),
             instructions=instructions(),
             reasoning={"effort": "low"},
-            structured_inputs={
-                "oboToken": StructuredInputDefinition(
-                    description="Short-lived delegated Entra token for the signed-in Teams user.",
-                    required=True,
-                    schema={"type": "string"},
-                )
-            },
             tools=[
                 MCPTool(
                     server_label="databricks-genie-obo",
                     server_url=required("MCP_SERVER_URL"),
-                    headers={"Authorization": "Bearer {{oboToken}}"},
+                    project_connection_id=required("MCP_CONNECTION_ID"),
                     allowed_tools=[],
                     require_approval="never",
                 )
@@ -85,7 +93,6 @@ def main() -> int:
             response = openai.responses.create(
                 conversation=conversation.id,
                 input=args.test_prompt,
-                extra_body={"structured_inputs": {"oboToken": args.test_token}},
             )
             if not response.output_text:
                 raise RuntimeError("Smoke test returned no text.")

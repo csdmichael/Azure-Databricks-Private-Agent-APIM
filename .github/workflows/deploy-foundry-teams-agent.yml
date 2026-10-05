@@ -31,6 +31,7 @@ env:
   FOUNDRY_MODEL_DEPLOYMENT_NAME: gpt-6-astra
   FOUNDRY_AGENT_PORTAL_URL: https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2
   MCP_SERVER_URL: https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp
+  MCP_CONNECTION_ID: databricks-genie-obo-user
   BOT_NAME: caldova-foundry-databricks-bot
   BOT_APP_NAME: caldova-foundry-databricks-bot
   OAUTH_CONNECTION_NAME: DatabricksGenieOBO
@@ -89,7 +90,7 @@ jobs:
               botAppName="$BOT_APP_NAME" \
               appServicePlanName=caldova-tokenomics-api-plan \
               oauthConnectionName="$OAUTH_CONNECTION_NAME" \
-              delegatedScope="api://${{ secrets.APIM_OBO_CLIENT_ID }}/Genie.Access" \
+              delegatedScope="https://ai.azure.com/.default" \
               foundryAgentName="$FOUNDRY_AGENT_NAME"
 
       - name: Deploy Teams bridge

@@ -20,10 +20,9 @@ Deployment scope:
 - Create the `databricks-genie-obo-mcp` APIM MCP facade over the existing OBO API.
 - Create `caldova-foundry-databricks-bot`, its Teams channel and delegated OAuth
   connection, and route `BotRequest` logs plus `AllMetrics` to Log Analytics.
-- Create the Linux App Service bridge, plan, Application Insights, Log Analytics,
-  and a project-scoped Foundry User assignment for its managed identity.
-- Publish a new `semiconductor-sales-genie` prompt-agent version whose MCP
-  Authorization header uses the required per-request `oboToken` structured input.
+- Create the Linux App Service bridge, plan, Application Insights, and Log Analytics.
+- Publish a new `semiconductor-sales-genie` prompt-agent version that references a
+  `UserEntraToken` project connection for the APIM MCP audience.
 - Deploy the tested Node bridge and publish the generated Teams ZIP package.
 - Commit and push source to `origin/main`.
 
@@ -68,10 +67,9 @@ Validation acceptance:
 - `terraform validate` passed for the alternative Terraform implementation.
 - `python foundry/agent/provision_agent.py --help` imported the Foundry SDK models
   and completed successfully.
-- Static RBAC review and a second ARM validation passed after scoping the sole new
-  role assignment to the existing `sales-poc` project. It grants only
-  `Foundry User` (`53ca6127-db72-4b80-b1b0-d745d6d5456d`) to the bot App
-  Service managed identity; Terraform uses the same project scope and role.
+- The initially deployed App Service managed-identity `Foundry User` assignment was
+  removed after the supported user-token design was verified. Each signed-in user,
+  not the bridge identity, must hold the required project role.
 
 ## Showcase Analytics and Genie User Federation
 

@@ -11,7 +11,7 @@ bot_client_secret     = "set-with-TF_VAR_bot_client_secret"
 bot_name              = "caldova-foundry-databricks-bot"
 bot_app_name          = "caldova-foundry-databricks-bot"
 app_service_plan_name = "caldova-tokenomics-api-plan"
-delegated_scope       = "api://00000000-0000-0000-0000-000000000000/Genie.Access"
+delegated_scope       = "https://ai.azure.com/.default"
 
 tags = {
   component   = "foundry-teams-obo"

@@ -90,8 +90,9 @@ variable "oauth_connection_name" {
 }
 
 variable "delegated_scope" {
-  description = "Full delegated scope URI requested by the OAuth connection."
+  description = "Delegated Microsoft Foundry scope requested by the OAuth connection."
   type        = string
+  default     = "https://ai.azure.com/.default"
 }
 
 variable "tags" {

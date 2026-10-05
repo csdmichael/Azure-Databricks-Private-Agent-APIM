@@ -25,15 +25,14 @@ query runs as the signed-in user rather than as a shared service identity.
 The diagram reads left to right:
 
 1. A user opens the app in Teams and signs in with Microsoft Entra ID.
-2. Azure Bot Service validates the Teams activity. Its OAuth connection requests the
-   delegated `Genie.Access` scope and returns a short-lived user token to the bot.
+2. Azure Bot Service validates the Teams activity. Its OAuth connection requests a
+   delegated Microsoft Foundry token and returns it to the bot.
 3. The lightweight Teams bridge invokes `semiconductor-sales-genie` through the
-   Foundry Responses API. The bridge authenticates to Foundry with its managed
-   identity and supplies the user's token as the agent's required `oboToken`
-   structured input.
+   Foundry Responses API with that delegated token, so Foundry sees the signed-in
+   user rather than an application identity.
 4. The Foundry agent calls the APIM-hosted MCP server. Its MCP definition sets
-   `Authorization: Bearer {{oboToken}}`; the value changes for each invocation and is
-   never stored as a project connection secret.
+   `databricks-genie-obo-user` project connection uses `UserEntraToken` with the APIM
+   API audience. Foundry acquires and forwards the user's delegated APIM token.
 5. APIM validates tenant, audience, authorized client, delegated scope, user identity,
    and rate limit. It then exchanges the assertion for a short-lived Databricks token.
 6. Databricks Genie runs under the signed-in user's Unity Catalog and workspace
@@ -48,24 +47,27 @@ runner for agent publication after that lock-down.
 
 ## Security model
 
+For a full replication and operations walkthrough, see the
+**[Foundry OBO setup guide](docs/obo/README.md)**.
+
 | Boundary | Authentication | Authorization |
 |---|---|---|
 | Teams to Azure Bot Service | Bot Framework activity JWT | Registered bot and Teams channel |
-| User to Azure Bot OAuth | Entra delegated sign-in | `Genie.Access` consent |
-| Bot bridge to Foundry | App Service managed identity | `Foundry User` on the project |
-| Foundry to APIM MCP | Per-request delegated bearer token | APIM JWT claims and per-user rate limit |
+| User to Azure Bot OAuth | Entra delegated sign-in | Foundry delegated consent |
+| Bot bridge to Foundry | Delegated user token | `Foundry User` on the project |
+| Foundry to APIM MCP | `UserEntraToken` project connection | APIM JWT claims and per-user rate limit |
 | APIM to Databricks | RFC 8693 token exchange | Databricks user, workspace, and Unity Catalog grants |
 
 No Databricks PAT is stored in Teams, Bot Service, the web app, Foundry, APIM, or
 GitHub. The bot client secret is a deployment secret and is never committed. APIM
-diagnostics must continue to suppress request bodies and `Authorization` headers
-because the Foundry structured input contains a short-lived credential.
+diagnostics continue to suppress request bodies and `Authorization` headers.
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| [`agent/provision_agent.py`](agent/provision_agent.py) | Publishes a prompt-agent version with the OBO MCP header template |
+| [`agent/provision_agent.py`](agent/provision_agent.py) | Publishes a prompt-agent version with the user-token MCP project connection |
+| [`docs/obo/README.md`](docs/obo/README.md) | Detailed OBO identity, networking, deployment, logging, and verification guide |
 | [`teams-bot/`](teams-bot/) | Teams activity bridge, OAuth prompt, Foundry client, tests, and package builder |
 | [`infra/bicep/`](infra/bicep/) | Bicep deployment for Bot Service, App Service, monitoring, RBAC, and OBO MCP facade |
 | [`infra/terraform/`](infra/terraform/) | Equivalent Terraform deployment |
@@ -120,7 +122,7 @@ az deployment group create `
     botName=caldova-foundry-databricks-bot `
     botAppName=caldova-foundry-databricks-bot `
     appServicePlanName=caldova-tokenomics-api-plan `
-    delegatedScope='api://bdd127ff-fd4c-45f5-b553-ff77a7755161/Genie.Access' `
+    delegatedScope='https://ai.azure.com/.default' `
     foundryAgentName=semiconductor-sales-genie
 ```
 
@@ -131,7 +133,7 @@ This creates or updates:
 - Bot Service `BotRequest` logs and `AllMetrics` routed to Log Analytics;
 - the Bot OAuth connection;
 - a Linux App Service on the existing `caldova-tokenomics-api-plan` and Application Insights;
-- the bridge managed identity's `Foundry User` assignment.
+- the bot bridge application settings needed for delegated Foundry access.
 
 ### 3. Provision with Terraform
 
@@ -159,6 +161,7 @@ $env:FOUNDRY_PROJECT_ENDPOINT = 'https://foundry-myaacoub-private.services.ai.az
 $env:FOUNDRY_AGENT_NAME = 'semiconductor-sales-genie'
 $env:FOUNDRY_MODEL_DEPLOYMENT_NAME = 'gpt-6-astra'
 $env:MCP_SERVER_URL = 'https://caldova-apim-westus.azure-api.net/databricks-genie-obo-mcp/mcp'
+$env:MCP_CONNECTION_ID = 'databricks-genie-obo-user'
 $env:FOUNDRY_AGENT_PORTAL_URL = 'https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2'
 
 python -m pip install -r .\foundry\agent\requirements.txt
@@ -250,8 +253,8 @@ authenticated browser state.
 
 ## Validation checklist
 
-- `npm test` proves that the delegated token is sent only in
-  `structured_inputs.oboToken`, while Foundry uses its own access token.
+- `npm test` proves that the Teams user's delegated Foundry token authenticates both
+  Responses API calls and is not copied into the request body.
 - `npm run build` type-checks the bot.
 - `npm run package:teams` emits a valid zip with manifest and icons.
 - `az bicep build --file foundry/infra/bicep/main.bicep` validates Bicep syntax.
@@ -270,7 +273,7 @@ authenticated browser state.
 | APIM returns `401` | Token audience, tenant, signature, expiry, and `Genie.Access` scope |
 | APIM returns `403` | `azp` equals the configured bot client and `oid` is authorized |
 | Bot activities are missing from logs | Confirm the `bot-service-logs` diagnostic setting and query the `BotRequest` category |
-| Foundry returns `403` | App Service managed identity has `Foundry User` on the project |
+| Foundry returns `403` | Signed-in user has `Foundry User` on the project and the Bot OAuth token targets Foundry |
 | MCP call fails before APIM | OBO MCP API exists and Foundry can privately resolve the APIM gateway |
 | Agent publishes but Teams cannot reply | Bot endpoint, Teams channel, App Service health, and Bot Framework JWT settings |
 | GitHub agent publication times out | Use the VNet-connected `foundry-private` runner and private DNS |

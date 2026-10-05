@@ -46,8 +46,8 @@ param applicationInsightsName string = '${botAppName}-insights'
 @description('Azure Bot OAuth connection name.')
 param oauthConnectionName string = 'DatabricksGenieOBO'
 
-@description('Delegated scope exposed by the APIM API application.')
-param delegatedScope string
+@description('Delegated Microsoft Foundry scope requested by the Bot OAuth connection.')
+param delegatedScope string = 'https://ai.azure.com/.default'
 
 @description('Foundry prompt agent name.')
 param foundryAgentName string
@@ -57,15 +57,6 @@ param tags object = {}
 
 var foundryProjectEndpoint = 'https://${foundryAccountName}.services.ai.azure.com/api/projects/${foundryProjectName}'
 var mcpServerUrl = 'https://${apimName}.azure-api.net/${oboMcpPath}/mcp'
-
-resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
-  name: foundryAccountName
-}
-
-resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
-  parent: foundryAccount
-  name: foundryProjectName
-}
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimName
@@ -195,19 +186,6 @@ resource botApp 'Microsoft.Web/sites@2024-04-01' = {
         }
       ]
     }
-  }
-}
-
-resource foundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(foundryProject.id, botApp.id, 'foundry-user')
-  scope: foundryProject
-  properties: {
-    principalId: botApp.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '53ca6127-db72-4b80-b1b0-d745d6d5456d'
-    )
   }
 }
 

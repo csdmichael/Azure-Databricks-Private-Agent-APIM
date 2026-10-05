@@ -8,10 +8,9 @@ data "azurerm_api_management" "this" {
 }
 
 locals {
-  foundry_project_id = "${data.azurerm_resource_group.this.id}/providers/Microsoft.CognitiveServices/accounts/${var.foundry_account_name}/projects/${var.foundry_project_name}"
-  foundry_endpoint   = "https://${var.foundry_account_name}.services.ai.azure.com/api/projects/${var.foundry_project_name}"
-  mcp_server_url     = "https://${var.apim_name}.azure-api.net/${var.obo_mcp_path}/mcp"
-  source_api_id      = "${data.azurerm_api_management.this.id}/apis/${var.obo_source_api_id}"
+  foundry_endpoint = "https://${var.foundry_account_name}.services.ai.azure.com/api/projects/${var.foundry_project_name}"
+  mcp_server_url   = "https://${var.apim_name}.azure-api.net/${var.obo_mcp_path}/mcp"
+  source_api_id    = "${data.azurerm_api_management.this.id}/apis/${var.obo_source_api_id}"
 }
 
 resource "azapi_resource" "obo_mcp" {
@@ -95,13 +94,6 @@ resource "azurerm_linux_web_app" "bot" {
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.this.connection_string
     SCM_DO_BUILD_DURING_DEPLOYMENT        = "true"
   }
-}
-
-resource "azurerm_role_assignment" "foundry_user" {
-  scope                = local.foundry_project_id
-  role_definition_name = "Foundry User"
-  principal_id         = azurerm_linux_web_app.bot.identity[0].principal_id
-  principal_type       = "ServicePrincipal"
 }
 
 resource "azapi_resource" "bot" {

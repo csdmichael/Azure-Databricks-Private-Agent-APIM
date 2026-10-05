@@ -10,7 +10,7 @@ param botClientSecret = readEnvironmentVariable('TEAMS_BOT_CLIENT_SECRET')
 param botName = 'caldova-foundry-databricks-bot'
 param botAppName = 'caldova-foundry-databricks-bot'
 param appServicePlanName = 'caldova-tokenomics-api-plan'
-param delegatedScope = 'api://00000000-0000-0000-0000-000000000000/Genie.Access'
+param delegatedScope = 'https://ai.azure.com/.default'
 param foundryAgentName = 'semiconductor-sales-genie'
 param tags = {
   component: 'foundry-teams-obo'

@@ -1,5 +1,3 @@
-import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
-
 interface FoundryResponse {
   output_text?: string;
   output?: Array<{
@@ -9,24 +7,20 @@ interface FoundryResponse {
 }
 
 export class FoundryClient {
-  private readonly credential: TokenCredential;
   private readonly conversations = new Map<string, string>();
 
   constructor(
     private readonly projectEndpoint: string,
     private readonly agentName: string,
-    credential: TokenCredential = new DefaultAzureCredential(),
     private readonly fetcher: typeof fetch = fetch,
-  ) {
-    this.credential = credential;
-  }
+  ) {}
 
-  async ask(conversationKey: string, prompt: string, delegatedToken: string): Promise<string> {
+  async ask(conversationKey: string, prompt: string, foundryUserToken: string): Promise<string> {
     if (!prompt.trim()) {
       throw new Error("A non-empty prompt is required");
     }
-    if (!delegatedToken.trim()) {
-      throw new Error("A delegated user token is required");
+    if (!foundryUserToken.trim()) {
+      throw new Error("A delegated Foundry user token is required");
     }
 
     let conversationId = this.conversations.get(conversationKey);
@@ -34,7 +28,7 @@ export class FoundryClient {
       const created = await this.request<{ id: string }>("/openai/v1/conversations", {
         method: "POST",
         body: JSON.stringify({}),
-      });
+      }, foundryUserToken);
       conversationId = created.id;
       this.conversations.set(conversationKey, conversationId);
     }
@@ -45,9 +39,8 @@ export class FoundryClient {
         conversation: conversationId,
         input: prompt,
         agent_reference: { type: "agent_reference", name: this.agentName },
-        structured_inputs: { oboToken: delegatedToken },
       }),
-    });
+    }, foundryUserToken);
     const text =
       response.output_text ??
       response.output
@@ -60,15 +53,11 @@ export class FoundryClient {
     return text;
   }
 
-  private async request<T>(path: string, init: RequestInit): Promise<T> {
-    const accessToken = await this.credential.getToken("https://ai.azure.com/.default");
-    if (!accessToken) {
-      throw new Error("Unable to acquire a Microsoft Foundry access token");
-    }
+  private async request<T>(path: string, init: RequestInit, foundryUserToken: string): Promise<T> {
     const response = await this.fetcher(`${this.projectEndpoint}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${accessToken.token}`,
+        Authorization: `Bearer ${foundryUserToken}`,
         "Content-Type": "application/json",
         ...init.headers,
       },
