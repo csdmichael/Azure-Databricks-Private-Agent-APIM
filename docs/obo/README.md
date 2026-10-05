@@ -8,6 +8,11 @@ OAuth consent or OBO. See the separate [Copilot demo inventory](../deployed-reso
 for deployed names, URLs, dated evidence and verification limits; those are not
 customer inputs or proof of Phase 1 setup.
 
+**Phase 1 means no additional agent sign-in, not anonymous platform access.**
+Operators still use their existing authenticated Azure, Power Platform and
+Databricks portal sessions and assigned platform roles. The baseline connector
+uses protected service credentials; do not disable gateway or backend controls.
+
 Security migration is **additive**: retain the non-OBO managed-identity API and
 connector until the acceptance checks pass. Do not replace existing routes during
 setup or silently fall back to them after a user denial.
@@ -24,10 +29,18 @@ identity can read approved data. Secure APIM subscription keys in connections or
 secret storage, never in client source. This shared backend identity is not
 end-user authorization and requires no new end-user UI app registration.
 
-For the baseline Power Platform connector, configure **API key** authentication
-with parameter name `Ocp-Apim-Subscription-Key` in the **Header**. Store its value
-only in the connection, not the Swagger. Use one shared connection for all four
-operations. This service credential is separate from the agent's **No authentication**
+For the baseline Copilot connector, select API key authentication with header
+`Ocp-Apim-Subscription-Key`. The connector definition stores only that header
+name; enter the approved APIM subscription key in the protected connection.
+Authorize the subscription for the intended Genie API/product, restrict who can
+use the connection, and rotate the key under the resource owner's procedure.
+Never put its value in Swagger, agent instructions, prompts, screenshots, source
+or logs. Portal/connection access still follows existing platform permissions.
+The shared identity must be appropriate for every baseline caller; do not use it
+for datasets requiring end-user-specific authorization.
+
+Use one shared connection for all four operations. This service credential is
+separate from the agent's **No authentication**
 setting and does not establish per-user Databricks permissions.
 
 ![Baseline connector Security tab with the subscription-key header](../images/12-connector-security.png)

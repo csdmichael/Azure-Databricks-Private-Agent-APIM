@@ -13,6 +13,11 @@ Entra app registrations, OBO or Teams/Bot deployment. The [Foundry demo inventor
 contains actual demo names, URLs and dated evidence, not customer deployment inputs
 or proof of Phase 1 setup.
 
+**Phase 1 means no additional agent sign-in, not anonymous portal access.**
+Keep existing authenticated Azure, Foundry and Databricks sessions, platform RBAC,
+APIM subscription protection and backend identity authorization. Do not expose
+an anonymous public agent or disable platform controls to avoid OAuth.
+
 This migration is **additive**. Keep the non-OBO MCP/API route available to the
 existing baseline until allowed-user, denied-user and least-privilege acceptance
 passes. Do not overwrite it while adding the OBO facade, and never automatically
@@ -30,41 +35,106 @@ APIM by the configured gateway policy. None of this requires a new end-user UI
 app registration or proves user-specific data permissions. See the
 [shared backend security guidance](../../../docs/obo/README.md#shared-baseline-backend-authorization).
 
-### Phase-one Foundry service connection
+### Existing Foundry project access
 
-The operator needs existing project access to manage connections/agents and use
-the playground. A managed-identity automation caller needs the appropriate
-Foundry project role; this is service authorization, not delegated user passthrough.
+The operator needs existing Azure permission to manage the selected Foundry project
+and its connections; use `Foundry Project Manager` or the equivalent permissions
+approved by the resource owner. Playground callers need existing `Foundry User`
+project access. Scope assignments to the project where supported, not the whole
+subscription. Private-network access and model access must also be available.
+These existing platform permissions do not require a new agent app registration,
+Teams sign-in or delegated APIM OAuth consent. Connection access remains subject
+to project RBAC; do not share a subscription key with individual users.
 
-If the portal does not expose key-based MCP connection creation, use the ARM
-project connections endpoint:
+### Baseline CustomKeys MCP connection
 
-```text
-PUT https://management.azure.com/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<foundry-account>/projects/<project-name>/connections/<connection-name>?api-version=2025-06-01
-```
+Use this section only for Phase 1's **non-OBO** Genie MCP facade:
 
-Supply this body through an approved secret-handling deployment process, replacing
-the key placeholder only in memory, never in source or logs:
+1. Confirm `databricks-genie` and `databricks-genie-mcp` use the intended APIM
+   subscription/product, preserve subscription protection, and grant APIM's backend
+   managed identity only the required Databricks access described above.
+2. In the customer Foundry project, add a remote MCP tool targeting
+   `https://<apim-name>.azure-api.net/databricks-genie-mcp/mcp`.
+3. Select a key-based service connection with `category: RemoteTool`,
+   `metadata.type: custom_MCP`, and `authType: CustomKeys`. Store the existing
+   subscription key as protected `credentials.keys.Ocp-Apim-Subscription-Key`.
+   Do **not** select OAuth2, user identity passthrough, or the OBO MCP facade.
+4. Name it `<connection-name>`, retain `isSharedToAll: false`, and attach the
+   connection to the baseline agent using its `project_connection_id`.
+5. Verify all four Genie operations are discovered and a grounded playground query
+   succeeds without an additional agent sign-in. This uses the shared backend
+   identity, not each caller's Databricks permissions.
 
-```json
-{
-  "properties": {
-    "category": "RemoteTool",
-    "target": "https://<apim-name>.azure-api.net/databricks-genie-mcp/mcp",
-    "authType": "CustomKeys",
-    "credentials": {
-      "keys": { "Ocp-Apim-Subscription-Key": "<protected-apim-subscription-key>" }
-    },
-    "metadata": { "type": "custom_MCP" },
-    "isSharedToAll": false
-  }
+If the portal does not expose CustomKeys creation, an authorized operator can use
+the project ARM connections API. The following PowerShell obtains the existing
+APIM key and ARM token in process memory, submits them over HTTPS, prints only
+nonsecret connection metadata and clears local references. Run in a secured
+operator session with PowerShell transcription/debug tracing and CLI HTTP logging
+disabled; do not capture command responses containing secrets. No secret is
+written to a file or entered as a literal command argument.
+The operator needs permission to list secrets on that APIM subscription and write
+connections on that Foundry project; ordinary playground callers do not need
+either administrative permission.
+
+```powershell
+$subscriptionId = '<subscription-id>'
+$resourceGroup = '<resource-group>'
+$apimName = '<apim-name>'
+$apimSubscriptionName = '<apim-subscription-resource-name>'
+$foundryAccount = '<foundry-account>'
+$projectName = '<foundry-project>'
+$connectionName = '<connection-name>'
+$mcpUrl = "https://$apimName.azure-api.net/databricks-genie-mcp/mcp"
+
+az account set --subscription $subscriptionId
+if ($LASTEXITCODE -ne 0) { throw 'Unable to select customer subscription.' }
+$keyUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.ApiManagement/service/$apimName/subscriptions/$apimSubscriptionName/listSecrets?api-version=2024-05-01"
+$connectionUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.CognitiveServices/accounts/$foundryAccount/projects/$projectName/connections/${connectionName}?api-version=2025-06-01"
+
+try {
+    $secretResult = az rest --method post --url $keyUri -o json --only-show-errors | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or -not $secretResult.primaryKey) {
+        throw 'Unable to obtain approved APIM subscription key.'
+    }
+    $armToken = az account get-access-token --resource https://management.azure.com --query accessToken -o tsv --only-show-errors
+    if ($LASTEXITCODE -ne 0 -or -not $armToken) { throw 'Unable to obtain ARM token.' }
+    $body = @{
+        properties = @{
+            category = 'RemoteTool'
+            target = $mcpUrl
+            authType = 'CustomKeys'
+            credentials = @{
+                keys = @{ 'Ocp-Apim-Subscription-Key' = $secretResult.primaryKey }
+            }
+            metadata = @{ type = 'custom_MCP' }
+            isSharedToAll = $false
+        }
+    } | ConvertTo-Json -Depth 8
+    $connection = Invoke-RestMethod -Method Put -Uri $connectionUri `
+        -Headers @{ Authorization = ('Bearer ' + $armToken) } `
+        -ContentType 'application/json' -Body $body
+    [pscustomobject]@{
+        name = $connection.name
+        target = $connection.properties.target
+        authType = $connection.properties.authType
+    }
+} finally {
+    $secretResult = $null
+    $armToken = $null
+    $body = $null
+    $connection = $null
 }
 ```
 
-Reference the connection by name in the phase-one agent's MCP
-`project_connection_id`. Restrict access to the stored connection and rotate the
-subscription key according to customer policy. Do not use this shared-identity
-connection as a fallback for the phase-two OAuth connection after a denied request.
+Project connections are not an alternative to RBAC. Restrict connection management
+and invocation to approved operators/callers, verify the private MCP target and
+avoid broad project sharing. Rotate APIM primary/secondary keys using the owner's
+approved staged procedure, update the protected connection, test it, then retire
+the old key. Never put a key in agent instructions, prompts, inline tool headers,
+screenshots, source, workflow logs or checked-in configuration.
+
+All subsequent delegated identity, Entra, Bot and Teams steps are **Phase 2**.
+The Phase 1 CustomKeys connection is separate from the OAuth2 connection below.
 
 ![Private Microsoft Foundry Agent to Databricks Genie through APIM MCP with delegated OBO](../Teams-Bot-Foundry-APIM-Databricks-OboFlow-Architecture.png)
 
@@ -164,6 +234,14 @@ the downstream token. Capture one real, redacted token in a secure operator sess
 inspect its nonsecret claims, and configure APIM's authorized-client allowlist to
 the observed and approved Foundry client identity. Never weaken the policy by
 removing the authorized-client check.
+
+The private token-exchange Function independently validates the assertion's `azp`.
+Add the same approved client ID to its comma-separated `ALLOWED_CLIENT_IDS`
+application setting, preserving the existing Copilot connector ID during additive
+migration. The broker infrastructure initializes this setting from `connectorClientId`;
+retain the approved combined list in deployment parameters so redeployment does
+not erase it. Verify both existing Copilot and new Foundry calls before cutover.
+Passing APIM validation alone does not prove broker acceptance.
 
 ## Trust boundaries
 

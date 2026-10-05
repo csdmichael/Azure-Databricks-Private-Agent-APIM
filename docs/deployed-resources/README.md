@@ -84,6 +84,12 @@ Public portal entry points remain [Azure](https://portal.azure.com/),
 | Power Platform primary | Canada Central | `10.194.0.0/16` | delegated `10.194.0.0/24` |
 | Power Platform secondary | Canada East | `10.195.0.0/16` | delegated `10.195.0.0/24` |
 
+Both recorded Power Platform delegated subnets are `/24` because the enterprise
+policy requires the regional subnets to expose the same usable address count.
+The original `Caldova Private` environment's `canada` geo selects the
+`canadacentral` / `canadaeast` pair. This is a demo choice, not a requirement to
+deploy every customer's environment in Canada.
+
 The recorded broker integration subnet is `genie-obo-integration`; configuration
 also records Showcase integration range `10.190.5.0/24`. Demo private DNS uses
 `privatelink.azure-api.net`, `privatelink.azuredatabricks.net` and broker app/SCM
