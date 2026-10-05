@@ -1,0 +1,18 @@
+using './main.bicep'
+
+param location = 'westus2'
+param foundryAccountName = 'foundry-myaacoub-private'
+param foundryProjectName = 'sales-poc'
+param apimName = 'caldova-apim-westus'
+param tenantId = '00000000-0000-0000-0000-000000000000'
+param botClientId = '00000000-0000-0000-0000-000000000000'
+param botClientSecret = readEnvironmentVariable('TEAMS_BOT_CLIENT_SECRET')
+param botName = 'caldova-foundry-databricks-bot'
+param botAppName = 'caldova-foundry-databricks-bot'
+param appServicePlanName = 'caldova-tokenomics-api-plan'
+param delegatedScope = 'api://00000000-0000-0000-0000-000000000000/Genie.Access'
+param foundryAgentName = 'semiconductor-sales-genie'
+param tags = {
+  component: 'foundry-teams-obo'
+  environment: 'poc'
+}

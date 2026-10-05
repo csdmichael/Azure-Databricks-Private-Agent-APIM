@@ -2,6 +2,77 @@
 
 Status: Validated
 
+## 2026-10-04 Foundry Teams OBO Deployment
+
+The user approved commit, publication, and deployment of the new Microsoft Foundry
+Teams path. The deployment reuses subscription
+`cf824570-a8ba-497a-a184-0a52f1830aa9`, resource group `m365-myaacoub`, the existing
+`foundry-myaacoub-private/sales-poc` project, `caldova-apim-westus`, and the existing
+Databricks Genie OBO API. Foundry and APIM remain in West US. The bot app and
+monitoring use West US 2 and reuse the existing Linux B1
+`caldova-tokenomics-api-plan`, avoiding new App Service quota.
+
+Recipe: Bicep plus Azure CLI and GitHub Actions. Terraform is retained as an
+equivalent operator-selected alternative but will not be applied in parallel.
+
+Deployment scope:
+
+- Create the `databricks-genie-obo-mcp` APIM MCP facade over the existing OBO API.
+- Create `caldova-foundry-databricks-bot`, its Teams channel and delegated OAuth
+  connection.
+- Create the Linux App Service bridge, plan, Application Insights, Log Analytics,
+  and a project-scoped Foundry User assignment for its managed identity.
+- Publish a new `semiconductor-sales-genie` prompt-agent version whose MCP
+  Authorization header uses the required per-request `oboToken` structured input.
+- Deploy the tested Node bridge and publish the generated Teams ZIP package.
+- Commit and push source to `origin/main`.
+
+Security gates:
+
+- No Databricks PAT or delegated token is persisted.
+- Bot and OAuth client secrets are generated into process memory, saved to GitHub
+  Actions secrets, and never printed or committed.
+- The live delegated/Teams test is allowed only with an authenticated user token.
+- Existing APIM validation, allowed-user enforcement, rate limiting, sanitized
+  diagnostics, and Databricks federation remain authoritative.
+
+Validation acceptance:
+
+- [x] All validation checks pass.
+  - [x] 1. Core Validation (CLI, auth, Bicep build, ARM validate, and what-if).
+  - [x] 2. Bicep linting.
+  - [x] 3. Azure Policy validation.
+  - [x] 4. Node unit tests and TypeScript build.
+  - [x] 5. Teams ZIP contains a parseable manifest and both required icons.
+  - [x] 6. Terraform validates as the documented alternative.
+  - [x] 7. Foundry provisioning script imports successfully.
+- [ ] App Service health responds after deployment.
+- [ ] Foundry agent is active and the published URL resolves for an authenticated user.
+
+### 2026-10-04 Validation Proof
+
+2026-10-04T17:35-07:00:
+
+- `validate-deployment.ps1` passed Azure CLI, authentication, Bicep compilation,
+  resource-group ARM validation, and what-if. Target was subscription
+  `cf824570-a8ba-497a-a184-0a52f1830aa9`, resource group `m365-myaacoub`.
+  What-if reported Create 9, Modify 0, Delete 0.
+- The initial preflight exposed zero new West US App Service VM quota. The
+  deployment was corrected to reuse the existing West US 2 Linux B1
+  `caldova-tokenomics-api-plan`; the full preflight then passed.
+- `az bicep lint --file foundry/infra/bicep/main.bicep` passed.
+- Applicable resource-group policy assignments returned an empty list; no inherited
+  deny, modify, or deploy-if-not-exists assignment applies.
+- `npm test` passed 1 test, `npm run build` passed TypeScript strict compilation,
+  and `npm run package:teams` produced the three required ZIP entries.
+- `terraform validate` passed for the alternative Terraform implementation.
+- `python foundry/agent/provision_agent.py --help` imported the Foundry SDK models
+  and completed successfully.
+- Static RBAC review and a second ARM validation passed after scoping the sole new
+  role assignment to the existing `sales-poc` project. It grants only
+  `Foundry User` (`53ca6127-db72-4b80-b1b0-d745d6d5456d`) to the bot App
+  Service managed identity; Terraform uses the same project scope and role.
+
 ## Showcase Analytics and Genie User Federation
 
 This document records the Caldova Databricks deployment and its validation evidence.

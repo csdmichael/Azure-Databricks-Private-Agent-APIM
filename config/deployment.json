@@ -69,6 +69,8 @@
       "accountName": "foundry-myaacoub-private",
       "projectName": "sales-poc",
       "agentName": "semiconductor-sales",
+      "teamsAgentName": "semiconductor-sales-genie",
+      "publishedAgentUrl": "https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2",
       "modelDeploymentName": "gpt-6-astra",
       "modelName": "gpt-6-astra",
       "modelVersion": "2026-09-03",
@@ -154,8 +156,17 @@
     "planName": "caldova-showcase-plan",
     "jumpVmName": "caldova-jump",
     "scope": "Genie.Access",
+    "mcpPath": "databricks-genie-obo-mcp",
     "jwkFetchTimeoutMs": 5000,
     "tokenExchangeTimeoutMs": 10000
+  },
+  "teams": {
+    "botName": "caldova-foundry-databricks-bot",
+    "appServiceName": "caldova-foundry-databricks-bot",
+    "oauthConnectionName": "DatabricksGenieOBO",
+    "appId": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
+    "appDisplayName": "Foundry Databricks Genie",
+    "packageName": "Foundry-Databricks-Agent.zip"
   },
   "showcase": {
     "appName": "caldova-databricks-showcase",

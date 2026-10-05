@@ -1,0 +1,30 @@
+{
+  "name": "foundry-databricks-teams-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "node --test --import tsx test/*.test.ts",
+    "package:teams": "tsx scripts/build-package.ts",
+    "screenshots": "tsx scripts/capture-screenshots.ts"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "botbuilder": "^4.23.3",
+    "botbuilder-dialogs": "^4.23.3",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.0",
+    "adm-zip": "^0.5.16",
+    "playwright": "^1.56.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

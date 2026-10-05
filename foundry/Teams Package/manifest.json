@@ -1,0 +1,57 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.23/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.23",
+  "version": "1.0.0",
+  "id": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
+  "developer": {
+    "name": "Michael Yaacoub",
+    "websiteUrl": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM",
+    "privacyUrl": "https://privacy.microsoft.com/privacystatement",
+    "termsOfUseUrl": "https://www.microsoft.com/servicesagreement"
+  },
+  "name": {
+    "short": "Foundry Databricks",
+    "full": "Microsoft Foundry Databricks Genie Agent"
+  },
+  "description": {
+    "short": "Ask governed Databricks Genie questions from Teams.",
+    "full": "A Microsoft Teams bot backed by a Microsoft Foundry agent. It calls the existing APIM MCP server with a short-lived delegated Entra token so Databricks applies the signed-in user's permissions."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#5B5FC7",
+  "bots": [
+    {
+      "botId": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "Revenue by region",
+              "description": "Analyze revenue by region with Databricks Genie"
+            },
+            {
+              "title": "Yield by fab",
+              "description": "Compare manufacturing yield by fab and process node"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": [
+    "token.botframework.com",
+    "caldova-foundry-databricks-bot.azurewebsites.net"
+  ],
+  "webApplicationInfo": {
+    "id": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
+    "resource": "api://botid-8127fb92-0641-4f6e-9d6e-f508e18e9606"
+  }
+}

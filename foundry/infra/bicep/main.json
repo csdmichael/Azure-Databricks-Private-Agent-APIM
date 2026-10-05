@@ -1,0 +1,358 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.47.16.16243",
+      "templateHash": "2008627089927899216"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for the bot application and monitoring resources."
+      }
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing Microsoft Foundry account name."
+      }
+    },
+    "foundryProjectName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing Microsoft Foundry project name."
+      }
+    },
+    "apimName": {
+      "type": "string",
+      "metadata": {
+        "description": "Existing API Management service name."
+      }
+    },
+    "oboSourceApiId": {
+      "type": "string",
+      "defaultValue": "databricks-genie-obo",
+      "metadata": {
+        "description": "Existing delegated Databricks Genie API identifier."
+      }
+    },
+    "oboMcpApiId": {
+      "type": "string",
+      "defaultValue": "databricks-genie-obo-mcp",
+      "metadata": {
+        "description": "MCP API identifier created over the delegated Genie API."
+      }
+    },
+    "oboMcpPath": {
+      "type": "string",
+      "defaultValue": "databricks-genie-obo-mcp",
+      "metadata": {
+        "description": "MCP gateway path."
+      }
+    },
+    "tenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "Microsoft Entra tenant ID."
+      }
+    },
+    "botClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Client ID of the single-tenant bot application registration."
+      }
+    },
+    "botClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Client secret of the bot application registration."
+      }
+    },
+    "botName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Bot resource name."
+      }
+    },
+    "botAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Linux web app name that hosts the Teams-to-Foundry bridge."
+      }
+    },
+    "appServicePlanName": {
+      "type": "string",
+      "defaultValue": "caldova-tokenomics-api-plan",
+      "metadata": {
+        "description": "Existing Linux App Service plan name."
+      }
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-insights', parameters('botAppName'))]",
+      "metadata": {
+        "description": "Application Insights name."
+      }
+    },
+    "oauthConnectionName": {
+      "type": "string",
+      "defaultValue": "DatabricksGenieOBO",
+      "metadata": {
+        "description": "Azure Bot OAuth connection name."
+      }
+    },
+    "delegatedScope": {
+      "type": "string",
+      "metadata": {
+        "description": "Delegated scope exposed by the APIM API application."
+      }
+    },
+    "foundryAgentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Foundry prompt agent name."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Resource tags."
+      }
+    }
+  },
+  "variables": {
+    "foundryProjectResourceId": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('foundryAccountName'), parameters('foundryProjectName'))]",
+    "foundryProjectEndpoint": "[format('https://{0}.services.ai.azure.com/api/projects/{1}', parameters('foundryAccountName'), parameters('foundryProjectName'))]",
+    "mcpServerUrl": "[format('https://{0}.azure-api.net/{1}/mcp', parameters('apimName'), parameters('oboMcpPath'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2024-06-01-preview",
+      "name": "[format('{0}/{1}', parameters('apimName'), parameters('oboMcpApiId'))]",
+      "properties": {
+        "type": "mcp",
+        "displayName": "Databricks Genie OBO MCP",
+        "description": "MCP facade that preserves the signed-in user through the existing APIM OBO policy.",
+        "path": "[parameters('oboMcpPath')]",
+        "protocols": [
+          "https"
+        ],
+        "subscriptionRequired": false,
+        "mcpTools": [
+          {
+            "name": "ask",
+            "operationId": "[format('{0}/operations/ask', resourceId('Microsoft.ApiManagement/service/apis', parameters('apimName'), parameters('oboSourceApiId')))]"
+          },
+          {
+            "name": "follow-up",
+            "operationId": "[format('{0}/operations/follow-up', resourceId('Microsoft.ApiManagement/service/apis', parameters('apimName'), parameters('oboSourceApiId')))]"
+          },
+          {
+            "name": "message",
+            "operationId": "[format('{0}/operations/message', resourceId('Microsoft.ApiManagement/service/apis', parameters('apimName'), parameters('oboSourceApiId')))]"
+          },
+          {
+            "name": "result",
+            "operationId": "[format('{0}/operations/result', resourceId('Microsoft.ApiManagement/service/apis', parameters('apimName'), parameters('oboSourceApiId')))]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('{0}-logs', parameters('applicationInsightsName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "retentionInDays": 30,
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('applicationInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('applicationInsightsName')))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('applicationInsightsName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('botAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "tags": "[parameters('tags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "httpsOnly": true,
+        "publicNetworkAccess": "Enabled",
+        "siteConfig": {
+          "alwaysOn": true,
+          "ftpsState": "Disabled",
+          "http20Enabled": true,
+          "linuxFxVersion": "NODE|20-lts",
+          "minTlsVersion": "1.2",
+          "appCommandLine": "node dist/index.js",
+          "appSettings": [
+            {
+              "name": "MicrosoftAppType",
+              "value": "SingleTenant"
+            },
+            {
+              "name": "MicrosoftAppId",
+              "value": "[parameters('botClientId')]"
+            },
+            {
+              "name": "MicrosoftAppPassword",
+              "value": "[parameters('botClientSecret')]"
+            },
+            {
+              "name": "MicrosoftAppTenantId",
+              "value": "[parameters('tenantId')]"
+            },
+            {
+              "name": "OAUTH_CONNECTION_NAME",
+              "value": "[parameters('oauthConnectionName')]"
+            },
+            {
+              "name": "FOUNDRY_PROJECT_ENDPOINT",
+              "value": "[variables('foundryProjectEndpoint')]"
+            },
+            {
+              "name": "FOUNDRY_AGENT_NAME",
+              "value": "[parameters('foundryAgentName')]"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            {
+              "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(variables('foundryProjectResourceId'), resourceId('Microsoft.Web/sites', parameters('botAppName')), 'foundry-user')]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('botAppName')), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '53ca6127-db72-4b80-b1b0-d745d6d5456d')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('botAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.BotService/botServices",
+      "apiVersion": "2022-09-15",
+      "name": "[parameters('botName')]",
+      "location": "global",
+      "kind": "azurebot",
+      "tags": "[parameters('tags')]",
+      "sku": {
+        "name": "F0"
+      },
+      "properties": {
+        "displayName": "Foundry Databricks Genie",
+        "description": "Teams channel for a Microsoft Foundry agent with Databricks OBO.",
+        "endpoint": "[format('https://{0}/api/messages', reference(resourceId('Microsoft.Web/sites', parameters('botAppName')), '2024-04-01').defaultHostName)]",
+        "msaAppId": "[parameters('botClientId')]",
+        "msaAppTenantId": "[parameters('tenantId')]",
+        "msaAppType": "SingleTenant",
+        "publicNetworkAccess": "Enabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('botAppName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.BotService/botServices/channels",
+      "apiVersion": "2022-09-15",
+      "name": "[format('{0}/{1}', parameters('botName'), 'MsTeamsChannel')]",
+      "location": "global",
+      "properties": {
+        "channelName": "MsTeamsChannel",
+        "properties": {
+          "enableCalling": false,
+          "isEnabled": true
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.BotService/botServices', parameters('botName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.BotService/botServices/connections",
+      "apiVersion": "2022-09-15",
+      "name": "[format('{0}/{1}', parameters('botName'), parameters('oauthConnectionName'))]",
+      "location": "global",
+      "properties": {
+        "clientId": "[parameters('botClientId')]",
+        "clientSecret": "[parameters('botClientSecret')]",
+        "scopes": "[parameters('delegatedScope')]",
+        "serviceProviderId": "30dd229c-58e3-4a48-bdfd-91ec48eb906c",
+        "serviceProviderDisplayName": "Azure Active Directory v2",
+        "parameters": [
+          {
+            "key": "tenantID",
+            "value": "[parameters('tenantId')]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.BotService/botServices', parameters('botName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "botEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.BotService/botServices', parameters('botName')), '2022-09-15').endpoint]"
+    },
+    "botPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('botAppName')), '2024-04-01', 'full').identity.principalId]"
+    },
+    "foundryProjectEndpoint": {
+      "type": "string",
+      "value": "[variables('foundryProjectEndpoint')]"
+    },
+    "mcpServerUrl": {
+      "type": "string",
+      "value": "[variables('mcpServerUrl')]"
+    },
+    "publishedAgentUrl": {
+      "type": "string",
+      "value": "[format('https://ai.azure.com/nextgen/build/agents/{0}', parameters('foundryAgentName'))]"
+    }
+  }
+}

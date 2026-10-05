@@ -1,0 +1,19 @@
+subscription_id       = "00000000-0000-0000-0000-000000000000"
+resource_group_name   = "m365-myaacoub"
+location              = "westus2"
+tenant_id             = "00000000-0000-0000-0000-000000000000"
+foundry_account_name  = "foundry-myaacoub-private"
+foundry_project_name  = "sales-poc"
+foundry_agent_name    = "semiconductor-sales-genie"
+apim_name             = "caldova-apim-westus"
+bot_client_id         = "00000000-0000-0000-0000-000000000000"
+bot_client_secret     = "set-with-TF_VAR_bot_client_secret"
+bot_name              = "caldova-foundry-databricks-bot"
+bot_app_name          = "caldova-foundry-databricks-bot"
+app_service_plan_name = "caldova-tokenomics-api-plan"
+delegated_scope       = "api://00000000-0000-0000-0000-000000000000/Genie.Access"
+
+tags = {
+  component   = "foundry-teams-obo"
+  environment = "poc"
+}

@@ -53,3 +53,10 @@ node_modules/
 ui/www/
 ui/.angular/
 npm-debug.log*
+foundry/teams-bot/node_modules/
+foundry/teams-bot/dist/
+foundry/teams-bot/playwright-auth.json
+foundry/docs/screenshots/.auth-state.json
+foundry/infra/terraform/.terraform/
+foundry/infra/terraform/*.tfstate*
+foundry/infra/terraform/terraform.tfvars
