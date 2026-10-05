@@ -138,6 +138,7 @@ resource "azapi_resource" "teams_channel" {
     properties = {
       channelName = "MsTeamsChannel"
       properties = {
+        acceptedTerms = true
         enableCalling = false
         isEnabled     = true
       }

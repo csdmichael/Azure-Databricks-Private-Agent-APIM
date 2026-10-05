@@ -237,6 +237,7 @@ resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
   properties: {
     channelName: 'MsTeamsChannel'
     properties: {
+      acceptedTerms: true
       enableCalling: false
       isEnabled: true
     }
