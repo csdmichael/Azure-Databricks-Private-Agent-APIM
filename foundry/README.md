@@ -28,13 +28,7 @@ Use approved demo data, not data requiring per-user authorization.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  DATA["Databricks tables + SQL warehouse"] --> GENIE["Genie space"]
-  GENIE --> APIM["Private APIM Genie API + MCP facade"]
-  APIM --> AGENT["Foundry prompt agent"]
-  AGENT --> UI["Foundry playground answer"]
-```
+![Private Microsoft Foundry Agent to Databricks Genie via APIM MCP architecture](docs/Architecture-Phases.png)
 
 Requests travel in the opposite direction: the playground invokes the agent, the
 agent calls APIM's non-OBO MCP server using its stored service connection, and
