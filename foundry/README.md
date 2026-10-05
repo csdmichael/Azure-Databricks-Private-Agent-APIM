@@ -84,6 +84,15 @@ No Databricks PAT is stored in Teams, Bot Service, the web app, Foundry, APIM, o
 GitHub. The bot client secret is a deployment secret and is never committed. APIM
 diagnostics continue to suppress request bodies and `Authorization` headers.
 
+The following redacted evidence is generated from the live ARM, APIM, Databricks
+account-policy, permission, and correlated audit APIs:
+
+![APIM private networking, OBO policy enforcement, and diagnostics privacy controls](docs/screenshots/07-apim-security-policy.png)
+
+![Databricks private networking and OIDC federation policy](docs/screenshots/08-databricks-network-federation.png)
+
+![Guest least-privilege Databricks authorization and correlated success](docs/screenshots/09-databricks-guest-permissions.png)
+
 ## Repository layout
 
 | Path | Purpose |
@@ -297,6 +306,9 @@ The script waits for the expected resource or app name before writing:
 | `docs/screenshots/04-teams-chat.png` | Published Teams app with grounded multi-turn results |
 | `docs/screenshots/05-foundry-agent-yaml.png` | Versioned agent definition and OAuth MCP connection |
 | `docs/screenshots/06-foundry-agent-details.png` | Agent status, identity, endpoint, and channel surfaces |
+| `docs/screenshots/07-apim-security-policy.png` | APIM private access, JWT/OBO policy, rate limit, and diagnostics privacy |
+| `docs/screenshots/08-databricks-network-federation.png` | Databricks VNet isolation, private endpoints, and OIDC federation |
+| `docs/screenshots/09-databricks-guest-permissions.png` | Guest Foundry/APIM/Databricks grants and correlated success |
 
 ### Setup coverage
 
@@ -307,6 +319,9 @@ The script waits for the expected resource or app name before writing:
 | Agent identity, endpoint, and channels | `06-foundry-agent-details.png` | Foundry version 7 |
 | Azure Bot deployment | `02-bot-service.png` | [`infra/bicep/main.bicep`](infra/bicep/main.bicep) |
 | OAuth, APIM OBO, and Databricks path | Web Chat and Teams success evidence | [Foundry OBO setup](docs/obo/README.md) |
+| APIM security and safe diagnostics | `07-apim-security-policy.png` | Deployed APIM policy and diagnostics API |
+| Databricks network and federation | `08-databricks-network-federation.png` | Live ARM workspace and account federation APIs |
+| Guest least privilege | `09-databricks-guest-permissions.png` | Live RBAC, workspace, Genie, warehouse, catalog, and audit evidence |
 | End-to-end Azure test | `03-bot-web-chat.png` | Bot diagnostics and correlated APIM events |
 | End-to-end Teams test | `04-teams-chat.png` | Rebuilt Teams package and guest-access grants |
 
@@ -327,6 +342,12 @@ verification commands are documented instead of exposing security-sensitive valu
 ![Foundry YAML for the deployed agent and MCP connection](docs/screenshots/05-foundry-agent-yaml.png)
 
 ![Foundry identity, endpoint, and channel details](docs/screenshots/06-foundry-agent-details.png)
+
+![APIM OBO security controls](docs/screenshots/07-apim-security-policy.png)
+
+![Databricks network isolation and federation](docs/screenshots/08-databricks-network-federation.png)
+
+![Guest least-privilege authorization](docs/screenshots/09-databricks-guest-permissions.png)
 
 The first browser run requires interactive sign-in. Keep `playwright-auth.json` and
 `docs/screenshots/.auth-state.json` out of source control because they contain

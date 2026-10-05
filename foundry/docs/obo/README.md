@@ -29,6 +29,7 @@ failure diagnosis.
 - [9. Package and install the Teams app](#9-package-and-install-the-teams-app)
 - [10. Configure private networking](#10-configure-private-networking)
 - [Logging and correlated request history](#logging-and-correlated-request-history)
+- [Security evidence screenshots](#security-evidence-screenshots)
 - [Acceptance and cutover](#acceptance-and-cutover)
 - [Troubleshooting](#troubleshooting)
 - [Security and operational boundaries](#security-and-operational-boundaries)
@@ -858,6 +859,24 @@ Preserve:
 Do not place any token in a correlation field. A production bridge should add these
 nonsecret IDs as structured telemetry properties to make cross-service diagnosis
 deterministic.
+
+## Security evidence screenshots
+
+These screenshots are generated from live management and data-plane APIs and are
+redacted to exclude credentials, bearer tokens, invitation links, request bodies,
+and Authorization headers.
+
+### APIM security policy and diagnostics
+
+![APIM private networking, JWT validation, user allowlist, rate limiting, OBO exchange, and zero-payload diagnostics](../screenshots/07-apim-security-policy.png)
+
+### Databricks private networking and federation
+
+![Databricks disabled public access, VNet injection, approved private endpoints, and exact OIDC federation policy](../screenshots/08-databricks-network-federation.png)
+
+### Guest least-privilege authorization
+
+![Guest Foundry, APIM, workspace, Genie, warehouse, Unity Catalog, and correlated success evidence](../screenshots/09-databricks-guest-permissions.png)
 
 ## Acceptance and cutover
 
