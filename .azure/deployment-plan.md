@@ -70,6 +70,11 @@ Validation acceptance:
 - The initially deployed App Service managed-identity `Foundry User` assignment was
   removed after the supported user-token design was verified. Each signed-in user,
   not the bridge identity, must hold the required project role.
+- External guest `myaacoub@microsoft.com` redeemed the Caldova B2B invitation,
+  received project-scoped `Foundry User`, was added to the APIM allowlist, assigned
+  to the Databricks workspace, and granted Genie `CAN_RUN`, warehouse `CAN_USE`, and
+  read-only Unity Catalog access. A Teams query returned grounded Databricks data.
+  APIM and the broker recorded correlated guest token-exchange and HTTP 200 events.
 
 ## Showcase Analytics and Genie User Federation
 

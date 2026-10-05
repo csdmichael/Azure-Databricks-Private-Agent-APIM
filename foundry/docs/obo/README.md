@@ -440,13 +440,27 @@ Verified on 2026-10-04:
 | Guest UPN | `myaacoub_microsoft.com#EXT#@caldova37587778.onmicrosoft.com` |
 | Foundry access | `Foundry User` at `foundry-myaacoub-private/sales-poc` only |
 | APIM allowlist | Existing administrator plus the guest object ID |
-| Databricks provisioning | Pending execution from the private Databricks network path |
+| Databricks account user | `myaacoub@microsoft.com`, account principal `146486100743121` |
+| Databricks workspace | Assigned as `USER` with workspace and Databricks SQL access |
+| Genie permission | `CAN_RUN` on `Arrow Semiconductor Analytics` |
+| Warehouse permission | `CAN_USE` on warehouse `a3c7c9526aa58992` |
+| Unity Catalog | `USE CATALOG`, `USE SCHEMA`, and `SELECT` on `caldova_dbx_westus2.arrow_semiconductor` |
+| Teams validation | Guest completed both OAuth flows and received a grounded quarterly-sales answer |
+| Audit evidence | APIM and Function recorded correlated guest `oid` events, successful token exchanges, and HTTP 200 completion |
 
 The Databricks SCIM endpoint correctly rejected direct administration from the
-operator's public network with `Unauthorized network access to workspace`. Do not
-temporarily enable public workspace access to bypass this control. Complete account
-and workspace provisioning through the existing private jump host, VNet-connected
-runner, or approved identity-provisioning service.
+operator's public network with `Unauthorized network access to workspace`. The
+account-level assignment was performed through the Databricks account API. Workspace
+SCIM, Genie, warehouse, and Unity Catalog grants were applied from the private
+`caldova-jump` VM by using a temporary managed-identity workspace-admin assignment.
+That assignment was removed immediately after the grants, and the VM was deallocated.
+Public workspace access was never enabled.
+
+The first guest query failed at token exchange because it occurred before workspace
+assignment and grants propagated. The retry succeeded. Correlation
+`91eec6dc-2448-422f-85de-3bdb35f13262` recorded the guest object
+`439541d7-796b-4523-ba3b-a4d159c66bbc`, successful Function exchange, and final APIM
+HTTP 200 result retrieval.
 
 ## 1. Configure the APIM API application
 
