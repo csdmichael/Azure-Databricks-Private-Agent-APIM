@@ -145,6 +145,20 @@ resource "azapi_resource" "teams_channel" {
   }
 }
 
+resource "azurerm_monitor_diagnostic_setting" "bot" {
+  name                       = "bot-service-logs"
+  target_resource_id         = azapi_resource.bot.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "BotRequest"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
 resource "azapi_resource" "oauth_connection" {
   type      = "Microsoft.BotService/botServices/connections@2022-09-15"
   name      = var.oauth_connection_name

@@ -163,6 +163,8 @@
   "teams": {
     "botName": "caldova-foundry-databricks-bot",
     "appServiceName": "caldova-foundry-databricks-bot",
+    "botServiceUrl": "https://portal.azure.com/#resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.BotService/botServices/caldova-foundry-databricks-bot/overview",
+    "botEndpoint": "https://caldova-foundry-databricks-bot.azurewebsites.net/api/messages",
     "oauthConnectionName": "DatabricksGenieOBO",
     "appId": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
     "appDisplayName": "Foundry Databricks Genie",

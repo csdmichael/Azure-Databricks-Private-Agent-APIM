@@ -243,6 +243,26 @@ resource teamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = {
   }
 }
 
+resource botDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'bot-service-logs'
+  scope: bot
+  properties: {
+    workspaceId: logAnalytics.id
+    logs: [
+      {
+        category: 'BotRequest'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+      }
+    ]
+  }
+}
+
 resource oauthConnection 'Microsoft.BotService/botServices/connections@2022-09-15' = {
   parent: bot
   name: oauthConnectionName

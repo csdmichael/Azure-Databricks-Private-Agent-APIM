@@ -19,7 +19,7 @@ Deployment scope:
 
 - Create the `databricks-genie-obo-mcp` APIM MCP facade over the existing OBO API.
 - Create `caldova-foundry-databricks-bot`, its Teams channel and delegated OAuth
-  connection.
+  connection, and route `BotRequest` logs plus `AllMetrics` to Log Analytics.
 - Create the Linux App Service bridge, plan, Application Insights, Log Analytics,
   and a project-scoped Foundry User assignment for its managed identity.
 - Publish a new `semiconductor-sales-genie` prompt-agent version whose MCP

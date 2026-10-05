@@ -10,6 +10,12 @@ query runs as the signed-in user rather than as a shared service identity.
 > **Published Foundry agent:**  
 > [Open `semiconductor-sales-genie` in Microsoft Foundry](https://ai.azure.com/nextgen/r/z4JFcKi6SXqhhApS8YMKqQ,m365-myaacoub,,foundry-myaacoub-private,sales-poc/build/agents/semiconductor-sales-genie/build?tid=12a4b86b-e64c-43f9-af05-d9130a72dfd2)
 >
+> **Deployed Azure Bot Service:**  
+> [Open `caldova-foundry-databricks-bot` in Azure](https://portal.azure.com/#resource/subscriptions/cf824570-a8ba-497a-a184-0a52f1830aa9/resourceGroups/m365-myaacoub/providers/Microsoft.BotService/botServices/caldova-foundry-databricks-bot/overview)
+>
+> **Bot messaging endpoint:** `https://caldova-foundry-databricks-bot.azurewebsites.net/api/messages`  
+> **Bot health endpoint:** <https://caldova-foundry-databricks-bot.azurewebsites.net/health>
+>
 > **Project endpoint:** `https://foundry-myaacoub-private.services.ai.azure.com/api/projects/sales-poc`
 >
 > **Teams package:** [`Teams Package/Foundry-Databricks-Agent.zip`](Teams%20Package/Foundry-Databricks-Agent.zip)
@@ -122,6 +128,7 @@ This creates or updates:
 
 - `databricks-genie-obo-mcp` over the existing OBO API operations;
 - the Bot Service registration and Teams channel;
+- Bot Service `BotRequest` logs and `AllMetrics` routed to Log Analytics;
 - the Bot OAuth connection;
 - a Linux App Service on the existing `caldova-tokenomics-api-plan` and Application Insights;
 - the bridge managed identity's `Foundry User` assignment.
@@ -262,6 +269,7 @@ authenticated browser state.
 | Teams repeatedly asks the user to sign in | Bot OAuth connection name, client secret, redirect URL, admin consent |
 | APIM returns `401` | Token audience, tenant, signature, expiry, and `Genie.Access` scope |
 | APIM returns `403` | `azp` equals the configured bot client and `oid` is authorized |
+| Bot activities are missing from logs | Confirm the `bot-service-logs` diagnostic setting and query the `BotRequest` category |
 | Foundry returns `403` | App Service managed identity has `Foundry User` on the project |
 | MCP call fails before APIM | OBO MCP API exists and Foundry can privately resolve the APIM gateway |
 | Agent publishes but Teams cannot reply | Bot endpoint, Teams channel, App Service health, and Bot Framework JWT settings |
