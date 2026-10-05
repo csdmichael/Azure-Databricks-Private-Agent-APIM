@@ -1,16 +1,25 @@
-# Azure Databricks Private Agent + APIM
+# Phase 1: Databricks Genie to Copilot Studio through private APIM
 
 Private Azure Databricks fronted by API Management, surfaced to Copilot Studio and
 Microsoft 365 Copilot over a fully private network path. A Copilot Studio agent asks
 natural-language questions of Unity Catalog through AI/BI Genie and returns a
 high-fidelity, downloadable PowerPoint deck.
 
+Start with the [phase-one setup](#phase-one-setup): connect Databricks to the
+Copilot Studio test-chat UI **without agent sign-in, delegated user tokens, or OBO**.
+No Entra application registration, consent, federation, or user-token setup is
+required in this phase. Platform access for the setup operator and the existing
+APIM subscription key / backend managed identity remain necessary; this is not an
+anonymous Databricks API. All queries use the same backend identity and its grants.
+Use only approved demo data until per-user security is configured.
+
+Then follow [Phase 2: setup security](docs/obo/README.md) for authentication,
+Entra ID, delegated permissions, and OBO. Actual demo resources and verification
+status are kept separately in the [Copilot demo deployment README](docs/deployed-resources/README.md).
+
 Databricks and API Management both have **public network access disabled**. Nothing in
 the data path traverses the public internet.
 
-> **Live showcase:** <https://caldova-databricks-showcase.azurewebsites.net>
-> — video series, business case, features, architecture, and a link into the demo app.
->
 > **Business case:** $892.5K annual run-rate benefit, 243% year-one ROI, 2.4 month payback
 > at 100 active users. Full model in [docs/Business Case](docs/Business%20Case).
 
@@ -20,11 +29,11 @@ the data path traverses the public internet.
 
 - [Architecture](#architecture)
 - [How it works](#how-it-works)
-- [Delegated user identity (OBO)](#delegated-user-identity-obo)
+- [Phase-one setup](#phase-one-setup)
+- [Phase 2: setup security](docs/obo/README.md)
 - [Technologies used](#technologies-used)
 - [Portals and URLs](#portals-and-urls)
-- [Current environment](#current-environment)
-- [Address plan](#address-plan)
+- [Demo deployed resources](docs/deployed-resources/README.md)
 - [Repository layout](#repository-layout)
 - [Configuration](#configuration)
 - [Deploy](#deploy)
@@ -39,12 +48,11 @@ the data path traverses the public internet.
   - [8. Import the custom connector](#8-import-the-custom-connector)
   - [9. Build the Copilot Studio agent](#9-build-the-copilot-studio-agent)
   - [10. Generate the deck](#10-generate-the-deck)
-  - [11. Final resource group](#11-final-resource-group)
 - [Why a custom connector and not an MCP server](#why-a-custom-connector-and-not-an-mcp-server)
 - [The deck skill](#the-deck-skill)
 - [Observability](#observability)
 - [Key design decisions](#key-design-decisions)
-- [Setup guide](#setup-guide)
+- [Detailed network guide](#detailed-network-guide)
 - [Archived environment](#archived-environment)
 - [Provide feedback](#provide-feedback)
 - [Responsible AI Transparency FAQ](#responsible-ai-transparency-faq)
@@ -72,7 +80,7 @@ The detailed diagram above reads left to right, in eight numbered hops.
    public internet.
 4. **Traffic crosses a VNet peering** into the API Management VNet. Peering is not
    transitive, so each Power Platform regional VNet peers *directly* with the APIM VNet.
-5. **APIM receives the request on its private endpoint** at `10.191.1.4`. Its public
+5. **APIM receives the request on its private endpoint** at your assigned private IP. Its public
    gateway is disabled, so this is the only way in.
 6. **APIM authenticates to Databricks with its managed identity** and crosses a global
    peering into the Databricks VNet. No Databricks token or key is ever stored in Power
@@ -83,34 +91,85 @@ The detailed diagram above reads left to right, in eight numbered hops.
 8. **The agent builds a real `.pptx`** from those rows in its sandbox and returns it as a
    download card in the chat.
 
-The bands across the bottom of the diagram are the cross-cutting controls: **identity**
-(managed identity into Databricks, Entra ID for users), **private networking** (private
+The bands across the bottom of the reference diagram include phase-two user security.
+Phase one uses a shared backend identity, **private networking** (private
 endpoints, delegated subnets, peering, private DNS), **AI gateway controls** (APIM
 policies, subscription keys, rate limiting), and **observability** (APIM diagnostics into
 Log Analytics).
 
 ---
 
-## Delegated user identity (OBO)
+## Phase-one setup
 
-The [OBO configuration guide](docs/obo/README.md) describes the new per-user path:
-Copilot Studio obtains a delegated Entra token, private APIM validates it, and a
-private Azure Function exchanges it through Databricks OAuth federation. Databricks
-then evaluates the user's workspace and data permissions instead of APIM's managed
-identity. The guide includes architecture, configuration tables, security checks,
-and correlated APIM/Function request history with KQL.
+### Prerequisites and customer inputs
 
-**Verified:** The private broker, additive APIM API, federation and OAuth connector
-are deployed. All four connector operations passed administrator tests: Databricks
-returned the signed-in user's identity and a successful table aggregate, with
-correlated APIM/Function audit events. Denied-user validation, least-privilege grants
-and agent cutover remain pending. The Showcase now hosts administrator-protected
-[visit statistics](https://caldova-databricks-showcase.azurewebsites.net/stats) and
-[per-request token-exchange history](https://caldova-databricks-showcase.azurewebsites.net/history).
-Both APIs passed live administrator checks and reject anonymous or forged identity
-headers. The OBO guide includes the actual APIM policy screenshot, commented policy
-excerpts and an in-depth Function walkthrough. The existing managed-identity API
-remains unchanged.
+Use your own Azure resource group, workspace URL, catalog/schema, warehouse ID,
+Genie space ID, APIM hostname, and Power Platform environment ID. Obtain these from
+your deployed resources; never copy demo identifiers. The workspace URL must be
+copied exactly from Databricks, including its shard.
+
+You need a Databricks workspace with Unity Catalog data and a SQL warehouse, an APIM
+service with its existing backend managed-identity access and subscription, a
+Power Platform Managed Environment with Dataverse, and access to Copilot Studio.
+For the private path, use a test host in the peered VNets. If the backend identity
+is not already authorized, have the resource owner complete the
+[baseline service security setup](docs/obo/README.md) first; no end-user OAuth is needed.
+
+### 1. Prepare Databricks and verify the backend
+
+1. In Databricks, select your catalog and schema, start the SQL warehouse, and create
+   a Genie space over the approved tables. Attach that warehouse and test a question
+   in the Genie UI. Record the warehouse and Genie space IDs.
+2. Set APIM's `databricks-workspace-url`, `databricks-warehouse-id`, and
+   `databricks-genie-space-id` named values to your resources. Publish the existing
+   non-OBO `databricks-genie` API using the [APIM templates](apim/main.bicep).
+3. Test the API from a private-network host: start a conversation, poll until
+   `COMPLETED`, and retrieve the query result. Resolve backend failures before
+   building the agent. Keep the existing subscription protection and private access.
+
+### 2. Connect the private network
+
+Follow [walkthrough steps 1–6](#setup-walkthrough) to link the Managed Environment
+to delegated subnets in its geo pair, peer both regional VNets directly to APIM,
+and link private DNS. Ensure APIM can reach Databricks. Confirm private resolution
+and reachability before disabling public access.
+
+### 3. Add the connector without user OAuth
+
+1. Import [the Genie Swagger](connector/genie-swagger2.json) in your linked
+   environment. Replace its demo `host` with `<apim-name>.azure-api.net`; keep
+   `/databricks-genie` and all four operations.
+2. Create one connection using the existing APIM subscription key. This is a
+   shared service connection, **not** end-user OAuth. Never paste the key into the
+   Swagger, instructions, screenshots, or source control.
+3. In the connector Test tab, run `ask`, poll `message`, retrieve `result`, and run
+   `follow-up` in the same conversation. Retain the returned conversation/message IDs.
+
+### 4. Build and test in the agent UI
+
+1. Create a Copilot Studio agent in the same environment. Under **Settings →
+   Security → Authentication**, select **No authentication** for this phase.
+2. Add all four tools from the same connector. Select the existing shared
+   maker-provided connection where supported, rather than requiring each user to
+   create an OAuth connection. If the chosen channel disallows this mode, use the
+   Copilot Studio test chat; do not bypass channel policy.
+3. Instruct the agent to call `ask`, poll `message` until `COMPLETED`, fetch `result`,
+   and use `follow-up` for the next question. Treat a failed or timed-out query as
+   an error rather than inventing data.
+4. Ask a question in **Test your agent** and compare the answer with Genie. Ask a
+   follow-up to prove that the same conversation is used.
+5. Optionally add the [deck skill](#the-deck-skill) on the file-capable harness,
+   test a downloadable deck, and publish only to a channel supporting this
+   no-agent-authentication configuration. Teams rollout and delegated user security
+   are phase two.
+
+### Phase-one acceptance
+
+- Genie, the connector Test tab, and the agent test chat return the same grounded result.
+- All four operations work, including polling and a follow-up.
+- No agent sign-in card, delegated token, or OBO connection is used.
+- No credentials are in prompts, source, or diagnostic payloads.
+- Private routing works; shared-identity results are **not** evidence of per-user authorization.
 
 ---
 
@@ -143,7 +202,6 @@ Replace the identifiers with your own where they differ.
 
 | What | URL |
 |---|---|
-| **Showcase site** | <https://caldova-databricks-showcase.azurewebsites.net> |
 | Azure portal | <https://portal.azure.com/> |
 | Power Platform admin center | <https://admin.powerplatform.microsoft.com/> |
 | This environment in the admin center | <https://admin.powerplatform.microsoft.com/manage/environments/environment/{Environment Id}/hub> |
@@ -151,42 +209,15 @@ Replace the identifiers with your own where they differ.
 | Power Apps custom connectors | <https://make.powerapps.com/environments/{Environment Id}/customconnectors> |
 | Power Apps connections | <https://make.powerapps.com/environments/{Environment Id}/connections> |
 | Copilot Studio | <https://copilotstudio.microsoft.com/> |
-| Databricks workspace | <https://adb-{Workspace Id}.10.azuredatabricks.net> |
-| APIM gateway (private only) | `https://caldova-apim-westus.azure-api.net` |
+| Databricks workspace | `<databricks-workspace-url>` from your workspace |
+| APIM gateway (private only) | `https://<apim-name>.azure-api.net` |
 
 ---
 
-## Current environment
-
-| Setting | Value |
-|---|---|
-| Subscription | `{Subscription Id}` |
-| Resource group | `m365-myaacoub` |
-| Tenant | `{Tenant Id}` |
-| Databricks | `caldova-dbx-westus2` (West US 2), public access **disabled** |
-| API Management | `caldova-apim-westus` (West US), StandardV2, public access **disabled** |
-| Power Platform | `Caldova Private` (`{Environment Id}`), canada geo |
-| Catalog | `caldova_dbx_westus2.arrow_semiconductor` |
-| SQL warehouse | `{SQL Warehouse Id}` (serverless 2X-Small, auto-stop 5 min) |
-| Genie space | `{Genie Space Id}` |
-| Log Analytics | `caldova-apim-logs-westus` |
-| Copilot Studio agent | `Genie Deck Builder Pro` (`{Agent Id}`) |
-
----
-
-## Address plan
-
-| Purpose | Region | VNet | Subnets |
-|---|---|---|---|
-| Databricks | West US 2 | `10.190.0.0/16` | host `10.190.1.0/24`, container `10.190.2.0/24`, private endpoints `10.190.3.0/24` |
-| API Management | West US | `10.191.0.0/16` | integration `10.191.0.0/24`, private endpoints `10.191.1.0/24` |
-| Power Platform | Canada Central | `10.194.0.0/16` | delegated `10.194.0.0/24` |
-| Power Platform | Canada East | `10.195.0.0/16` | delegated `10.195.0.0/24` |
-
-Both Power Platform subnets are `/24` because the enterprise policy requires each regional
-subnet to expose the same usable address count. The region pair must match the environment
-geo: environment `{Environment Id}` is `canada`, so the VNets are
-`canadacentral` and `canadaeast`.
+Choose non-overlapping address ranges for your VNets. Both Power Platform subnets
+must expose the same usable address count, and their region pair must match your
+environment's geo. The demo address plan is in the
+[Copilot demo deployment README](docs/deployed-resources/README.md), not a required customer topology.
 
 ---
 
@@ -226,9 +257,15 @@ to the target catalog at run time.
 environment-specific values used by PowerShell, local Python tooling, runtime app
 settings, and GitHub Actions. Create a separate copy for another environment and pass it
 to PowerShell with `-ConfigPath`; explicit command parameters override the selected file.
+The checked-in file describes the demo, not your environment. Replace every applicable
+resource name, ID, URL, region, and network range before running deployment commands.
+Review companion Bicep parameter files and Terraform inputs too; `-ConfigPath` does
+not rewrite those files.
 
 ```powershell
-./scripts/deploy-infra.ps1 -ConfigPath ./config/deployment.production.json -Step all
+Copy-Item ./config/deployment.json ./config/deployment.customer.json
+# Populate the customer configuration and infrastructure parameter files before deployment.
+./scripts/deploy-infra.ps1 -ConfigPath ./config/deployment.customer.json -Step all
 ```
 
 Bicep templates contain required parameters instead of live resource defaults. Their
@@ -256,8 +293,7 @@ not be edited as source configuration.
 ## Deploy
 
 ```powershell
-az login --tenant <tenant-id>
-./scripts/deploy-infra.ps1 -Step all
+./scripts/deploy-infra.ps1 -ConfigPath ./config/deployment.customer.json -Step all
 ```
 
 Individual steps run with `-Step <name>`:
@@ -284,7 +320,9 @@ private endpoint exists, which is another reason the lockdown flip is a separate
 
 ## Setup walkthrough
 
-The screenshots below follow the order you actually perform the setup.
+The screenshots below are demo illustrations, not customer configuration values.
+Use your own resource names, regions, IDs, and addresses. This network walkthrough
+supports the [phase-one setup](#phase-one-setup).
 
 ### 1. Power Platform managed environment
 
@@ -320,9 +358,9 @@ Create one VNet per region in the environment's geo pair. Each needs a subnet de
 `Microsoft.PowerPlatform/enterprisePolicies`, and both subnets must expose the same usable
 address count.
 
-![Subnets blade for caldova-pp-vnet-canadacentral showing the delegated subnet](docs/images/02-pp-vnet-canadacentral-subnets.png)
+![Demo primary-region VNet showing the delegated subnet](docs/images/02-pp-vnet-canadacentral-subnets.png)
 
-![Subnets blade for caldova-pp-vnet-canadaeast showing the delegated subnet](docs/images/03-pp-vnet-canadaeast-subnets.png)
+![Demo secondary-region VNet showing the delegated subnet](docs/images/03-pp-vnet-canadaeast-subnets.png)
 
 ### 3. Virtual network peerings
 
@@ -351,12 +389,12 @@ then link it to the environment. This is the step that actually injects the subn
 Deploy API Management on the **Standard v2** tier, which supports the private endpoint
 and virtual network integration used by this architecture.
 
-![API Management overview showing caldova-apim-westus online in West US on the Standard v2 tier](docs/images/07.00.%20APIM-Tier.png)
+![Demo API Management overview showing the Standard v2 tier](docs/images/07.00.%20APIM-Tier.png)
 
 Confirm the service is online and exposes the expected gateway host before applying the
 network lockdown.
 
-![API Management overview confirming the caldova-apim-westus gateway URL and Standard v2 tier](docs/images/07.01-apim-private-networking.png)
+![Demo API Management overview confirming the gateway URL and Standard v2 tier](docs/images/07.01-apim-private-networking.png)
 
 Associate a dedicated NSG with the private-endpoint subnet and verify that it is attached
 to one subnet.
@@ -369,17 +407,17 @@ subnet association as well.
 ![Network security group overview for the APIM West US integration subnet showing one associated subnet and the default security rules](docs/images/07.03.%20APIM-NSG-WestUS-Integration.png)
 
 Once the private endpoint exists and DNS resolves, disable public network access. From
-this point APIM answers only on `10.191.1.4`.
+this point APIM answers only through its assigned private endpoint.
 
 ### 7. Publish the Databricks APIs
 
-Import the SQL and Genie REST APIs, attach the policies, and grant APIM's managed identity
-access to Databricks.
+Import the SQL and Genie REST APIs and attach the non-OBO policies. Backend
+managed-identity permissions are covered in [setup security](docs/obo/README.md).
 
 ![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/08-apim-apis.png)
 
-Both APIs can also be projected as MCP servers. Those belong to the archived Microsoft
-Foundry path in [old mcaps/foundry/README.md](old%20mcaps/foundry/README.md) — they are
+Both APIs can also be projected as MCP servers for the current
+[Microsoft Foundry phase-one path](foundry/README.md) — they are
 **not** usable from Copilot Studio over the private network. See
 [why](#why-a-custom-connector-and-not-an-mcp-server).
 
@@ -396,12 +434,11 @@ Portal: <https://make.powerapps.com/environments/{Environment Id}/customconnecto
 
 Point it at the APIM host with `/databricks-genie` as the base URL.
 
-![Custom connector General tab showing host caldova-apim-westus.azure-api.net and base URL /databricks-genie](docs/images/11-connector-general.png)
+![Demo connector General tab showing the APIM host and base URL /databricks-genie](docs/images/11-connector-general.png)
 
-Use API key authentication with the `Ocp-Apim-Subscription-Key` header. Only the parameter
-name lives in the connector; the key value goes in the connection.
-
-![Custom connector Security tab showing API Key authentication with parameter name Ocp-Apim-Subscription-Key in the Header](docs/images/12-connector-security.png)
+Use the existing shared APIM connection for phase one, not an OAuth/OBO connector.
+Credential configuration and the connector Security tab are documented in
+[setup security](docs/obo/README.md).
 
 Confirm the four actions and their path parameters.
 
@@ -461,14 +498,6 @@ is not computable rather than inventing it.
 > group leaves the other `Stale` permanently. Neither is a network or key problem; APIM
 > returns `200` throughout.
 
-### 11. Final resource group
-
-Everything lands in one resource group.
-
-![Azure resource group m365-myaacoub showing the Databricks workspace, API Management service, virtual networks, private endpoints, private DNS zones, and the enterprise policy](docs/images/16-resource-group.png)
-
----
-
 ## Why a custom connector and not an MCP server
 
 Power Platform virtual network support covers Dataverse plugins and **connectors**,
@@ -507,11 +536,11 @@ on this harness. It specifies:
 
 ## Observability
 
-APIM diagnostics flow to the `caldova-apim-logs-westus` Log Analytics workspace.
+APIM diagnostics flow to your configured Log Analytics workspace.
 
-This deployment writes to the legacy **`AzureDiagnostics`** table, not
-`ApiManagementGatewayLogs`. Querying the resource-specific table returns zero rows and
-looks like there is no traffic. Use:
+For diagnostics configured in legacy mode, query **`AzureDiagnostics`**.
+If you selected resource-specific mode, use `ApiManagementGatewayLogs` instead.
+For legacy mode:
 
 ```kusto
 AzureDiagnostics
@@ -520,8 +549,8 @@ AzureDiagnostics
 | order by TimeGenerated desc
 ```
 
-A full deck run produces 16 calls, 3 `POST` and 13 `GET`, all `200` at both APIM and the
-Databricks backend.
+One demo deck run produced 16 successful calls. Your call count depends on the
+questions and polling; verify both APIM and backend response codes.
 
 ---
 
@@ -543,11 +572,13 @@ Databricks backend.
 
 ---
 
-## Setup guide
+## Detailed network guide
 
 [docs/setup-guide.md](docs/setup-guide.md) is the detailed, command-by-command version of
 the walkthrough above, written for a customer who already has private Databricks and API
 Management and needs to connect a Power Platform managed environment to them.
+Use [phase-one setup](#phase-one-setup) as the customer entry point and
+[setup security](docs/obo/README.md) for identity and credential configuration.
 
 ---
 
