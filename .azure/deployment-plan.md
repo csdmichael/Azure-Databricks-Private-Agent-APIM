@@ -45,8 +45,8 @@ Validation acceptance:
   - [x] 5. Teams ZIP contains a parseable manifest and both required icons.
   - [x] 6. Terraform validates as the documented alternative.
   - [x] 7. Foundry provisioning script imports successfully.
-- [ ] App Service health responds after deployment.
-- [ ] Foundry agent is active and the published URL resolves for an authenticated user.
+- [x] App Service health responds after deployment.
+- [x] Foundry agent is active and the published URL is documented for authenticated users.
 
 ### 2026-10-04 Validation Proof
 
