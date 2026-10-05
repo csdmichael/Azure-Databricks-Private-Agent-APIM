@@ -1,0 +1,37 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.29/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.29",
+  "version": "1.0.0",
+  "id": "b43ac57f-1c4d-546c-adc8-8d4ff5b9f926",
+  "developer": {
+    "name": "Michael Yaacoub",
+    "websiteUrl": "https://github.com/csdmichael/Azure-Databricks-Private-Agent-APIM",
+    "privacyUrl": "https://privacy.microsoft.com/privacystatement",
+    "termsOfUseUrl": "https://www.microsoft.com/servicesagreement"
+  },
+  "name": {
+    "short": "Databricks Genie MCP",
+    "full": "Private Databricks Genie MCP Tools"
+  },
+  "description": {
+    "short": "Query governed Databricks data through Genie.",
+    "full": "Connects agents to the Arrow Semiconductor Analytics Genie space through the private Azure API Management MCP endpoint."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#FF3621",
+  "agentConnectors": [
+    {
+      "id": "databricks-genie-mcp",
+      "displayName": "Databricks Genie MCP",
+      "description": "Queries the Arrow Semiconductor Analytics Genie space through Azure API Management.",
+      "toolSource": {
+        "remoteMcpServer": {
+          "mcpServerUrl": "https://caldova-apim-westus.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/01f1abe9e51e19ddbb15297aee9a5850"
+        }
+      }
+    }
+  ]
+}
