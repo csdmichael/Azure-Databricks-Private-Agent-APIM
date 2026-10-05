@@ -40,7 +40,8 @@
     <choose>
       <when condition='@{
         var jwt = (Jwt)context.Variables["genie-user-jwt"];
-        return jwt.Claims.GetValueOrDefault("oid", "") != "{{genie-obo-allowed-user-id}}"
+        var allowed = "{{genie-obo-allowed-user-id}}".Split(',').Select(value => value.Trim());
+        return !allowed.Contains(jwt.Claims.GetValueOrDefault("oid", ""))
           || String.IsNullOrWhiteSpace(jwt.Claims.GetValueOrDefault("preferred_username", ""))
           || String.Equals(jwt.Claims.GetValueOrDefault("idtyp", ""), "app", StringComparison.OrdinalIgnoreCase);
       }'>

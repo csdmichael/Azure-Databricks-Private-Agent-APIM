@@ -18,7 +18,11 @@
     <include-fragment fragment-id="genie-obo-audit" />
     <!-- Authorize the verified user object ID before contacting the broker or Databricks. -->
     <choose>
-      <when condition='@(((Jwt)context.Variables["genie-user-jwt"]).Claims.GetValueOrDefault("oid", "") != "{{genie-obo-allowed-user-id}}")'>
+      <when condition='@{
+        var oid = ((Jwt)context.Variables["genie-user-jwt"]).Claims.GetValueOrDefault("oid", "");
+        var allowed = "{{genie-obo-allowed-user-id}}".Split(',').Select(value => value.Trim());
+        return !allowed.Contains(oid);
+      }'>
         <set-variable name="audit-stage" value="request_completed" />
         <set-variable name="audit-outcome" value="failure" />
         <set-variable name="audit-status" value="@(403)" />

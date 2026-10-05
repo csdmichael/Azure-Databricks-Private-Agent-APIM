@@ -54,7 +54,7 @@ variable "connector_client_id" {
 }
 
 variable "allowed_user_id" {
-  description = "Authorized user object-ID override. Defaults to obo.allowedUserId in config_path."
+  description = "Comma-separated authorized user object-ID override. Defaults to obo.allowedUserId in config_path."
   type        = string
   default     = null
   nullable    = true

@@ -10,7 +10,7 @@ param apiClientId string
 @description('Application client ID allowed to call the delegated API.')
 param connectorClientId string
 
-@description('User object ID authorized to call the delegated API.')
+@description('Comma-separated user object IDs authorized to call the delegated API.')
 param allowedUserId string
 
 @description('Private Databricks workspace URL.')

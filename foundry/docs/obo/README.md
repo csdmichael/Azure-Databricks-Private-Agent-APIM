@@ -17,6 +17,7 @@ failure diagnosis.
 - [Identity and token chain](#identity-and-token-chain)
 - [Trust boundaries](#trust-boundaries)
 - [Prerequisites](#prerequisites)
+- [B2B guest access for external users](#b2b-guest-access-for-external-users)
 - [1. Configure the APIM API application](#1-configure-the-apim-api-application)
 - [2. Configure the Teams bot application](#2-configure-the-teams-bot-application)
 - [3. Configure Databricks user federation](#3-configure-databricks-user-federation)
@@ -191,6 +192,261 @@ removing the authorized-client check.
 - Azure CLI, Bicep, Terraform, Node.js 20+, Python 3.12+, and Agents Toolkit.
 - `Foundry User` permission for each person who will invoke the project.
 - A VNet-connected runner or operator host when Foundry/APIM public access is disabled.
+
+## B2B guest access for external users
+
+The reference deployment is single-tenant to Caldova. An external account such as
+`user@microsoft.com` cannot authenticate directly as a home-tenant user. Invite the
+person into the Caldova tenant as a Microsoft Entra B2B guest, require redemption,
+and authorize the resulting **Caldova guest object** at every downstream boundary.
+
+The external user's home-tenant object ID is not used by this solution. After
+redemption, Entra issues Caldova-tenant tokens with the guest object's Caldova `oid`.
+Use that object ID for Foundry RBAC and APIM authorization.
+
+### Access required by the setup operator
+
+| System | Minimum access needed | Purpose |
+| --- | --- | --- |
+| Microsoft Entra ID | `Guest Inviter` or `User Administrator` | Invite the external user and read the guest object |
+| Entra app registrations | Application owner or `Application Administrator` | Add delegated API permissions and redirect URIs |
+| Tenant consent | A role permitted to grant tenant-wide admin consent, commonly `Cloud Application Administrator` or `Privileged Role Administrator` under tenant policy | Grant Foundry and APIM delegated permissions |
+| Azure RBAC | `Owner`, or `User Access Administrator` plus resource write permission at the Foundry project scope | Assign `Foundry User` |
+| Microsoft Foundry | `Foundry Project Manager` for connection management; `Foundry User` for invocation | Configure OAuth MCP and run the agent |
+| API Management | API Management Service Contributor or equivalent policy/named-value write access | Add the guest object to the authorized-user set |
+| Databricks account | Account admin or delegated identity-provisioning administrator | Add the guest user to the Databricks account |
+| Databricks workspace | Workspace admin or identity-federation group manager | Assign the user or group to the workspace and Genie space |
+| Unity Catalog | Metastore admin, catalog owner, or owner of the securable being granted | Apply least-privilege catalog/schema/table permissions |
+| Teams | Tenant policy allowing the app and custom app upload | Install and test the packaged bot |
+
+Do not give the guest a broad tenant directory role, Azure subscription role,
+Databricks account-admin role, or APIM administrative role merely to use the agent.
+The operator needs the administrative access above; the guest needs only invocation
+and data permissions.
+
+### 1. Invite the external user
+
+Portal:
+
+1. Open **Microsoft Entra ID** → **Users** → **New user**.
+2. Select **Invite external user**.
+3. Enter the external email address.
+4. Set the redirect URL to Teams or My Apps.
+5. Send the invitation, or securely share the generated redemption URL.
+
+Microsoft Graph:
+
+```powershell
+$email = 'user@microsoft.com'
+$invitation = @{
+  invitedUserEmailAddress = $email
+  inviteRedirectUrl = 'https://teams.microsoft.com'
+  sendInvitationMessage = $false
+} | ConvertTo-Json
+
+$invitation | Set-Content .\invitation.json -Encoding utf8
+az rest `
+  --method post `
+  --url 'https://graph.microsoft.com/v1.0/invitations' `
+  --headers 'Content-Type=application/json' `
+  --body '@invitation.json'
+Remove-Item .\invitation.json
+```
+
+Treat `inviteRedeemUrl` as a short-lived, user-specific value. Do not commit it,
+place it in a shared README, or retain it after redemption.
+
+### 2. Redeem the invitation
+
+The guest must open the redemption URL and authenticate with the invited home-tenant
+account. A successful invitation creation with `PendingAcceptance` is not sufficient.
+
+Verify redemption:
+
+```powershell
+az rest `
+  --method get `
+  --url "https://graph.microsoft.com/v1.0/users/<guest-object-id>?`$select=id,userPrincipalName,userType,externalUserState,mail"
+```
+
+Expected properties:
+
+```text
+userType          = Guest
+externalUserState = Accepted
+```
+
+The guest UPN usually has this form:
+
+```text
+user_domain.com#EXT#@caldova37587778.onmicrosoft.com
+```
+
+Keep the immutable guest object ID. Do not key authorization to the generated UPN.
+
+### 3. Assign Foundry project access
+
+Assign the guest the built-in `Foundry User` role at the project scope, not the
+subscription or resource-group scope:
+
+```powershell
+$projectScope = '/subscriptions/<subscription>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<foundry-account>/projects/<project>'
+
+az role assignment create `
+  --assignee-object-id '<guest-object-id>' `
+  --assignee-principal-type User `
+  --role 'Foundry User' `
+  --scope $projectScope
+```
+
+Allow several minutes for RBAC propagation. Confirm with:
+
+```powershell
+az role assignment list `
+  --assignee-object-id '<guest-object-id>' `
+  --scope $projectScope `
+  --query "[].{role:roleDefinitionName,scope:scope}"
+```
+
+### 4. Configure application consent and redirects
+
+The Teams bot application is single-tenant in the Caldova tenant. It needs:
+
+- Azure Machine Learning Services delegated `user_impersonation`;
+- the APIM API delegated `Genie.Access` permission;
+- tenant admin consent when required by tenant policy;
+- `https://token.botframework.com/.auth/web/redirect`;
+- the Foundry OAuth MCP connection's generated redirect URL;
+- `api://botid-<bot-client-id>` when Teams SSO metadata uses that application URI.
+
+If the app requests `https://ai.azure.com` without the Azure Machine Learning
+Services permission, Entra returns `AADSTS650057 Invalid resource`.
+
+If the Bot Framework redirect is missing, Entra returns `AADSTS50011 Redirect URI
+mismatch`.
+
+### 5. Add the guest to APIM authorization
+
+APIM must authorize the **guest object's Caldova `oid`**. Prefer an Entra group or a
+comma-separated allowlist rather than replacing the existing administrator ID.
+
+Example authorized set:
+
+```text
+715bb744-31d0-4f76-ac85-7193bcf5a4eb,439541d7-796b-4523-ba3b-a4d159c66bbc
+```
+
+APIM still validates issuer, tenant, audience, delegated scope, authorized client,
+and non-application user identity before evaluating this set. Never remove those
+checks to make guest access work.
+
+For production, prefer a security group:
+
+1. Create an agent-users group in Caldova.
+2. Add approved member and guest objects.
+3. Emit group claims or perform a controlled group lookup.
+4. Validate the exact group ID in APIM.
+5. Keep Databricks assignment and Unity Catalog grants group-based where possible.
+
+### 6. Provision the user in Databricks
+
+The Entra guest and Foundry role do not automatically create a Databricks user.
+Provision the identity through account SCIM or the configured identity-management
+process.
+
+Before adding the user, inspect the actual delegated APIM token's nonsecret claims in
+a secure operator session and determine which subject value the federation policy
+uses. The reference policy maps `preferred_username`. For a B2B guest this might be
+the guest UPN rather than the original email.
+
+Required Databricks layers:
+
+1. User exists in the Databricks account with a subject matching the federation
+   claim.
+2. User or group is assigned to the workspace.
+3. User can access the target Genie space.
+4. User has warehouse use permission.
+5. User has only the required Unity Catalog `USE CATALOG`, `USE SCHEMA`, and
+   `SELECT` grants.
+6. Row filters, column masks, or dynamic views apply as designed.
+
+Do not grant `account_admin` or broad catalog ownership to complete a test.
+
+### 7. Install and test as the guest
+
+1. Open Teams using the guest account.
+2. Switch to the **Caldova** organization before opening the app.
+3. Install the Teams package if tenant policy allows it.
+4. Send a prompt.
+5. Complete the Bot OAuth sign-in.
+6. Open the one-time **Authorize Databricks access** link returned by the agent.
+7. Return to chat and send `continue`.
+8. Verify `current_user()` or a safe data query returns the guest's Databricks
+   identity and permitted rows.
+
+Test both an allowed and denied resource. A successful sign-in alone does not prove
+Databricks authorization.
+
+### FIDO and Conditional Access errors
+
+`AADSTS135003: Fido assertion verification failed. Invalid gesture provided` is an
+authentication ceremony failure, not an APIM or Databricks error. Common causes:
+
+- the user is authenticating in the home tenant instead of redeeming/switching to
+  the Caldova guest context;
+- an embedded browser cannot complete the passkey/WebAuthn gesture;
+- the wrong account or security key was selected;
+- the passkey challenge expired;
+- Conditional Access requires an authentication method unavailable in that browser.
+
+Recovery:
+
+1. Redeem the B2B invitation first.
+2. Sign out of conflicting Microsoft sessions.
+3. Use an external current Edge/Chrome window or the Teams desktop client.
+4. Select the invited `user@microsoft.com` account.
+5. Switch to the Caldova organization.
+6. Retry the passkey gesture from the beginning; do not reuse an expired page.
+7. If policy permits, choose another registered authentication method.
+8. If it still fails, provide the request ID, correlation ID, and timestamp to the
+   Caldova Entra/Conditional Access administrator.
+
+Do not weaken tenant Conditional Access, disable MFA, or convert the bot to
+multitenant solely to work around a FIDO gesture failure.
+
+### Guest-access acceptance checklist
+
+- [ ] Invitation state is `Accepted`.
+- [ ] Guest signs into the Caldova tenant and can switch organizations in Teams.
+- [ ] Guest has `Foundry User` only at the project scope.
+- [ ] Bot application permissions and both redirect URLs are present.
+- [ ] APIM authorizes the guest object's Caldova `oid`.
+- [ ] Databricks account and workspace contain the mapped identity.
+- [ ] Genie, warehouse, and Unity Catalog grants are least privilege.
+- [ ] OAuth consent completes and `continue` resumes the original response.
+- [ ] Allowed query returns only permitted data.
+- [ ] Denied query fails without managed-identity or application-token fallback.
+- [ ] Bot, Foundry, APIM, and Databricks audit events can be correlated.
+
+### Reference guest deployment evidence
+
+Verified on 2026-10-04:
+
+| Check | Result |
+| --- | --- |
+| Invited identity | `myaacoub@microsoft.com` |
+| Caldova guest object | `439541d7-796b-4523-ba3b-a4d159c66bbc` |
+| Guest state | `Accepted` |
+| Guest UPN | `myaacoub_microsoft.com#EXT#@caldova37587778.onmicrosoft.com` |
+| Foundry access | `Foundry User` at `foundry-myaacoub-private/sales-poc` only |
+| APIM allowlist | Existing administrator plus the guest object ID |
+| Databricks provisioning | Pending execution from the private Databricks network path |
+
+The Databricks SCIM endpoint correctly rejected direct administration from the
+operator's public network with `Unauthorized network access to workspace`. Do not
+temporarily enable public workspace access to bypass this control. Complete account
+and workspace provisioning through the existing private jump host, VNet-connected
+runner, or approved identity-provisioning service.
 
 ## 1. Configure the APIM API application
 

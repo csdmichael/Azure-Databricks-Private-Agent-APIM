@@ -151,7 +151,7 @@
   "obo": {
     "apiClientId": "bdd127ff-fd4c-45f5-b553-ff77a7755161",
     "connectorClientId": "8127fb92-0641-4f6e-9d6e-f508e18e9606",
-    "allowedUserId": "715bb744-31d0-4f76-ac85-7193bcf5a4eb",
+    "allowedUserId": "715bb744-31d0-4f76-ac85-7193bcf5a4eb,439541d7-796b-4523-ba3b-a4d159c66bbc",
     "apiDisplayName": "Caldova Genie OBO API",
     "connectorDisplayName": "Caldova Genie OBO Connector",
     "functionName": "caldova-genie-obo-fn",
