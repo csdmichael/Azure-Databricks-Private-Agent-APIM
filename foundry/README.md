@@ -167,6 +167,10 @@ This creates or updates:
 - a Linux App Service on the existing `caldova-tokenomics-api-plan` and Application Insights;
 - the bot bridge application settings needed for delegated Foundry access.
 
+The deployed Bot Service overview confirms the resource and operational entry points:
+
+![Deployed Azure Bot Service overview](docs/screenshots/02-bot-service.png)
+
 ### 3. Provision with Terraform
 
 Use Terraform instead of Bicep, not in addition to it.
@@ -204,6 +208,16 @@ The script creates a new immutable agent version and prints the published URL. A
 delegated test token can be provided with `--test-token`; do not put that token in a
 shell history, source file, workflow log, or persistent environment file.
 
+The YAML view confirms the active model, instructions, MCP endpoint, approval mode,
+and `databricks-genie-obo-oauth` project connection:
+
+![Foundry agent YAML showing version 7 and the OAuth MCP connection](docs/screenshots/05-foundry-agent-yaml.png)
+
+The Details view confirms the running version, Entra agent identity, Responses
+endpoint, and channel publication surfaces:
+
+![Foundry agent details showing identity, endpoint, and channels](docs/screenshots/06-foundry-agent-details.png)
+
 ### 5. Build and deploy the Teams bridge
 
 ```powershell
@@ -217,6 +231,11 @@ az webapp deploy --resource-group m365-myaacoub --name caldova-foundry-databrick
 Invoke-RestMethod https://caldova-foundry-databricks-bot.azurewebsites.net/health
 ```
 
+Azure Bot Test in Web Chat verifies the deployed endpoint, Bot OAuth, Foundry agent,
+MCP consent, APIM OBO policy, Databricks federation, Genie, and grounded response:
+
+![Azure Bot Test in Web Chat returning grounded quarterly sales](docs/screenshots/03-bot-web-chat.png)
+
 ### 6. Install and test in Teams
 
 1. Open Teams **Apps** and select **Manage your apps**.
@@ -227,6 +246,11 @@ Invoke-RestMethod https://caldova-foundry-databricks-bot.azurewebsites.net/healt
 5. Send the prompts below and verify that results match the user's Databricks grants.
 6. Test with a denied user. A `403` is the expected result; the solution must not fall
    back to application identity.
+
+The final Teams test below shows grounded quarterly, regional, fab-yield, and product
+family results with basis, filters, and Databricks source tables:
+
+![Microsoft Teams chat with grounded Databricks Genie results](docs/screenshots/04-teams-chat.png)
 
 ### 7. Deploy through GitHub Actions
 
@@ -270,6 +294,25 @@ The script waits for the expected resource or app name before writing:
 | `docs/screenshots/01-foundry-agent.png` | Agent model, instructions, and MCP tool |
 | `docs/screenshots/02-bot-service.png` | Bot Service endpoint and Teams channel |
 | `docs/screenshots/03-bot-web-chat.png` | Azure Bot Web Chat with a grounded Databricks result |
+| `docs/screenshots/04-teams-chat.png` | Published Teams app with grounded multi-turn results |
+| `docs/screenshots/05-foundry-agent-yaml.png` | Versioned agent definition and OAuth MCP connection |
+| `docs/screenshots/06-foundry-agent-details.png` | Agent status, identity, endpoint, and channel surfaces |
+
+### Setup coverage
+
+| Setup area | Visual evidence | Authoritative configuration |
+|---|---|---|
+| Architecture and identity hops | Architecture diagram at the beginning of this guide | [Detailed OBO guide](docs/obo/README.md) |
+| Foundry model, instructions, and tool | `01-foundry-agent.png`, `05-foundry-agent-yaml.png` | [`agent/provision_agent.py`](agent/provision_agent.py) |
+| Agent identity, endpoint, and channels | `06-foundry-agent-details.png` | Foundry version 7 |
+| Azure Bot deployment | `02-bot-service.png` | [`infra/bicep/main.bicep`](infra/bicep/main.bicep) |
+| OAuth, APIM OBO, and Databricks path | Web Chat and Teams success evidence | [Foundry OBO setup](docs/obo/README.md) |
+| End-to-end Azure test | `03-bot-web-chat.png` | Bot diagnostics and correlated APIM events |
+| End-to-end Teams test | `04-teams-chat.png` | Rebuilt Teams package and guest-access grants |
+
+Client secrets, bearer tokens, invitation redemption URLs, and full authenticated
+browser state are intentionally excluded from screenshots. Their required setup and
+verification commands are documented instead of exposing security-sensitive values.
 
 ### Captured deployment evidence
 
@@ -278,6 +321,12 @@ The script waits for the expected resource or app name before writing:
 ![Deployed Azure Bot Service overview](docs/screenshots/02-bot-service.png)
 
 ![Azure Bot Test in Web Chat returning a grounded Databricks Genie result](docs/screenshots/03-bot-web-chat.png)
+
+![Microsoft Teams app returning grounded Databricks Genie results](docs/screenshots/04-teams-chat.png)
+
+![Foundry YAML for the deployed agent and MCP connection](docs/screenshots/05-foundry-agent-yaml.png)
+
+![Foundry identity, endpoint, and channel details](docs/screenshots/06-foundry-agent-details.png)
 
 The first browser run requires interactive sign-in. Keep `playwright-auth.json` and
 `docs/screenshots/.auth-state.json` out of source control because they contain

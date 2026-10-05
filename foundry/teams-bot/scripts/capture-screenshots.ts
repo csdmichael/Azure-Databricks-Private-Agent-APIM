@@ -36,6 +36,26 @@ for (const target of pages) {
   await page.goto(target.url, { waitUntil: "domcontentloaded" });
   await page.getByText(target.ready).first().waitFor({ timeout: 120_000 });
   await page.screenshot({ path: resolve(output, target.name), fullPage: true });
+
+  if (target.name === "01-foundry-agent.png") {
+    await page.getByRole("tab", { name: "YAML" }).click();
+    await page.getByText("project_connection_id:", { exact: false }).waitFor({
+      timeout: 120_000,
+    });
+    await page.screenshot({
+      path: resolve(output, "05-foundry-agent-yaml.png"),
+      fullPage: true,
+    });
+
+    await page.getByRole("tab", { name: "Details" }).click();
+    await page.getByText("Agent configuration", { exact: true }).waitFor({
+      timeout: 120_000,
+    });
+    await page.screenshot({
+      path: resolve(output, "06-foundry-agent-details.png"),
+      fullPage: true,
+    });
+  }
 }
 
 await context.storageState({ path: resolve(output, ".auth-state.json") });
