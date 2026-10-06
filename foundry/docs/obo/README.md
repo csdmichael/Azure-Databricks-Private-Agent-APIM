@@ -1,11 +1,20 @@
 # Phase 2: Setup security — Microsoft Foundry
 
 This guide explains how to reproduce the Microsoft Teams → Azure Bot Service →
-Microsoft Foundry → private API Management MCP → Azure Databricks Genie
+Microsoft Foundry → private API Management → native Azure Databricks Genie MCP
 on-behalf-of (OBO) flow in this repository. It covers the identity chain, Entra
 registrations, Foundry user identity passthrough, APIM validation, Databricks
 federation, private networking, deployment, logging, live verification, and
 failure diagnosis.
+
+The preferred MCP target is the Databricks-native Genie MCP route proxied by APIM:
+
+```text
+https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>
+```
+
+Do not point Foundry directly at the Databricks workspace URL. APIM remains the
+private policy enforcement and OBO token-exchange boundary.
 
 Begin with the [Phase 1 main guide](../../README.md): deploy and validate the
 private Foundry → APIM → Databricks baseline without end-user authentication,
@@ -185,7 +194,8 @@ The data and identity flow has eight logical hops:
 6. **APIM validates and exchanges the assertion.** APIM validates signature,
    issuer, tenant, audience, delegated scope, authorized client, user identity,
    and rate limit. The existing OBO policy exchanges the assertion through the
-   configured Databricks RFC 8693 flow.
+   configured Databricks RFC 8693 flow, then forwards the request to the native
+   Genie MCP path for the configured space.
 7. **Databricks applies user permissions.** Genie executes as the mapped
    Databricks user. Workspace permissions, Genie-space access, warehouse access,
    Unity Catalog grants, row filters, and column masks remain authoritative.
@@ -275,8 +285,9 @@ Passing APIM validation alone does not prove broker acceptance.
 - APIM is the policy enforcement point in front of Databricks.
 - JWT, user allowlist/group authorization, per-user rate limits, token exchange,
   backend routing, and sanitized audit logging stay in APIM.
-- The OBO MCP facade maps MCP tools to the existing OBO API operations. It does not
-  duplicate or bypass the API policy.
+- The `dbx-native-genie-mcp` route transparently proxies the Databricks-native MCP
+  protocol after policy enforcement. It must not translate the protocol into the
+  repository's legacy `ask`, `follow-up`, `message`, and `result` REST facade.
 
 ### Databricks
 
@@ -609,21 +620,46 @@ Account-wide federation creates trust; it does not grant data access. Separately
 Validate with `current_user()` through the complete Teams path. An administrator test
 alone cannot prove least privilege.
 
-## 4. Expose the OBO API as an APIM MCP server
+![Databricks private networking and OIDC federation evidence](../screenshots/08-databricks-network-federation.png)
 
-The Bicep and Terraform modules create an additive MCP API named
-`databricks-genie-obo-mcp`. It maps these tools to existing OBO operations:
+![Guest user least-privilege Databricks authorization evidence](../screenshots/09-databricks-guest-permissions.png)
 
-| MCP tool | Existing APIM operation |
-| --- | --- |
-| `ask` | Start a Genie conversation |
-| `follow-up` | Send a follow-up in the same conversation |
-| `message` | Read message status |
-| `result` | Retrieve the query result |
+## 4. Proxy the native Genie MCP server through APIM
 
-The MCP API has no subscription-key requirement because bearer-token validation is
-performed by the underlying OBO policy. Do not expose the non-OBO managed-identity
-API through this MCP facade.
+Create or retain an APIM API with the public path `dbx-native-genie-mcp` and a
+backend rooted at the private Databricks workspace. Preserve the remainder of the
+native path so each request reaches:
+
+```text
+https://<databricks-workspace-host>/api/2.0/mcp/genie/<genie-space-id>
+```
+
+The Foundry-facing URL is:
+
+```text
+https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>
+```
+
+Apply the existing OBO controls to this API: validate the APIM audience and
+`Genie.Access` scope, authorize the verified user, rate-limit by verified object
+ID, exchange the assertion for a short-lived Databricks token, replace the
+inbound authorization header with that token, and forward the native streamable
+HTTP MCP request without rewriting its JSON-RPC body. The API has no subscription
+key requirement because delegated bearer-token validation is mandatory.
+
+The screenshot below uses Copilot Studio to show the same native APIM MCP URL.
+In Foundry, enter this URL as the custom OAuth2 project connection target rather
+than selecting `None` authentication.
+
+![Native Databricks Genie MCP URL through APIM](../../../Copilot%20Tools/Screenshots/MCP-01.%20Connect%20in%20Copilot%20Studio.png)
+
+![APIM OBO validation, token exchange, and diagnostics controls](../screenshots/07-apim-security-policy.png)
+
+The repository's current Bicep and Terraform OBO modules still create the legacy
+`databricks-genie-obo-mcp` four-operation facade. Do not use that generated facade
+as the Foundry MCP target for this native route, and do not run those modules
+against an existing native proxy without first excluding the legacy APIM MCP
+resource. Bot, networking, diagnostics, and connection resources remain reusable.
 
 ### Provision with Bicep
 
@@ -657,11 +693,12 @@ az deployment group create `
     apimApiClientId='<apim-api-client-id>'
 ```
 
-This creates or updates the additive `databricks-genie-obo-mcp` facade, Bot Service
-registration, Teams channel, Bot OAuth connection, `BotRequest`/`AllMetrics`
-diagnostics, custom OAuth2 MCP project connection and generated redirect URL,
-Application Insights, and the Linux bridge App Service on the selected existing
-plan. It sets the bridge's delegated Foundry application settings.
+This creates or updates the Bot Service registration, Teams channel, Bot OAuth
+connection, `BotRequest`/`AllMetrics` diagnostics, custom OAuth2 MCP project
+connection and generated redirect URL, Application Insights, and the Linux bridge
+App Service on the selected existing plan. Until the infrastructure modules are
+migrated, override their connection target with the native APIM URL and exclude
+the generated legacy `databricks-genie-obo-mcp` resource.
 
 ### Provision with Terraform
 
@@ -683,15 +720,17 @@ Review and replace **every** example identifier, resource name, scope and region
 `terraform.tfvars`; consult the module's variables for required values. Never
 commit generated tfvars, plans or state containing sensitive values.
 
-Verify:
+Verify the native APIM proxy:
 
 ```powershell
 az rest --method get `
-  --url "https://management.azure.com/subscriptions/<subscription>/resourceGroups/<rg>/providers/Microsoft.ApiManagement/service/<apim>/apis/databricks-genie-obo-mcp?api-version=2024-06-01-preview"
+  --url "https://management.azure.com/subscriptions/<subscription>/resourceGroups/<rg>/providers/Microsoft.ApiManagement/service/<apim>/apis/dbx-native-genie-mcp?api-version=2024-05-01"
 ```
 
 An anonymous MCP initialize or tool call must fail. A valid delegated user call
-must reach the underlying operation without a subscription key.
+must complete native MCP initialization and tool discovery without a subscription
+key. Confirm the available tool names from the live server; do not hard-code the
+legacy facade's four operation names.
 
 ## 5. Create the Foundry OAuth2 MCP connection
 
@@ -717,7 +756,7 @@ ID and a separately rotated secret:
       "api://<APIM-API-client-id>/Genie.Access",
       "offline_access"
     ],
-    "target": "https://<apim-host>/<obo-mcp-path>/mcp",
+    "target": "https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>",
     "tokenUrl": "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token",
     "useCustomConnector": false,
     "useWorkspaceManagedIdentity": false
@@ -740,7 +779,7 @@ environment variables:
 $env:FOUNDRY_PROJECT_ENDPOINT = 'https://<foundry-account>.services.ai.azure.com/api/projects/<foundry-project>'
 $env:FOUNDRY_AGENT_NAME = '<foundry-agent-name>'
 $env:FOUNDRY_MODEL_DEPLOYMENT_NAME = '<model-deployment-name>'
-$env:MCP_SERVER_URL = 'https://<apim-name>.azure-api.net/databricks-genie-obo-mcp/mcp'
+$env:MCP_SERVER_URL = 'https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>'
 $env:MCP_CONNECTION_ID = '<mcp-oauth-connection-name>'
 $env:FOUNDRY_AGENT_PORTAL_URL = '<customer-agent-portal-url>'
 python -m pip install -r .\foundry\agent\requirements.txt
@@ -765,8 +804,8 @@ The resulting MCP tool must contain:
 ```json
 {
   "type": "mcp",
-  "server_label": "databricks-genie-obo",
-  "server_url": "https://<apim-name>.azure-api.net/databricks-genie-obo-mcp/mcp",
+  "server_label": "databricks-native-genie",
+  "server_url": "https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>",
   "project_connection_id": "<mcp-oauth-connection-name>",
   "require_approval": "never"
 }
@@ -807,6 +846,8 @@ https://ai.azure.com/.default
 After deployment, open the OAuth connection in Azure and run **Test Connection**.
 This interactive check is required; ARM provisioning success does not prove consent,
 redirect URI, or conditional-access success.
+
+![Azure Bot Service endpoint and Teams channel](../screenshots/02-bot-service.png)
 
 ## 8. Deploy the Teams bridge
 
@@ -910,6 +951,10 @@ with `What can you help me analyze?`, then validate permitted results against
 the user's Databricks grants. A genuine denied-user query must fail with no
 application-identity fallback. Azure Bot **Test in Web Chat** is a useful intermediate
 check, not proof of Teams installation or denied-user behavior.
+
+![Grounded Genie response in Azure Bot Web Chat](../screenshots/03-bot-web-chat.png)
+
+![Grounded multi-turn Genie responses in Microsoft Teams](../screenshots/04-teams-chat.png)
 
 For group chat or team use, validate tenant policy, consent behavior, mention
 handling, and conversation state separately.
