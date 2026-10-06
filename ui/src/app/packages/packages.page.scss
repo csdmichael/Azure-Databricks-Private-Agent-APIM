@@ -1,0 +1,166 @@
+:host {
+  display: block;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.packages {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+.page-header h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.page-header p {
+  margin: 0 0 20px;
+  font-size: 13.5px;
+  color: var(--app-muted);
+  max-width: 80ch;
+  line-height: 1.6;
+}
+
+.page-header a {
+  color: #0f5ba7;
+}
+
+.page-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fdece9;
+  color: #a4262c;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  flex: none;
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.description {
+  font-size: 13px;
+  color: #3a3a3a;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0 0 14px;
+  font-size: 12px;
+}
+
+.meta dt {
+  color: var(--app-muted);
+}
+
+.meta dd {
+  margin: 0;
+}
+
+code {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11.5px;
+  background: #f4f4f4;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.contents {
+  margin-bottom: 10px;
+}
+
+.contents-label {
+  display: block;
+  font-size: 11px;
+  color: var(--app-muted);
+  margin-bottom: 4px;
+}
+
+.contents ion-chip {
+  height: 21px;
+  font-size: 10.5px;
+  margin: 2px 4px 0 0;
+}
+
+.key-input {
+  --background: #fafafa;
+  --border-radius: 8px;
+  --padding-start: 10px;
+  margin-bottom: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--app-muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.steps {
+  margin-top: 32px;
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  padding: 18px 22px;
+}
+
+.steps h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.steps ol {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #3a3a3a;
+}

@@ -1,0 +1,20 @@
+.request-heading { padding: 22px 0 12px; }
+.request { border-bottom: 1px solid #dce3e9; }
+.request summary { display: grid; grid-template-columns: 180px minmax(140px, 1fr) minmax(180px, 240px); gap: 16px; padding: 16px 10px 16px 28px; cursor: pointer; position: relative; font-size: 13px; background: #f5f8fa; }
+.request summary::before { content: '+'; position: absolute; left: 8px; top: 16px; font-weight: 600; }
+.request[open] summary::before { content: '-'; }
+summary:focus-visible { outline: 2px solid #0078d4; outline-offset: 2px; }
+.request-user, .outcome { overflow-wrap: anywhere; }
+small { font-size: 12px; font-weight: 400; }
+.request small, .event-code { display: block; margin-top: 5px; color: #596678; }
+.outcome.failure { color: #a43525; }
+.outcome.success { color: #147b52; }
+.request-detail { padding: 12px 10px 20px; }
+.identity { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 0; }
+.identity dd { font-size: 12px; margin: 4px 0; font-weight: 400; overflow-wrap: anywhere; }
+.split-total { font-size: 25px; }
+.incomplete { color: #8b5710; font-size: 13px; }
+.query { margin-top: 24px; }
+.query summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+pre { overflow: auto; background: #f1f5f7; padding: 16px; font-size: 12px; line-height: 1.65; max-height: 340px; }
+@media (max-width: 640px) { .request summary { grid-template-columns: minmax(0, 1fr); gap: 8px; } .request-time { font-size: 12px; } .identity { display: grid; } }

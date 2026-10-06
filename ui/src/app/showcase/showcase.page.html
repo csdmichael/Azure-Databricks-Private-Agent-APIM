@@ -1,0 +1,568 @@
+<section class="showcase">
+  <div class="experience-switcher" role="group" aria-label="Choose an implementation approach">
+    <button
+      type="button"
+      [class.is-active]="experience() === 'copilot-studio'"
+      [attr.aria-pressed]="experience() === 'copilot-studio'"
+      (click)="setExperience('copilot-studio')"
+    >
+      <span>Copilot Studio</span>
+      <small>Low Code</small>
+    </button>
+    <button
+      type="button"
+      [class.is-active]="experience() === 'foundry'"
+      [attr.aria-pressed]="experience() === 'foundry'"
+      (click)="setExperience('foundry')"
+    >
+      <span>Foundry</span>
+      <small>Pro-Code</small>
+    </button>
+  </div>
+
+  <header class="showcase-hero">
+    <p class="hero-kicker">Microsoft solution showcase</p>
+    <h1>{{ heroTitle() }}</h1>
+    <p class="hero-lede">{{ heroDescription() }}</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" [href]="repoUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+        GitHub repository
+      </a>
+      <a class="btn" [href]="setupGuideUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Setup guide
+      </a>
+      <a class="btn" [href]="oboGuideUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        OBO deployment guide
+      </a>
+    </div>
+  </header>
+
+  <div class="tabbar" role="tablist" aria-label="Showcase sections">
+    @for (tab of tabs; track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'tab-' + tab.id"
+        [class.is-active]="activeTab() === tab.id"
+        [attr.aria-selected]="activeTab() === tab.id"
+        [attr.aria-controls]="'panel-' + tab.id"
+        (click)="setTab(tab.id)"
+      >
+        <ion-icon [name]="tab.icon" aria-hidden="true"></ion-icon>
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  <!-- Videos -->
+  <section
+    class="tab-panel"
+    id="panel-videos"
+    role="tabpanel"
+    aria-labelledby="tab-videos"
+    [hidden]="activeTab() !== 'videos'"
+  >
+    <div class="video-layout">
+      <div class="video-stage">
+        <div class="video-frame" #videoFrame>
+          @if (selectedVideo().comingSoon) {
+            <div class="video-coming-soon" role="img" [attr.aria-label]="selectedVideo().title + ' coming soon'">
+              <ion-icon name="play-circle-outline" aria-hidden="true"></ion-icon>
+              <strong>Coming soon</strong>
+              <span>Foundry video {{ selectedVideo().sequence }}</span>
+            </div>
+          } @else {
+            <video
+              #videoPlayer
+              controls
+              playsinline
+              preload="metadata"
+              [attr.aria-label]="'Video ' + selectedVideo().sequence + ': ' + selectedVideo().title"
+              (canplay)="onVideoCanPlay()"
+              (ended)="playNext()"
+              (error)="onVideoError()"
+            >
+              Your browser does not support HTML video.
+            </video>
+          }
+          <div class="video-frame__topline">
+            <span>Video {{ selectedVideo().sequence }}</span>
+            <button type="button" title="Enter full screen" aria-label="Enter full screen" (click)="enterFullscreen()">
+              <ion-icon name="expand-outline" aria-hidden="true"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <dl class="video-stats" aria-label="Solution at a glance">
+          @for (stat of videoStats(); track stat.label) {
+            <div><dt>{{ stat.value }}</dt><dd>{{ stat.label }}</dd></div>
+          }
+        </dl>
+
+        <div class="video-details">
+          <div>
+            <p class="video-kicker">
+              {{ selectedVideo().comingSoon ? 'Planned episode' : 'Now playing' }}
+              &middot; {{ selectedVideo().duration }}
+            </p>
+            <h3>{{ selectedVideo().title }}</h3>
+            <p>{{ selectedVideo().description }}</p>
+          </div>
+          <ion-toggle labelPlacement="start" [checked]="autoplayNext()" (ionChange)="setAutoplayNext($event)">
+            Autoplay next
+          </ion-toggle>
+        </div>
+
+        @if (!selectedVideo().comingSoon && autoplayBlocked() && !videoError()) {
+          <div class="video-message" role="status">
+            <ion-icon name="volume-high-outline" aria-hidden="true"></ion-icon>
+            <span>Sound is on. Your browser requires one click to start audible playback.</span>
+            <button type="button" (click)="playSelectedVideo()">Play with sound</button>
+          </div>
+        }
+        @if (!selectedVideo().comingSoon && videoError()) {
+          <div class="video-message video-message--pending" role="status">
+            <ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon>
+            <span>This video could not be loaded. Check your connection and try again.</span>
+            <button type="button" (click)="selectVideo(selectedVideoIndex())">Retry video</button>
+          </div>
+        }
+      </div>
+
+      <div class="video-rail">
+        @if (!isFoundry()) {
+        <aside class="value-gadget" aria-labelledby="value-gadget-title">
+          <div class="value-gadget__heading">
+            <span>Illustrative business case</span>
+            <ion-icon name="analytics-outline" aria-hidden="true"></ion-icon>
+          </div>
+
+          <div class="value-gadget__primary" aria-live="polite">
+            <span id="value-gadget-title">Annual run-rate benefit</span>
+            <strong>{{ selectedValueScenario().annualBenefit }}</strong>
+            <small>
+              {{ selectedValueScenario().label }} &middot; {{ selectedValueScenario().users }}
+              @if (selectedValueScenario().isDefault) {
+                <b>Default</b>
+              }
+            </small>
+          </div>
+
+          <dl class="value-gadget__metrics">
+            <div>
+              <dt>{{ selectedValueScenario().roi }}</dt>
+              <dd>Year-one ROI</dd>
+            </div>
+            <div>
+              <dt>{{ selectedValueScenario().payback }}</dt>
+              <dd>Payback</dd>
+            </div>
+          </dl>
+
+          <div class="value-gadget__range">
+            <span>Net monthly benefit</span>
+            <strong>{{ selectedValueScenario().netMonthly }}</strong>
+            <div aria-hidden="true"><span [style.width.%]="selectedValueScenario().relative"></span></div>
+          </div>
+
+          <div class="value-gadget__modes" role="group" aria-label="Select a deployment scenario">
+            @for (scenario of valueScenarios; track scenario.id) {
+              <button
+                type="button"
+                [class.is-active]="selectedValueScenarioId() === scenario.id"
+                [attr.aria-pressed]="selectedValueScenarioId() === scenario.id"
+                [attr.aria-label]="'Show the ' + scenario.label + ' estimate'"
+                (click)="setValueScenario(scenario.id)"
+              >
+                {{ scenario.selectorLabel }}
+              </button>
+            }
+          </div>
+
+          <button class="value-gadget__details" type="button" (click)="setTab('business-case')">
+            Assumptions and full business case
+            <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon>
+          </button>
+        </aside>
+        }
+
+        <aside class="playlist" aria-label="Video playlist">
+        <div class="playlist__header">
+          <div>
+            <span>Solution series</span>
+            <strong>{{ videos().length }} videos</strong>
+          </div>
+          <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+        </div>
+        <ol>
+          @for (video of videos(); track video.sequence; let i = $index) {
+            <li>
+              <button
+                type="button"
+                [class.is-active]="selectedVideoIndex() === i"
+                [attr.aria-current]="selectedVideoIndex() === i"
+                (click)="selectVideo(i)"
+              >
+                <span class="playlist__seq">{{ video.sequence }}</span>
+                <span class="playlist__body">
+                  <strong>{{ video.title }}</strong>
+                  <small>{{ video.duration }}</small>
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- Walkthrough -->
+  <section
+    class="tab-panel"
+    id="panel-walkthrough"
+    role="tabpanel"
+    aria-labelledby="tab-walkthrough"
+    [hidden]="activeTab() !== 'walkthrough'"
+  >
+    <div class="foundry-intro">
+      <div>
+        <p class="case-kicker">{{ walkthrough().kicker }}</p>
+        <h2>{{ walkthrough().title }}</h2>
+        <p>{{ walkthrough().description }}</p>
+      </div>
+      <a class="btn btn-primary" [href]="setupGuideUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Open setup guide
+      </a>
+    </div>
+    <div class="foundry-resource-grid">
+      @for (resource of walkthrough().resources; track resource.title) {
+        <a [href]="resource.url" target="_blank" rel="noopener noreferrer">
+          <img [src]="resource.image" [alt]="resource.title" loading="lazy" />
+          <span>
+            <strong>{{ resource.title }}</strong>
+            <small>{{ resource.description }}</small>
+          </span>
+        </a>
+      }
+    </div>
+  </section>
+
+  <!-- Business case -->
+  <section
+    class="tab-panel"
+    id="panel-business-case"
+    role="tabpanel"
+    aria-labelledby="tab-business-case"
+    [hidden]="activeTab() !== 'business-case'"
+  >
+    @if (isFoundry()) {
+      <header class="case-header">
+        <div>
+          <p class="case-kicker">Pro-code business case</p>
+          <h2>Enterprise control without losing user-level governance</h2>
+          <p>
+            Choose Foundry when the solution needs code-first lifecycle management, a custom Teams
+            experience, repeatable infrastructure, and explicit control over identity and observability.
+          </p>
+        </div>
+        <a class="btn btn-primary" [href]="setupGuideUrl()" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Review implementation guide
+        </a>
+      </header>
+      <div class="metric-grid">
+        <article class="metric-card">
+          <strong>0</strong><span>Databricks PATs</span><small>User-delegated OAuth and token exchange</small>
+        </article>
+        <article class="metric-card">
+          <strong>2</strong><span>Infrastructure options</span><small>Bicep and Terraform implementations</small>
+        </article>
+        <article class="metric-card">
+          <strong>1:1</strong><span>User authorization</span><small>Unity Catalog permissions remain authoritative</small>
+        </article>
+        <article class="metric-card">
+          <strong>End to end</strong><span>Operational evidence</span><small>Bot, APIM, Foundry, and Databricks diagnostics</small>
+        </article>
+      </div>
+      <div class="case-split">
+        <section class="case-block">
+          <h3>When Foundry is the better fit</h3>
+          <dl class="change-list">
+            <div><dt>Engineering ownership</dt><dd>Teams want source-controlled prompts, bridge code, tests, and deployment automation.</dd></div>
+            <div><dt>Custom channels</dt><dd>The experience requires Azure Bot Service and a tailored Microsoft Teams application.</dd></div>
+            <div><dt>Identity fidelity</dt><dd>Every query must retain the signed-in user across Foundry, APIM, and Databricks.</dd></div>
+            <div><dt>Repeatable environments</dt><dd>Infrastructure and agent publication must be reproducible through CI/CD.</dd></div>
+          </dl>
+        </section>
+        <section class="case-block">
+          <h3>Value delivered</h3>
+          <dl class="change-list">
+            <div><dt>Governed self-service analytics</dt><dd>Users ask natural-language questions while existing data permissions stay in force.</dd></div>
+            <div><dt>Reduced credential risk</dt><dd>No shared Databricks identity or personal access token is stored in the solution.</dd></div>
+            <div><dt>Faster operations</dt><dd>Correlated diagnostics shorten investigation across the full request path.</dd></div>
+            <div><dt>Portable deployment</dt><dd>Documented Bicep, Terraform, Python, and TypeScript components support controlled rollout.</dd></div>
+          </dl>
+        </section>
+      </div>
+    } @else {
+    <header class="case-header">
+      <div>
+        <p class="case-kicker">Illustrative business case</p>
+        <h2>Private data to executive PowerPoint</h2>
+        <p>
+          Low-code business case for enterprise adoption, modelled on a business unit of
+          <strong>100 active users</strong>. Every figure below is editable and should be recalibrated
+          with pilot usage and time-study data.
+        </p>
+      </div>
+      <div class="case-header__actions">
+        <a class="btn btn-primary" [href]="businessCasePdfUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Download PDF
+        </a>
+        <a class="btn" [href]="businessCasePptxUrl" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Download PPTX
+        </a>
+      </div>
+    </header>
+
+    <div class="metric-grid">
+      @for (metric of businessMetrics; track metric.label) {
+        <article class="metric-card">
+          <strong>{{ metric.value }}</strong>
+          <span>{{ metric.label }}</span>
+          <small>{{ metric.detail }}</small>
+        </article>
+      }
+    </div>
+
+    <div class="case-split">
+      <section class="case-block">
+        <h3>What changes</h3>
+        <p class="case-block__lede">
+          Each completed deck releases about three hours of employee capacity. The largest savings come
+          from data preparation, chart creation, and revision cycles.
+        </p>
+        <dl class="change-list">
+          <div>
+            <dt>Data preparation</dt>
+            <dd>The agent calls governed APIs instead of manual exports.</dd>
+          </div>
+          <div>
+            <dt>Analysis</dt>
+            <dd>Genie translates business questions into governed queries.</dd>
+          </div>
+          <div>
+            <dt>Presentation</dt>
+            <dd>The deck skill creates native slides and charts.</dd>
+          </div>
+          <div>
+            <dt>Review</dt>
+            <dd>Users validate insights and refine the narrative.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="case-block">
+        <h3>Where it applies</h3>
+        <p class="case-block__lede">
+          One reusable low-code pattern serves many business functions. Teams share the same governed
+          connector and deck skill while changing prompts, data permissions, and templates.
+        </p>
+        <ul class="usecase-list">
+          @for (item of useCases; track item.team) {
+            <li>
+              <strong>{{ item.team }}</strong>
+              <span>{{ item.focus }}</span>
+              <small>{{ item.output }}</small>
+            </li>
+          }
+        </ul>
+      </section>
+    </div>
+
+    <section class="case-block">
+      <h3>Assumptions that drive the model</h3>
+      <p class="case-block__lede">
+        Five assumptions determine most of the financial value. The core formula is
+        <em>users &times; deck volume &times; hours saved &times; loaded hourly cost &times; productive usage</em>.
+      </p>
+      <div class="table-wrap">
+        <table class="scenario-table">
+          <thead>
+            <tr>
+              <th scope="col">Assumption</th>
+              <th scope="col">Pilot</th>
+              <th scope="col">Business unit</th>
+              <th scope="col">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of scenarios; track row.assumption) {
+              <tr>
+                <th scope="row">{{ row.assumption }}</th>
+                <td>{{ row.pilot }}</td>
+                <td class="is-highlight">{{ row.businessUnit }}</td>
+                <td>{{ row.enterprise }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="case-note">
+        Capacity value measures time redirected to higher-value work. It is not a headcount reduction
+        commitment.
+      </p>
+    </section>
+
+    <section class="case-block">
+      <h3>Full deck</h3>
+      <div class="pdf-frame">
+        <iframe
+          [src]="businessCaseEmbedUrl()"
+          title="Private data to executive PowerPoint business case"
+          loading="lazy"
+        ></iframe>
+      </div>
+      <p class="case-note">
+        If the viewer does not load in your browser, use the download buttons above.
+      </p>
+    </section>
+    }
+  </section>
+
+  <!-- Features -->
+  <section
+    class="tab-panel"
+    id="panel-features"
+    role="tabpanel"
+    aria-labelledby="tab-features"
+    [hidden]="activeTab() !== 'features'"
+  >
+    <div class="feature-grid">
+      @for (feature of features(); track feature.title) {
+        <article class="feature-card">
+          <ion-icon [name]="feature.icon" aria-hidden="true"></ion-icon>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section
+    class="tab-panel"
+    id="panel-architecture"
+    role="tabpanel"
+    aria-labelledby="tab-architecture"
+    [hidden]="activeTab() !== 'architecture'"
+  >
+    @if (isFoundry()) {
+      <figure class="architecture">
+        <img
+          [src]="foundryArchitecture.imageUrl"
+          [alt]="foundryArchitecture.imageAlt"
+          loading="lazy"
+        />
+        <figcaption>{{ foundryArchitecture.caption }}</figcaption>
+      </figure>
+      <section class="architecture-explainer" aria-labelledby="foundry-architecture-title">
+        <header>
+          <p class="case-kicker">How the architecture works</p>
+          <h2 id="foundry-architecture-title">Private data plane with end-user authorization</h2>
+          <p>{{ foundryArchitecture.overview }}</p>
+        </header>
+        <ol class="architecture-flow">
+          @for (item of foundryArchitecture.flow; track item.step) {
+            <li>
+              <span>{{ item.step }}</span>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.description }}</p>
+              </div>
+            </li>
+          }
+        </ol>
+        <div class="architecture-controls">
+          @for (control of foundryArchitecture.controls; track control.title) {
+            <article>
+              <h3>{{ control.title }}</h3>
+              <p>{{ control.description }}</p>
+            </article>
+          }
+        </div>
+      </section>
+      <div class="architecture-links">
+        <a class="btn" [href]="oboGuideUrl()" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Foundry OBO guide
+        </a>
+        <a class="btn" [href]="setupGuideUrl()" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+          Foundry setup guide
+        </a>
+        <a class="btn" [href]="repoUrl()" target="_blank" rel="noopener noreferrer">
+          <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+          Foundry source
+        </a>
+      </div>
+    } @else {
+    <figure class="architecture">
+      <img
+        [src]="highLevelArchitectureImageUrl"
+        alt="High-level architecture: Microsoft 365 users access a Copilot Studio agent in a VNet-enabled Power Platform managed environment, which reaches private API Management and Databricks services"
+        loading="lazy"
+      />
+      <figcaption>
+        High-level view of the managed Power Platform environment, private API Management gateway,
+        and private Azure Databricks workspace used to generate presentations from governed data.
+      </figcaption>
+    </figure>
+    <figure class="architecture">
+      <img
+        [src]="architectureImageUrl"
+        alt="End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie"
+        loading="lazy"
+      />
+      <figcaption>
+        The request leaves Copilot Studio through a delegated subnet, crosses a virtual network peering
+        into the API Management VNet, reaches the gateway on its private endpoint, and is proxied to
+        Databricks using API Management's managed identity. Nothing traverses the public internet.
+      </figcaption>
+    </figure>
+    <figure class="architecture">
+      <img
+        [src]="oboArchitectureImageUrl"
+        alt="Delegated user identity for private Databricks Genie: per-user Entra OAuth through API Management and a private Azure Function, with RFC 8693 token exchange and user-level data permissions"
+        loading="lazy"
+      />
+      <figcaption>
+        Delegated user identity: APIM authenticates to the private Function with its managed identity,
+        while the original user's Entra JWT is exchanged for a Databricks user token.
+        Genie enforces the mapped user's data permissions.
+      </figcaption>
+    </figure>
+    <div class="architecture-links">
+      <a class="btn" [href]="oboGuideUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Delegated identity guide
+      </a>
+      <a class="btn" [href]="setupGuideUrl()" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+        Full setup guide
+      </a>
+      <a class="btn" [href]="skillUrl" target="_blank" rel="noopener noreferrer">
+        <ion-icon name="layers-outline" aria-hidden="true"></ion-icon>
+        Deck skill specification
+      </a>
+    </div>
+    }
+  </section>
+</section>

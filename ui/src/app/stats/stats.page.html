@@ -1,0 +1,37 @@
+<section class="traffic">
+  <header class="traffic-heading">
+    <div><a class="back" href="/showcase"><ion-icon name="arrow-back-outline" /> Showcase</a><h1>Site traffic</h1><p>Caldova Databricks Showcase <span class="zone">UTC</span></p></div>
+    <button class="icon-button" type="button" title="Refresh statistics" aria-label="Refresh statistics" (click)="load()" [disabled]="loading()"><ion-icon name="refresh-outline" /></button>
+  </header>
+  @if (authRequired()) {
+    <div class="state"><ion-icon name="lock-closed-outline" /><h2>Administrator sign-in</h2><a class="primary" href="/.auth/login/aad?post_login_redirect_uri=/stats">Sign in with Microsoft</a></div>
+  } @else if (forbidden()) {
+    <div class="state" role="alert"><ion-icon name="lock-closed-outline" /><h2>Access restricted</h2><p>This account does not have access to visitor statistics.</p><a href="/.auth/logout?post_logout_redirect_uri=/stats">Sign out</a></div>
+  } @else {
+    <form class="filters" (ngSubmit)="load()">
+      <label>From<input type="date" name="start" [(ngModel)]="start" [min]="oldest" [max]="end" required /></label>
+      <label>To<input type="date" name="end" [(ngModel)]="end" [min]="start" [max]="today" required /></label>
+      <label>Group by<select name="period" [(ngModel)]="period"><option value="day">Day</option><option value="month">Month</option><option value="year">Year</option></select></label>
+      <button type="submit" class="primary" [disabled]="loading()">Apply</button>
+      <div class="presets" aria-label="Date range"><button type="button" (click)="setRange(7)">7 days</button><button type="button" (click)="setRange(30)">30 days</button><button type="button" (click)="setRange(90)">90 days</button></div>
+    </form>
+    @if (loading()) { <div class="state" role="status">Loading visitor statistics...</div> }
+    @if (error()) { <div class="error" role="alert">{{ error() }}</div> }
+    @if (stats(); as data) {
+      <dl class="totals"><div><dt>Page visits</dt><dd>{{ data.totalVisits | number }}</dd></div><div><dt>Unique IP addresses</dt><dd>{{ data.uniqueIps | number }}</dd></div><div><dt>Locations</dt><dd>{{ data.locations.length | number }}</dd></div><div><dt>Visits without an IP</dt><dd>{{ data.unknownIpVisits | number }}</dd></div></dl>
+      @if (data.totalVisits === 0) { <div class="empty">No visits recorded in this date range.</div> }
+      <section class="section"><h2>Traffic over time</h2><div class="legend"><span class="visit-key"></span> Visits <span class="unique-key"></span> Unique IPs</div>
+        <div class="chart" aria-label="Traffic by selected time period">
+          @for (row of data.periods; track row.period) {
+            <div class="chart-row"><span class="period">{{ row.period }}</span><div class="bars"><div class="visit-bar" [style.width.%]="barWidth(row.visits)"></div><div class="unique-bar" [style.width.%]="barWidth(row.uniqueIps)"></div></div><span class="chart-value">{{ row.visits }} / {{ row.uniqueIps }}</span></div>
+          }
+        </div>
+      </section>
+      <section class="section"><div class="section-heading"><h2>Visitors by location</h2><div class="table-tools"><input type="search" aria-label="Filter locations" placeholder="Country, state or city" [(ngModel)]="locationSearch" /><button class="icon-button" type="button" title="Download locations CSV" aria-label="Download locations CSV" (click)="exportLocations()"><ion-icon name="download-outline" /></button></div></div>
+        <div class="table-scroll"><table><thead><tr><th>Country</th><th>State / region</th><th>City</th><th class="numeric">Visits</th><th class="numeric">Unique IPs</th></tr></thead><tbody>@for (row of locations(); track $index) {<tr><td>{{ row.country }}</td><td>{{ row.state }}</td><td>{{ row.city }}</td><td class="numeric">{{ row.visits | number }}</td><td class="numeric">{{ row.uniqueIps | number }}</td></tr>} @empty {<tr><td colspan="5">No matching locations.</td></tr>}</tbody></table></div>
+      </section>
+      <section class="section"><h2>Recent visits <span class="count">Latest {{ data.recentVisits.length }}</span></h2><div class="table-scroll"><table><thead><tr><th>Time (UTC)</th><th>IP address</th><th>Country</th><th>State / region</th><th>City</th></tr></thead><tbody>@for (visit of data.recentVisits; track $index) {<tr><td class="timestamp">{{ visit.timestamp | date:'yyyy-MM-dd HH:mm:ss':'UTC' }}</td><td class="address">{{ visit.ip || 'Unknown' }}</td><td>{{ visit.country }}</td><td>{{ visit.state }}</td><td>{{ visit.city }}</td></tr>} @empty {<tr><td colspan="5">No recent visits.</td></tr>}</tbody></table></div></section>
+      <footer class="data-note"><span>Updated {{ data.generatedAt | date:'yyyy-MM-dd HH:mm:ss':'UTC' }} UTC</span><span>90-day retention. IP locations are approximate. Unique IPs are not unique people.</span><a href="/.auth/logout?post_logout_redirect_uri=/stats">Sign out</a></footer>
+    }
+  }
+</section>
