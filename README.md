@@ -46,6 +46,9 @@ the data path traverses the public internet.
   - [6. Lock down API Management](#6-lock-down-api-management)
   - [7. Publish an MCP route through API Management](#7-publish-an-mcp-route-through-api-management)
   - [8. Connect the MCP tool in Copilot Studio](#8-connect-the-mcp-tool-in-copilot-studio)
+    - [Package and publish the tool in Microsoft 365](#package-and-publish-the-tool-in-microsoft-365)
+    - [Add the MCP server to the agent](#add-the-mcp-server-to-the-agent)
+    - [Validate tool discovery and a grounded query](#validate-tool-discovery-and-a-grounded-query)
   - [9. Build the Copilot Studio agent](#9-build-the-copilot-studio-agent)
   - [10. Generate the deck](#10-generate-the-deck)
 - [Choosing the native or API-to-MCP route](#choosing-the-native-or-api-to-mcp-route)
@@ -462,23 +465,125 @@ Backend managed-identity permissions for both options are covered in
 
 ### 8. Connect the MCP tool in Copilot Studio
 
-Open the target agent, select **Tools > Add a tool > New tool > Model Context
-Protocol**, and enter the URL for the option selected in step 7.
+There are two supported onboarding paths:
 
-For native Genie MCP, leave client authentication set to **None**. The private
-APIM route authenticates to Databricks with its managed identity. A Power Apps
-custom connector and the optional Microsoft 365 registry package are not required
-for this native path.
+- **Direct connection:** add the remote MCP server URL to one Copilot Studio agent.
+  This is the fastest option for development and validation.
+- **Microsoft 365 tool registry:** publish the included package centrally and make
+  it available to selected users or groups. Use this when administrators need a
+  governed, reusable tool definition.
+
+Both paths ultimately connect to the same private APIM endpoint selected in step 7.
+The ready-to-upload sample and its detailed notes are in
+[`Copilot Tools`](Copilot%20Tools/README.md).
+
+#### Package and publish the tool in Microsoft 365
+
+The included [`Databricks-Genie-MCP.zip`](Copilot%20Tools/Databricks-Genie-MCP.zip)
+contains these files at the root of the archive:
+
+- `manifest.json` — Microsoft 365 app manifest with the `agentConnectors`
+  definition and remote MCP server URL.
+- `color.png` — full-color tool icon.
+- `outline.png` — transparent outline icon used by Microsoft 365 surfaces.
+
+![Package contents for the Databricks Genie MCP registry tool](Copilot%20Tools/Screenshots/01.%20Package%20Contents.png)
+
+Before uploading a package for another environment:
+
+1. Extract the ZIP and update `agentConnectors[0].toolSource.remoteMcpServer.mcpServerUrl`
+   in `manifest.json` to the target private APIM route. Do not use the demo endpoint
+   or Genie space ID.
+2. Give the package a unique manifest `id`, increment `version` for updates, and
+   update the display name, description, developer URLs, and icons as needed.
+3. Keep `manifest.json`, `color.png`, and `outline.png` at the ZIP root; do not wrap
+   them in another directory.
+4. Do not place APIM keys, Databricks tokens, client secrets, or other credentials
+   in the manifest or archive.
+
+To publish the package:
+
+1. Open the [Microsoft 365 admin center](https://admin.microsoft.com/).
+2. Go to **Agents > Tools > Registry**, select **Upload**, and choose the ZIP. Wait
+   for the green **MCP server uploaded** confirmation and review the detected server
+   details and tools.
+
+   ![Upload the Databricks Genie MCP package in the Microsoft 365 admin center](Copilot%20Tools/Screenshots/02.%20Package%20Upload.png)
+
+3. On **Users**, choose who can discover the tool and whether it should be
+   pre-installed. Start with a small test group rather than **All users**; expand
+   availability only after private connectivity, permissions, and grounding are
+   validated.
+
+   ![Choose which users can discover and install the Databricks Genie MCP tool](Copilot%20Tools/Screenshots/03.%20Select%20Users%20for%20Tool.png)
+
+4. On **Review & finish**, verify the package name, publication scope, and optional
+   installation scope, then select **Upload**.
+
+   ![Review the Databricks Genie MCP package and user scope before publishing](Copilot%20Tools/Screenshots/04.%20Review%20and%20finish.png)
+
+5. Return to the registry, filter to **MCP servers**, and search for the tool. The
+   status must be **Available** before users can add it in Copilot Studio.
+
+   ![Published Databricks Genie MCP tool showing Available in the Microsoft 365 registry](Copilot%20Tools/Screenshots/05.%20Tool%20uploaded.png)
+
+Registry publication distributes metadata and controls availability; it does not
+make a private endpoint public. The Copilot Studio environment still needs the
+VNet injection, peering, DNS, and APIM connectivity configured in steps 1–6.
+
+#### Add the MCP server to the agent
+
+Open the target Copilot Studio agent and use one of these paths:
+
+- For the centrally published package, select **Tools > Add a tool** and choose the
+  approved `Databricks Genie MCP` registry entry.
+- For a direct connection, select **Tools > Add a tool > New tool > Model Context
+  Protocol** and enter the URL for the option selected in step 7.
+
+For native Genie MCP, provide a clear server name and description, paste the full
+APIM URL ending in `/api/2.0/mcp/genie/<genie-space-id>`, and leave client
+authentication set to **None**. In this phase, APIM accepts the private request and
+replaces the inbound authorization header with a Databricks token obtained through
+its managed identity.
 
 ![Connect a Copilot agent to the native Genie MCP server through APIM](Copilot%20Tools/Screenshots/MCP-01.%20Connect%20in%20Copilot%20Studio.png)
+
+`None` does not mean the backend is anonymous: network access is private, APIM
+policies protect the route, and Databricks authorizes the APIM managed identity.
+All users therefore share that identity's Unity Catalog permissions. Use only
+approved shared-identity data in phase one; use the
+[OBO design](docs/obo/README.md) when Databricks must enforce each user's grants.
 
 For the API-to-MCP option, configure the APIM subscription credential required by
 that route. The MCP endpoint can be added directly to the agent; package it as a
 managed registry tool only when tenant governance requires centralized
-distribution.
+distribution. A Power Apps custom connector is not required for either MCP path.
 
-Confirm that Copilot discovers the native query and polling tools or the four
-API-projected tools, depending on the selected option.
+#### Validate tool discovery and a grounded query
+
+1. Open the tool in the agent and confirm that the connection is healthy.
+2. For native Genie MCP, verify that Copilot discovers both the query operation and
+   the polling operation. For the API-to-MCP projection, verify all four operations
+   listed in step 7. Enable only the operations the agent is allowed to invoke.
+
+   ![Native Databricks Genie query and polling tools loaded in Copilot Studio](Copilot%20Tools/Screenshots/MCP-02.%20Native%20Genie%20MCP%20tools%20loaded.png)
+
+3. Save and publish the agent, then run a question whose expected answer is already
+   known from the Genie UI. Ask the agent to include units, filters, the source
+   table or measure, and the Genie source so grounding can be checked—not merely
+   whether a response was returned.
+4. Confirm the agent invokes the query tool, polls until completion, and reports the
+   requested result with the applied filters and source details.
+
+   ![Successful grounded regional sales query through the native Genie MCP server](Copilot%20Tools/Screenshots/MCP-03.%20Native%20Genie%20MCP%20successful%20query.png)
+
+The validation shown above asked for total 2025 sales by region. The successful
+response included regional totals and units, the calendar-year filter, the
+`SUM(revenue_usd)` measure, the Unity Catalog table, the Genie space, and a
+successful statement ID. Treat those provenance details as acceptance criteria
+for a grounded test. If tools do not load, verify private DNS and APIM reachability
+first; if tools load but the query fails, inspect APIM diagnostics, managed-identity
+grants, the Genie space, and SQL warehouse availability.
 
 ### 9. Build the Copilot Studio agent
 
