@@ -44,11 +44,11 @@ the data path traverses the public internet.
   - [4. Private DNS](#4-private-dns)
   - [5. Enterprise policy](#5-enterprise-policy)
   - [6. Lock down API Management](#6-lock-down-api-management)
-  - [7. Publish the Databricks APIs](#7-publish-the-databricks-apis)
-  - [8. Import the custom connector](#8-import-the-custom-connector)
+  - [7. Publish an MCP route through API Management](#7-publish-an-mcp-route-through-api-management)
+  - [8. Connect the MCP tool in Copilot Studio](#8-connect-the-mcp-tool-in-copilot-studio)
   - [9. Build the Copilot Studio agent](#9-build-the-copilot-studio-agent)
   - [10. Generate the deck](#10-generate-the-deck)
-- [Why a custom connector and not an MCP server](#why-a-custom-connector-and-not-an-mcp-server)
+- [Choosing the native or API-to-MCP route](#choosing-the-native-or-api-to-mcp-route)
 - [The deck skill](#the-deck-skill)
 - [Observability](#observability)
 - [Key design decisions](#key-design-decisions)
@@ -75,9 +75,11 @@ The detailed diagram above reads left to right, in eight numbered hops.
 1. **A user asks for a deck** in Microsoft 365 Copilot or Teams, in plain language.
 2. **The Copilot Studio agent** picks up the request. It runs on the **GitHub Copilot
    harness**, which gives it a governed sandbox and the `executive-deck-builder` skill.
-3. **The agent calls its custom connector tools.** Because the Power Platform environment
-   is VNet-injected, that call leaves through a **delegated subnet** rather than the
-   public internet.
+3. **The agent calls the selected MCP tools.** The preferred path uses Databricks'
+   native Genie MCP endpoint through APIM. The alternative projects the repository's
+   Genie REST API as an APIM MCP server. Because the Power Platform environment is
+   VNet-injected, the call leaves through a **delegated subnet** rather than the public
+   internet.
 4. **Traffic crosses a VNet peering** into the API Management VNet. Peering is not
    transitive, so each Power Platform regional VNet peers *directly* with the APIM VNet.
 5. **APIM receives the request on its private endpoint** at your assigned private IP. Its public
@@ -180,13 +182,14 @@ and reachability before disabling public access.
 | **Azure Databricks** (Premium, VNet injected) | Hosts the data. Unity Catalog, a serverless SQL warehouse, and the AI/BI Genie space. Public access disabled. | [Azure portal](https://portal.azure.com/) |
 | **Azure Databricks AI/BI Genie** | Turns natural-language questions into governed SQL over a curated schema. | Databricks workspace → **Genie** |
 | **Unity Catalog** | Catalog, schema, tables, and the grants APIM's managed identity needs. | Databricks workspace → **Catalog** |
-| **Azure API Management** (StandardV2) | The only proxy in front of Databricks. Publishes the SQL and Genie REST APIs, holds the policies, and authenticates to Databricks with a managed identity. Public access disabled. | [Azure portal](https://portal.azure.com/) |
+| **Azure API Management** (StandardV2) | The only proxy in front of Databricks. Proxies native Genie MCP or publishes the SQL and Genie REST APIs as MCP tools, holds the policies, and authenticates to Databricks with a managed identity. Public access disabled. | [Azure portal](https://portal.azure.com/) |
 | **Azure Private Link / Private Endpoints** | Private ingress to both APIM and Databricks. | Azure portal → each resource → **Networking** |
 | **Azure Private DNS zones** | `privatelink.azure-api.net` and `privatelink.azuredatabricks.net`, linked to every VNet that must resolve them. | Azure portal → **Private DNS zones** |
 | **Azure Virtual Network peering** | Connects the Power Platform, APIM, and Databricks VNets. | Azure portal → VNet → **Peerings** |
 | **Power Platform managed environment** | The Dataverse-backed environment that gets subnet-injected. Must be a Managed Environment. | [Power Platform admin center](https://admin.powerplatform.microsoft.com/) |
 | **Power Platform enterprise policy** (`NetworkInjection`) | Binds the delegated subnets to the environment. Its geo must match the environment geo. | Azure portal + `Microsoft.PowerPlatform.EnterprisePolicies` module |
-| **Power Apps custom connector** | The supported way to reach a private endpoint from Copilot Studio. Exposes the four Genie operations. | [Power Apps → Custom connectors](https://make.powerapps.com/) |
+| **Copilot Studio MCP tool** | Connects the agent directly to the native Genie MCP route or the API-to-MCP projection. Native Genie MCP does not require a custom connector. | [Copilot Studio](https://copilotstudio.microsoft.com/) |
+| **Power Apps custom connector** | Optional legacy REST fallback for the four Genie operations; not required for native Genie MCP. | [Power Apps → Custom connectors](https://make.powerapps.com/) |
 | **Microsoft Copilot Studio** (GitHub Copilot harness) | Hosts the agent, its tools, and the deck skill. The harness supplies the sandbox that writes the `.pptx`. | [Copilot Studio](https://copilotstudio.microsoft.com/) |
 | **Copilot Studio skills** | Portable `SKILL.md` carrying the deck specification. | Copilot Studio → agent → **Skills** |
 | **Microsoft 365 Copilot / Teams** | Where users actually talk to the agent. | Copilot Studio → **Channels** |
@@ -409,40 +412,30 @@ subnet association as well.
 Once the private endpoint exists and DNS resolves, disable public network access. From
 this point APIM answers only through its assigned private endpoint.
 
-### 7. Publish the Databricks APIs
+### 7. Publish an MCP route through API Management
 
-Import the SQL and Genie REST APIs and attach the non-OBO policies. Backend
-managed-identity permissions are covered in [setup security](docs/obo/README.md).
+Choose one option at APIM. Use the same option when configuring the agent in step 8.
 
-![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/08-apim-apis.png)
+#### Option 1: Proxy native Genie MCP (recommended)
 
-Both APIs can also be projected as MCP servers for the current
-[Microsoft Foundry phase-one path](foundry/README.md) — they are
-**not** usable from Copilot Studio over the private network. See
-[why](#why-a-custom-connector-and-not-an-mcp-server).
+Create or retain an APIM API with public path `dbx-native-genie-mcp` and a backend
+rooted at the private Databricks workspace. Preserve the native path and JSON-RPC
+body so this APIM URL transparently reaches Databricks:
 
-![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](docs/images/09-apim-mcp-servers.png)
+```text
+https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>
+```
 
-### 8. Import the custom connector
+Apply the shared-identity
+[native Genie MCP policy](apim/policies/dbx-native-genie-mcp-policy.xml). It
+rate-limits requests, obtains a Databricks token for APIM's managed identity, and
+replaces the inbound authorization header. Do not create an APIM **MCP Server**
+projection for this route because the Databricks backend already speaks MCP.
 
-Create the connector in the linked environment from the Swagger 2.0 definition in
-[connector](connector).
+#### Option 2: Publish the Genie API, then expose it as MCP
 
-Portal: <https://make.powerapps.com/environments/{Environment Id}/customconnectors>
-
-![Power Apps Custom connectors list showing Databricks-Genie-Private-APIM](docs/images/10-powerapps-custom-connector.png)
-
-Point it at the APIM host with `/databricks-genie` as the base URL.
-
-![Demo connector General tab showing the APIM host and base URL /databricks-genie](docs/images/11-connector-general.png)
-
-Use the existing shared APIM connection for phase one, not an OAuth/OBO connector.
-Credential configuration and the connector Security tab are documented in
-[setup security](docs/obo/README.md).
-
-Confirm the four actions and their path parameters.
-
-![Custom connector Definition tab showing Actions (4) and the request URL with conversationId and messageId path parameters](docs/images/13-connector-definition.png)
+Import the Genie REST API, attach the non-OBO policies, and privately validate its
+four operations:
 
 | Tool | Operation |
 |---|---|
@@ -451,10 +444,41 @@ Confirm the four actions and their path parameters.
 | Get Genie message status | `GET /genie/conversations/{conversationId}/messages/{messageId}` |
 | Get Genie query result | `GET /genie/conversations/{conversationId}/messages/{messageId}/result` |
 
-> **Typed request bodies matter.** The APIM export gives `POST` bodies only an `example`,
-> which produces a single opaque `body` string input. Replace it with a typed schema so the
-> agent gets a real `Question` input:
-> `{"type":"object","required":["content"],"properties":{"content":{"type":"string"}}}`.
+![API Management APIs blade listing the Databricks SQL and Genie APIs](docs/images/08-apim-apis.png)
+
+In APIM **MCP Servers**, expose those four operations from `databricks-genie` with
+path `databricks-genie-mcp`. Confirm the resulting endpoint discovers all four
+tools:
+
+```text
+https://<apim-name>.azure-api.net/databricks-genie-mcp/mcp
+```
+
+![API Management MCP Servers blade listing databricks-genie-mcp and databricks-mcp](docs/images/09-apim-mcp-servers.png)
+
+Do not select the SQL-only `databricks-mcp` endpoint for a Genie conversation.
+Backend managed-identity permissions for both options are covered in
+[setup security](docs/obo/README.md).
+
+### 8. Connect the MCP tool in Copilot Studio
+
+Open the target agent, select **Tools > Add a tool > New tool > Model Context
+Protocol**, and enter the URL for the option selected in step 7.
+
+For native Genie MCP, leave client authentication set to **None**. The private
+APIM route authenticates to Databricks with its managed identity. A Power Apps
+custom connector and the optional Microsoft 365 registry package are not required
+for this native path.
+
+![Connect a Copilot agent to the native Genie MCP server through APIM](Copilot%20Tools/Screenshots/MCP-01.%20Connect%20in%20Copilot%20Studio.png)
+
+For the API-to-MCP option, configure the APIM subscription credential required by
+that route. The MCP endpoint can be added directly to the agent; package it as a
+managed registry tool only when tenant governance requires centralized
+distribution.
+
+Confirm that Copilot discovers the native query and polling tools or the four
+API-projected tools, depending on the selected option.
 
 ### 9. Build the Copilot Studio agent
 
@@ -468,7 +492,12 @@ files. Agents on the GitHub Copilot harness consume Copilot Credits.
 
 Portal: <https://copilotstudio.microsoft.com/>
 
-![Copilot Studio Build page for Genie Deck Builder Pro showing the instructions, the executive-deck-builder skill, and the four Genie connector tools](docs/images/14-agent-build.png)
+Attach the MCP tool from step 8 and enable only the discovered Genie operations.
+For native MCP, instruct the agent to issue the query and poll to completion. For
+API-to-MCP, instruct it to call `ask`, poll `message` until `COMPLETED`, fetch
+`result`, and retain the conversation ID for follow-up questions.
+
+![Copilot Studio Build page for Genie Deck Builder Pro showing the instructions, the executive-deck-builder skill, and the four legacy Genie connector tools](docs/images/14-agent-build.png)
 
 ### 10. Generate the deck
 
@@ -491,25 +520,22 @@ table, a shapes-and-connectors diagram, KPI tiles, and speaker notes on every sl
 The agent queried for 2024 comparatives, found none, and stated that year-over-year growth
 is not computable rather than inventing it.
 
-> **Connection state gotcha.** Every new conversation starts `Stale`. Open the card's
-> connection-manager link, choose **Review**, **Submit**, then **Retry in that same
-> conversation**. Also confirm the connection manager shows a **single** row covering all
-> four tools — if the tools are split across two connector registrations, authorizing one
-> group leaves the other `Stale` permanently. Neither is a network or key problem; APIM
-> returns `200` throughout.
+> **Legacy connector note.** The screenshots also preserve the earlier Power Apps
+> custom-connector flow. If you intentionally use that REST fallback, every new
+> conversation may start `Stale`; review and submit its connection card, then retry in
+> the same conversation. This does not apply to the preferred native MCP setup.
 
-## Why a custom connector and not an MCP server
+## Choosing the native or API-to-MCP route
 
-Power Platform virtual network support covers Dataverse plugins and **connectors**,
-including custom connectors. It does **not** cover MCP servers.
+Use native Genie MCP by default. It preserves Databricks' MCP protocol through APIM,
+requires no API-to-tool projection, and can be added directly to the Copilot Studio
+agent without a Power Apps custom connector.
 
-An MCP tool added to an agent in a VNet-injected environment fails in two distinct ways,
-both reproduced here:
-
-- Authoring time: `No tools available.`
-- Runtime: `that tool is not available in this chat environment`
-
-The custom connector is the supported path to a private endpoint, so the agent uses it.
+Use the API-to-MCP route when you need APIM to expose and govern the repository's four
+REST operations as distinct MCP tools. Agent setup remains similar after the APIM
+branch: add the selected remote MCP URL, enable its discovered tools, and validate a
+grounded query plus polling. Keep the legacy custom connector only for environments
+that explicitly require the REST fallback.
 
 ---
 
@@ -558,8 +584,10 @@ questions and polling; verify both APIM and backend response codes.
 
 - **Peering is not transitive.** Each Power Platform VNet peers directly with the APIM
   VNet, and separately with the Databricks VNet for the no-APIM path.
-- **MCP servers are not covered by Power Platform VNet support.** Reaching a private
-  endpoint from Copilot Studio requires a custom connector.
+- **Native Genie MCP is the preferred Copilot tool path.** APIM transparently proxies
+  the private streamable HTTP endpoint, and Copilot Studio connects without a custom
+  connector. The API-to-MCP projection remains available when separately governed REST
+  operations are required.
 - **The enterprise policy geo must match the environment geo**, which fixes the Azure
   region pair for the delegated subnets.
 - **APIM authenticates to Databricks with a managed identity**, so no Databricks token or
@@ -589,9 +617,9 @@ subscription. Those Azure resources have been deleted; the folder is retained fo
 and is not wired into any deployment path.
 
 It also holds the **Microsoft Foundry** prompt agents, which reach the same Databricks data
-through the APIM MCP servers and Code Interpreter rather than through the private custom
-connector. See [old mcaps/foundry/README.md](old%20mcaps/foundry/README.md). Its workflow
-is manual dispatch only and does not run on commits.
+through APIM MCP routes and Code Interpreter. See
+[old mcaps/foundry/README.md](old%20mcaps/foundry/README.md). Its workflow is manual
+dispatch only and does not run on commits.
 
 ---
 

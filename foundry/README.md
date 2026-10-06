@@ -7,10 +7,11 @@ part of this quick start.
 
 **No authentication** here means no added end-user authentication for the agent
 tools. Azure, Databricks, and Foundry portals still require the operator's existing
-platform access. Foundry uses a stored APIM subscription key, and APIM uses its
-backend managed identity. Do not disable these controls or make Databricks anonymous.
-All queries run as the shared backend identity, not the person using the playground.
-Use approved demo data, not data requiring per-user authorization.
+platform access. APIM uses its backend managed identity. The API-to-MCP option also
+uses a stored APIM subscription key. Do not disable these controls or make
+Databricks anonymous. All queries run as the shared backend identity, not the person
+using the playground. Use approved demo data, not data requiring per-user
+authorization.
 
 - **Next:** [Phase 2: setup security, Entra ID, OBO, and Teams](docs/obo/README.md).
 - **Demo only:** [Foundry deployed resources and evidence](docs/deployed-resources/README.md).
@@ -31,9 +32,19 @@ Use approved demo data, not data requiring per-user authorization.
 ![Private Microsoft Foundry Agent to Databricks Genie via APIM MCP architecture](docs/Architecture-Phases.png)
 
 Requests travel in the opposite direction: the playground invokes the agent, the
-agent calls APIM's non-OBO MCP server using its stored service connection, and
-APIM calls Genie with its managed identity. Genie resolves the question against
-Unity Catalog and returns results through APIM to the agent UI.
+agent calls the selected MCP endpoint through APIM, and APIM calls Genie with its
+managed identity. Genie resolves the question against Unity Catalog and returns
+results through APIM to the agent UI.
+
+At APIM, choose one MCP implementation:
+
+1. **Native Genie MCP (recommended):** transparently proxy Databricks' native
+   streamable HTTP MCP endpoint. APIM does not need to convert an API into MCP.
+2. **Genie API exposed as MCP:** publish the repository's four-operation Genie
+   REST API and use APIM **MCP Servers** to expose those operations as MCP tools.
+
+The Foundry agent setup is otherwise the same: create a remote MCP connection for
+the selected URL, attach it to the agent, and enable the discovered Genie tools.
 
 Foundry-to-APIM and APIM-to-Databricks traffic use private networking. The Foundry
 portal can remain accessible to authorized operators while agent egress is private;
@@ -44,8 +55,9 @@ The Teams bridge in this repository is OBO-only and is **not** a phase-one UI.
 
 - A Databricks workspace, approved Unity Catalog tables, a SQL warehouse, and a
   Genie space that answers a question in the Databricks UI.
-- APIM with the existing non-OBO `databricks-genie` API, subscription protection,
-  backend managed-identity permissions, and private access to Databricks.
+- APIM with backend managed-identity permissions and private access to Databricks.
+  The API-to-MCP option additionally requires the existing non-OBO
+  `databricks-genie` API and subscription protection.
 - A Foundry project with a deployed model supporting MCP tools and operator access
   to create connections, publish agents, and use the playground.
 - Foundry Agent Service private egress to APIM, peering/routing, and private DNS.
@@ -65,7 +77,8 @@ This does not require delegated user OAuth.
 | `<foundry-account>` / `<project-name>` | Foundry project overview |
 | `<model-deployment-name>` | Your project's deployed model, not a model catalog name |
 | `<agent-name>` / `<connection-name>` | Names you choose for this phase-one agent and connection |
-| MCP URL | `https://<apim-name>.azure-api.net/databricks-genie-mcp/mcp` |
+| Native Genie MCP URL (recommended) | `https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>` |
+| API-to-MCP URL | `https://<apim-name>.azure-api.net/databricks-genie-mcp/mcp` |
 
 Replace every placeholder with your environment's values. The checked-in
 [deployment configuration](../config/deployment.json), Bicep parameter files,
@@ -83,7 +96,29 @@ replace their environment-specific inputs before deploying. Do not reuse demo ID
    units before adding the agent layer.
 4. Record the workspace URL, warehouse ID, and Genie space ID for APIM.
 
-### 2. Publish the non-OBO Genie API and MCP server
+### 2. Publish an MCP route through APIM
+
+Choose one option. Prefer the native route unless you specifically need the
+repository's REST operations as independently governed MCP tools.
+
+#### Option 1: Proxy the native Genie MCP server (recommended)
+
+1. In APIM, create or retain an API with public path `dbx-native-genie-mcp` and
+   a backend rooted at `https://<databricks-workspace-host>`.
+2. Preserve the remaining request path so the Foundry-facing endpoint
+   `https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>`
+   maps directly to
+   `https://<databricks-workspace-host>/api/2.0/mcp/genie/<genie-space-id>`.
+   Do not rewrite the JSON-RPC request or response body.
+3. Apply the shared-identity
+   [native Genie MCP policy](../apim/policies/dbx-native-genie-mcp-policy.xml).
+   It rate-limits requests, obtains a Databricks token for APIM's managed
+   identity, and replaces the inbound authorization header.
+4. From a private-network host, verify MCP initialization, tool discovery, a
+   Genie query, and polling to completion. Do not create an APIM **MCP Server**
+   projection for this option; the backend endpoint already speaks MCP.
+
+#### Option 2: Publish the Genie API, then expose it as MCP
 
 1. In APIM, set `databricks-workspace-url`, `databricks-warehouse-id`, and
    `databricks-genie-space-id` to your values.
@@ -119,15 +154,19 @@ Do not use the SQL-only `databricks-mcp` endpoint for a Genie conversation.
 
 ### 4. Create a shared MCP tool connection
 
-1. In your Foundry project, add a remote MCP tool using the server URL from step 2.
-2. Select a **key-based service connection**, not user OAuth or user identity
-   passthrough. Store the existing APIM key in the connection's protected
-   `Ocp-Apim-Subscription-Key` field. The connection is `RemoteTool` /
-   `custom_MCP` with `authType: CustomKeys`.
-3. Name the connection `<connection-name>` and attach it to the agent. Do not put
-   the key in an agent instruction, prompt, inline tool header, or checked-in file.
+1. In your Foundry project, add a remote MCP tool using the URL for the option
+   selected in step 2.
+2. For the native Genie MCP route, use no client authentication. The private APIM
+   route authenticates to Databricks with APIM's managed identity.
+3. For the API-to-MCP route, select a **key-based service connection**, not user
+   OAuth or user identity passthrough. Store the existing APIM key in the
+   connection's protected `Ocp-Apim-Subscription-Key` field. The connection is
+   `RemoteTool` / `custom_MCP` with `authType: CustomKeys`.
+4. Name the connection `<connection-name>` and attach it to the agent. Do not put
+   a key in an agent instruction, prompt, inline tool header, or checked-in file.
    Detailed credential handling belongs to [setup security](docs/obo/README.md).
-4. Confirm Foundry discovers the four Genie tools.
+5. Confirm Foundry discovers the native Genie query and polling tools or the four
+   API-projected Genie tools, depending on the selected option.
 
 This connection authenticates the **service**, not each end user. If the portal
 does not expose CustomKeys connection creation, have the operator create the
@@ -138,11 +177,13 @@ project connection through the supported ARM connection API described in
 
 1. Create a prompt agent in the project, using `<agent-name>` and your
    `<model-deployment-name>`.
-2. Attach the MCP connection from step 4. Restrict enabled tools to the four Genie
-   operations and retain approval settings appropriate to the test.
-3. Tell the agent to start with `ask`, retain conversation/message IDs, poll
-   `message` until `COMPLETED`, then fetch `result`. Use `follow-up` in the same
-   conversation for subsequent questions.
+2. Attach the MCP connection from step 4. Restrict enabled tools to the discovered
+   Genie operations and retain approval settings appropriate to the test.
+3. For native Genie MCP, instruct the agent to use the native query tool and poll
+   with the native polling tool until completion. For API-to-MCP, tell the agent
+   to start with `ask`, retain conversation/message IDs, poll `message` until
+   `COMPLETED`, then fetch `result`. Use `follow-up` in the same conversation for
+   subsequent questions.
 4. Require grounded answers with source, filters, and units. Failed or timed-out
    queries must produce an error explanation, not fabricated numbers.
 5. Save/publish the agent version and open its playground.
@@ -154,7 +195,8 @@ this key-based quick start.
 ### 6. Test the end-to-end agent UI
 
 1. Ask a question you already tested in Genie, such as total sales by quarter.
-2. Inspect the tool trace: `ask` → `message` polling → `result`.
+2. Inspect the tool trace: native query and polling, or
+   `ask` -> `message` polling -> `result`, depending on the selected option.
 3. Compare the answer with Databricks and confirm the table, filters, and units.
 4. Ask a follow-up and confirm the same Genie conversation is used.
 5. Start a new chat and confirm the agent does not request bot sign-in or MCP
@@ -168,8 +210,8 @@ entirely in [Phase 2: setup security](docs/obo/README.md).
 ## Acceptance checklist
 
 - [ ] Genie answers directly using the selected warehouse and approved tables.
-- [ ] APIM's four non-OBO operations work through the private route.
-- [ ] Foundry discovers all four tools through the key-based service connection.
+- [ ] The selected native or API-to-MCP route works through private APIM.
+- [ ] Foundry discovers the expected Genie tools using the selected connection.
 - [ ] The playground returns a grounded answer and a same-conversation follow-up.
 - [ ] No added sign-in card, OAuth consent request, or delegated user token is used.
 - [ ] Credentials are absent from instructions, screenshots, logs, and source.
@@ -180,19 +222,19 @@ entirely in [Phase 2: setup security](docs/obo/README.md).
 | Symptom | Check |
 |---|---|
 | Genie fails before APIM is involved | Warehouse state, space tables, and backend grants |
-| APIM returns `401` | Existing APIM service subscription and protected connection key |
+| APIM returns `401` | For native MCP, verify the route does not require a subscription key; for API-to-MCP, verify the protected connection key |
 | Databricks rejects the backend call | Backend managed-identity access; ask the resource owner to check setup security |
-| MCP tools are missing | Genie MCP facade exists and exposes all four operations |
+| MCP tools are missing | Native route preserves streamable HTTP MCP traffic, or the API-to-MCP facade exposes all four operations |
 | SQL tools appear instead of Genie tools | Use `databricks-genie-mcp`, not `databricks-mcp` |
 | Tool calls time out | Agent subnet routing, peering, private DNS, and private endpoints |
-| An OAuth consent link appears | You attached a phase-two OAuth connection; select the phase-one CustomKeys connection |
+| An OAuth consent link appears | You attached a phase-two OAuth connection; select no client authentication for native MCP or CustomKeys for API-to-MCP |
 | A plausible answer has no tool trace | Require Genie calls and inspect the tool output; do not accept an ungrounded response |
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| [../apim/](../apim/) | Shared non-OBO Genie API, policies, and MCP projection |
+| [../apim/](../apim/) | Native Genie MCP proxy policy, shared non-OBO Genie API, and MCP projection |
 | [../bicep/foundry-private/](../bicep/foundry-private/) | Foundry private Agent Service egress infrastructure |
 | [../terraform/foundry-private/](../terraform/foundry-private/) | Terraform alternative |
 | [docs/obo/README.md](docs/obo/README.md) | Phase-two security and Teams deployment |
