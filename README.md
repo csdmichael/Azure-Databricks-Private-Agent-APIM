@@ -54,6 +54,7 @@ the data path traverses the public internet.
 - [Choosing the native or API-to-MCP route](#choosing-the-native-or-api-to-mcp-route)
 - [The deck skill](#the-deck-skill)
 - [Observability](#observability)
+- [Performance tuning](#performance-tuning)
 - [Key design decisions](#key-design-decisions)
 - [Detailed network guide](#detailed-network-guide)
 - [Archived environment](#archived-environment)
@@ -682,6 +683,26 @@ AzureDiagnostics
 
 One demo deck run produced 16 successful calls. Your call count depends on the
 questions and polling; verify both APIM and backend response codes.
+
+---
+
+## Performance tuning
+
+For one question, where the time goes from the Copilot Studio agent through the Power
+Platform custom connector, APIM OBO policies, and the token broker to Databricks Genie and
+back. The guide covers five end-to-end prompts with step timings and Gantt timelines, the
+cross-region network path, the turn count between the agent and Genie, and ranked
+improvements. See [docs/performance-tuning/README.md](docs/performance-tuning/README.md).
+
+- The timings are a **model, not measurements**. Replace the assumed values with measured
+  values before acting on the ranking.
+- Genie processing is about half of the wall-clock time. Most of the rest is sequential LLM
+  decision turns.
+- The cross-region path (Power Platform in Canada Central, APIM in West US, Databricks in
+  West US 2) adds about 0.25 s per prompt. Confirm that the Power Platform region pair
+  matches the environment geo.
+- The OBO rate limit (30 calls per minute per user) counts polls. Each prompt makes 5 to 7
+  calls.
 
 ---
 
