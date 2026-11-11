@@ -1,0 +1,231 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.47.16.16243",
+      "templateHash": "16844373202738803985"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for the deployment script."
+      }
+    },
+    "deploymentScriptName": {
+      "type": "string",
+      "defaultValue": "foundry-agent-deploy",
+      "metadata": {
+        "description": "Deployment script resource name."
+      }
+    },
+    "deploymentIdentityResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "User-assigned managed identity resource ID used by the deployment script."
+      }
+    },
+    "projectEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Microsoft Foundry project endpoint URL."
+      }
+    },
+    "agentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Foundry prompt agent name."
+      }
+    },
+    "versionDescription": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional immutable description for the created agent version."
+      }
+    },
+    "modelDeploymentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Model deployment name used by the prompt agent."
+      }
+    },
+    "instructions": {
+      "type": "string",
+      "metadata": {
+        "description": "Prompt-agent instructions."
+      }
+    },
+    "tools": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Tool definitions for definition.tools."
+      }
+    },
+    "knowledgeSources": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Knowledge source definitions for definition.knowledge_sources."
+      }
+    },
+    "skills": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Skill references for definition.skills."
+      }
+    },
+    "enableGuardrails": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, adds definition.rai_config from raiConfig."
+      }
+    },
+    "raiConfig": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Responsible AI guardrail configuration for definition.rai_config."
+      }
+    },
+    "additionalDefinition": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Optional advanced definition properties to merge (for example temperature, top_p, response_format, metadata)."
+      }
+    },
+    "enableEvaluation": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, runs post-deploy evaluation cases and enforces evaluationMinPassRate."
+      }
+    },
+    "evaluationCases": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Evaluation cases: [{name,prompt,must_contain_any,must_not_contain_any}]."
+      }
+    },
+    "evaluationMinPassRatePercent": {
+      "type": "int",
+      "defaultValue": 100,
+      "minValue": 0,
+      "maxValue": 100,
+      "metadata": {
+        "description": "Minimum evaluation pass-rate threshold as integer percent (0-100)."
+      }
+    },
+    "evaluationFailOnError": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true, fails deployment if evaluation pass-rate is below threshold."
+      }
+    },
+    "timeout": {
+      "type": "string",
+      "defaultValue": "PT30M",
+      "metadata": {
+        "description": "Script timeout in ISO-8601 duration format."
+      }
+    },
+    "retentionInterval": {
+      "type": "string",
+      "defaultValue": "P1D",
+      "metadata": {
+        "description": "How long to keep deployment script resources after completion."
+      }
+    },
+    "cleanupPreference": {
+      "type": "string",
+      "defaultValue": "OnSuccess",
+      "allowedValues": [
+        "Always",
+        "OnSuccess",
+        "OnExpiration"
+      ],
+      "metadata": {
+        "description": "Cleanup behavior for deployment script resources."
+      }
+    },
+    "forceUpdateTag": {
+      "type": "string",
+      "defaultValue": "[utcNow('u')]",
+      "metadata": {
+        "description": "Change this value to force a rerun without changing inputs."
+      }
+    }
+  },
+  "variables": {
+    "baseDefinition": {
+      "model": "[parameters('modelDeploymentName')]",
+      "instructions": "[parameters('instructions')]",
+      "tools": "[parameters('tools')]",
+      "skills": "[parameters('skills')]",
+      "knowledge_sources": "[parameters('knowledgeSources')]"
+    },
+    "guardrailDefinition": "[if(parameters('enableGuardrails'), createObject('rai_config', parameters('raiConfig')), createObject())]",
+    "mergedDefinition": "[union(variables('baseDefinition'), variables('guardrailDefinition'), parameters('additionalDefinition'))]",
+    "agentConfig": {
+      "project_endpoint": "[parameters('projectEndpoint')]",
+      "agent_name": "[parameters('agentName')]",
+      "version_description": "[parameters('versionDescription')]",
+      "definition": "[variables('mergedDefinition')]",
+      "evaluation": {
+        "enabled": "[parameters('enableEvaluation')]",
+        "min_pass_rate_percent": "[parameters('evaluationMinPassRatePercent')]",
+        "fail_on_error": "[parameters('evaluationFailOnError')]",
+        "cases": "[parameters('evaluationCases')]"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2023-08-01",
+      "name": "[parameters('deploymentScriptName')]",
+      "location": "[parameters('location')]",
+      "kind": "AzureCLI",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', parameters('deploymentIdentityResourceId'))]": {}
+        }
+      },
+      "properties": {
+        "azCliVersion": "2.63.0",
+        "timeout": "[parameters('timeout')]",
+        "retentionInterval": "[parameters('retentionInterval')]",
+        "cleanupPreference": "[parameters('cleanupPreference')]",
+        "forceUpdateTag": "[parameters('forceUpdateTag')]",
+        "environmentVariables": [
+          {
+            "name": "AGENT_CONFIG_JSON",
+            "value": "[string(variables('agentConfig'))]"
+          }
+        ],
+        "scriptContent": "set -euo pipefail\r\npython -m pip install --quiet --disable-pip-version-check \"azure-ai-projects>=2.0.0b4,<3\" \"azure-identity>=1.25.1,<2\"\r\npython - <<'PY'\r\nimport json\r\nimport os\r\n\r\nfrom azure.ai.projects import AIProjectClient\r\nfrom azure.ai.projects.models import PromptAgentDefinition\r\nfrom azure.identity import DefaultAzureCredential\r\n\r\nconfig = json.loads(os.environ[\"AGENT_CONFIG_JSON\"])\r\ndefinition = PromptAgentDefinition(**config[\"definition\"])\r\nclient = AIProjectClient(\r\n    endpoint=config[\"project_endpoint\"],\r\n    credential=DefaultAzureCredential(),\r\n)\r\nkwargs = {}\r\nif config.get(\"version_description\"):\r\n    kwargs[\"description\"] = config[\"version_description\"]\r\nagent = client.agents.create_version(\r\n    agent_name=config[\"agent_name\"],\r\n    definition=definition,\r\n    **kwargs,\r\n)\r\n\r\nevaluation = config.get(\"evaluation\") or {}\r\nevaluation_result = None\r\nif evaluation.get(\"enabled\"):\r\n    cases = evaluation.get(\"cases\") or []\r\n    if not isinstance(cases, list) or len(cases) == 0:\r\n        raise ValueError(\"evaluation.cases must contain at least one case when evaluation is enabled.\")\r\n\r\n    if \"min_pass_rate\" in evaluation:\r\n        min_pass_rate = float(evaluation.get(\"min_pass_rate\", 1.0))\r\n    else:\r\n        min_pass_rate = float(evaluation.get(\"min_pass_rate_percent\", 100)) / 100.0\r\n    fail_on_error = bool(evaluation.get(\"fail_on_error\", True))\r\n    openai = client.get_openai_client(agent_name=agent.name)\r\n\r\n    results = []\r\n    passed = 0\r\n    for index, case in enumerate(cases, start=1):\r\n        if not isinstance(case, dict):\r\n            raise ValueError(f\"evaluation.cases[{index - 1}] must be an object.\")\r\n        prompt = (case.get(\"prompt\") or \"\").strip()\r\n        if not prompt:\r\n            raise ValueError(f\"evaluation.cases[{index - 1}].prompt must be a non-empty string.\")\r\n        case_name = (case.get(\"name\") or f\"case-{index}\").strip()\r\n        must_contain_any = case.get(\"must_contain_any\") or []\r\n        must_not_contain_any = case.get(\"must_not_contain_any\") or []\r\n        if not isinstance(must_contain_any, list) or not all(isinstance(x, str) for x in must_contain_any):\r\n            raise ValueError(f\"evaluation.cases[{index - 1}].must_contain_any must be a string array.\")\r\n        if not isinstance(must_not_contain_any, list) or not all(isinstance(x, str) for x in must_not_contain_any):\r\n            raise ValueError(f\"evaluation.cases[{index - 1}].must_not_contain_any must be a string array.\")\r\n\r\n        conversation = openai.conversations.create()\r\n        try:\r\n            response = openai.responses.create(\r\n                conversation=conversation.id,\r\n                input=prompt,\r\n            )\r\n            output_text = (response.output_text or \"\").strip()\r\n        finally:\r\n            openai.conversations.delete(conversation.id)\r\n\r\n        lower_output = output_text.lower()\r\n        has_required = True if not must_contain_any else any(token.lower() in lower_output for token in must_contain_any)\r\n        has_forbidden = any(token.lower() in lower_output for token in must_not_contain_any)\r\n        case_passed = has_required and not has_forbidden\r\n        if case_passed:\r\n            passed += 1\r\n        results.append(\r\n            {\r\n                \"name\": case_name,\r\n                \"passed\": case_passed,\r\n                \"prompt\": prompt,\r\n                \"must_contain_any\": must_contain_any,\r\n                \"must_not_contain_any\": must_not_contain_any,\r\n                \"response_preview\": output_text[:500],\r\n            }\r\n        )\r\n\r\n    total = len(results)\r\n    pass_rate = float(passed) / float(total)\r\n    evaluation_result = {\r\n        \"enabled\": True,\r\n        \"total_cases\": total,\r\n        \"passed_cases\": passed,\r\n        \"pass_rate\": pass_rate,\r\n        \"min_pass_rate\": min_pass_rate,\r\n        \"cases\": results,\r\n    }\r\n    if fail_on_error and pass_rate < min_pass_rate:\r\n        raise RuntimeError(f\"Evaluation gate failed: pass_rate={pass_rate:.2f} required>={min_pass_rate:.2f}\")\r\n\r\nresult = {\r\n    \"agent_name\": agent.name,\r\n    \"agent_version\": agent.version,\r\n    \"project_endpoint\": config[\"project_endpoint\"],\r\n    \"evaluation\": evaluation_result,\r\n}\r\nwith open(os.environ[\"AZ_SCRIPTS_OUTPUT_PATH\"], \"w\", encoding=\"utf-8\") as handle:\r\n    json.dump(result, handle)\r\nPY\r\n"
+      }
+    }
+  ],
+  "outputs": {
+    "scriptResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Resources/deploymentScripts', parameters('deploymentScriptName'))]"
+    },
+    "agentDeploymentResult": {
+      "type": "object",
+      "value": "[reference(resourceId('Microsoft.Resources/deploymentScripts', parameters('deploymentScriptName')), '2023-08-01').outputs]"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+environment_name      = "dev"
+project_endpoint      = "https://<foundry-account>.services.ai.azure.com/api/projects/<project-name>"
+agent_name            = "sales-analyst-agent"
+version_description   = "Dev deployment from Terraform playbook"
+model_deployment_name = "<model-deployment-name>"
+
+instructions = <<EOT
+You are a concise enterprise sales analyst.
+Use connected tools for factual answers.
+Cite filters and assumptions used for each answer.
+EOT
+
+tools_json = jsonencode([
+  {
+    type                  = "mcp"
+    server_label          = "databricks-genie-obo"
+    server_url            = "https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>"
+    project_connection_id = "<foundry-project-connection-name>"
+    require_approval      = "never"
+    allowed_tools         = []
+  }
+])
+
+knowledge_sources_json = jsonencode([])
+skills_json            = jsonencode([])
+additional_definition_json = jsonencode({
+  temperature = 0.2
+})
+
+guardrails_enabled = false
+rai_config_json    = jsonencode({})
+
+evaluation_enabled = true
+evaluation_min_pass_rate = 1.0
+evaluation_fail_on_error = true
+evaluation_cases_json = jsonencode([
+  {
+    name = "scope-check"
+    prompt = "What can you help me analyze?"
+    must_contain_any = ["analyze", "data", "query"]
+    must_not_contain_any = ["I cannot help", "unknown"]
+  }
+])
+
+deploy_agent = true

@@ -24,6 +24,7 @@ authorization.
 - [Setup guide](#setup-guide)
 - [Acceptance checklist](#acceptance-checklist)
 - [Troubleshooting](#troubleshooting)
+- [Foundry agent IaC playbook](docs/agent-iac-playbook/README.md)
 - [Repository layout](#repository-layout)
 - [References](#references)
 
@@ -238,6 +239,7 @@ entirely in [Phase 2: setup security](docs/obo/README.md).
 | [../bicep/foundry-private/](../bicep/foundry-private/) | Foundry private Agent Service egress infrastructure |
 | [../terraform/foundry-private/](../terraform/foundry-private/) | Terraform alternative |
 | [docs/obo/README.md](docs/obo/README.md) | Phase-two security and Teams deployment |
+| [docs/agent-iac-playbook/README.md](docs/agent-iac-playbook/README.md) | Generic Terraform + Bicep playbook for reusable Foundry agent deployment |
 | [docs/deployed-resources/README.md](docs/deployed-resources/README.md) | Demo inventory and historical evidence |
 | [agent/](agent/) | Phase-two OAuth prompt-agent publisher |
 | [teams-bot/](teams-bot/) | Phase-two Teams OAuth bridge and package builder |

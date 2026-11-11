@@ -1,0 +1,53 @@
+using './main.bicep'
+
+param location = 'westus2'
+param deploymentScriptName = 'foundry-agent-deploy-dev'
+param deploymentIdentityResourceId = '/subscriptions/<subscription-id>/resourceGroups/<identity-rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<identity-name>'
+
+param projectEndpoint = 'https://<foundry-account>.services.ai.azure.com/api/projects/<project-name>'
+param agentName = 'sales-analyst-agent'
+param versionDescription = 'Dev deployment from Bicep playbook'
+param modelDeploymentName = '<model-deployment-name>'
+
+param instructions = '''
+You are a concise enterprise sales analyst.
+Use connected tools for factual answers.
+Cite filters and assumptions used for each answer.
+'''
+
+param tools = [
+  {
+    type: 'mcp'
+    server_label: 'databricks-genie-obo'
+    server_url: 'https://<apim-name>.azure-api.net/dbx-native-genie-mcp/api/2.0/mcp/genie/<genie-space-id>'
+    project_connection_id: '<foundry-project-connection-name>'
+    require_approval: 'never'
+    allowed_tools: []
+  }
+]
+
+param knowledgeSources = []
+param skills = []
+param enableGuardrails = false
+param raiConfig = {}
+param additionalDefinition = {
+  temperature: 0.2
+}
+param enableEvaluation = true
+param evaluationMinPassRatePercent = 100
+param evaluationFailOnError = true
+param evaluationCases = [
+  {
+    name: 'scope-check'
+    prompt: 'What can you help me analyze?'
+    must_contain_any: [
+      'analyze'
+      'data'
+      'query'
+    ]
+    must_not_contain_any: [
+      'I cannot help'
+      'unknown'
+    ]
+  }
+]

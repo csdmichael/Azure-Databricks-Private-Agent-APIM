@@ -31,6 +31,7 @@ the data path traverses the public internet.
 - [How it works](#how-it-works)
 - [Phase-one setup](#phase-one-setup)
 - [Phase 2: setup security](docs/obo/README.md)
+- [Foundry agent IaC playbook](foundry/docs/agent-iac-playbook/README.md)
 - [Technologies used](#technologies-used)
 - [Portals and URLs](#portals-and-urls)
 - [Demo deployed resources](docs/deployed-resources/README.md)
@@ -250,6 +251,7 @@ environment's geo. The demo address plan is in the
 | [databricks](databricks) | Sample dataset SQL and exploration notebook |
 | [scripts](scripts) | Deployment, data-load, connector, and test helpers |
 | [docs/setup-guide.md](docs/setup-guide.md) | Step-by-step guide for an existing Databricks + APIM estate |
+| [foundry/docs/agent-iac-playbook/README.md](foundry/docs/agent-iac-playbook/README.md) | Generic Terraform + Bicep playbook for Foundry agent deployment and promotion |
 | [old mcaps](old%20mcaps) | Archived MCAPS proof of concept and the Microsoft Foundry agents |
 
 The SQL under [databricks/sql](databricks/sql) deliberately keeps the original catalog
