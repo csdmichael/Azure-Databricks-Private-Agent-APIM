@@ -1080,6 +1080,9 @@ gh workflow run deploy-foundry-teams-agent.yml --ref '<customer-deployment-branc
 gh run list --workflow deploy-foundry-teams-agent.yml --limit 5
 ```
 
+Set `deploy_infrastructure=false` when you only need to publish a new Foundry
+agent version and do not want to update or redeploy the Teams bridge resources.
+
 The `publish-foundry-agent` job targets `[self-hosted, Windows, foundry-private]`;
 provide a VNet-connected runner with working private DNS so publication works
 after public Foundry access is disabled. Override demo defaults in the workflow

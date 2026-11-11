@@ -123,6 +123,7 @@ jobs:
           }
 
       - name: Deploy Teams bridge
+        if: ${{ inputs.deploy_infrastructure }}
         run: >-
           az webapp deploy
           --resource-group "$AZURE_RESOURCE_GROUP"
@@ -133,6 +134,7 @@ jobs:
           --restart true
 
       - name: Verify bot health
+        if: ${{ inputs.deploy_infrastructure }}
         run: |
           for attempt in {1..20}; do
             if curl --fail --silent "https://${BOT_APP_NAME}.azurewebsites.net/health"; then
