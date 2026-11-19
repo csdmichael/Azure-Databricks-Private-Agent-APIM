@@ -32,6 +32,7 @@ the data path traverses the public internet.
 - [Phase-one setup](#phase-one-setup)
 - [Phase 2: setup security](docs/obo/README.md)
 - [Foundry agent IaC playbook](foundry/docs/agent-iac-playbook/README.md)
+- [Cowork: potential architecture options](docs/CoWork/README.md)
 - [Technologies used](#technologies-used)
 - [Portals and URLs](#portals-and-urls)
 - [Demo deployed resources](docs/deployed-resources/README.md)
@@ -70,6 +71,11 @@ the data path traverses the public internet.
 ![High-level architecture: Microsoft 365 users access a Copilot Studio agent in a VNet-enabled Power Platform managed environment, which reaches private Azure API Management and Azure Databricks services](docs/HL%20Architecture.png)
 
 ![End-to-end architecture: Microsoft 365 Copilot and Teams, a Copilot Studio agent on the GitHub Copilot harness, a VNet-injected Power Platform managed environment, API Management with a private gateway endpoint, and a VNet-injected Azure Databricks workspace with Unity Catalog and Genie](docs/azure-databricks-private-agent-apim-architecture.png)
+
+For Cowork connectivity, see [potential architecture options](docs/CoWork/README.md):
+Application Gateway WAF or an Azure AI Gateway front door in front of private APIM.
+These are separate, unvalidated proposals with a controlled public entry point;
+they do not change the fully private Copilot Studio path documented here.
 
 ---
 
